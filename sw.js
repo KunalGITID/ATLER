@@ -1,5 +1,5 @@
 // Atler Service Worker — Cache-first for static assets, network-first for Supabase API
-const CACHE_NAME = 'atler-v2';
+const CACHE_NAME = 'atler-v4';
 
 // Assets to pre-cache on install (shell of the app)
 const STATIC_ASSETS = [
