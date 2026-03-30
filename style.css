@@ -45,11 +45,17 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ── App shell: full-height viewport, topbar fixed, content scrolls below it ── */
+html {
+  height: 100%;
+}
+
 body {
   background-color: var(--bg-color);
   color: var(--on-surface);
   font-family: var(--font-body);
   line-height: 1.5;
+  min-height: 100%;
   padding-bottom: 120px;
 }
 
@@ -75,12 +81,12 @@ h1, h2, h3, h4 {
   color: var(--on-surface-variant);
 }
 
+/* Container sits below the fixed topbar via padding-top */
 .container {
   max-width: 600px;
   margin: 0 auto;
-  padding: var(--spacing-6);
+  padding: 72px var(--spacing-6) 0;
   position: relative;
-  overflow-x: hidden;
 }
 
 .flex { display: flex; }
@@ -92,14 +98,15 @@ h1, h2, h3, h4 {
 .gap-2 { gap: var(--spacing-2); }
 .gap-4 { gap: var(--spacing-4); }
 
-/* Top App Bar */
+/* Fixed topbar — always visible at the top */
 .topbar {
   position: fixed;
   top: 0; left: 0; right: 0;
+  height: 64px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--spacing-4) var(--spacing-6);
+  padding: 0 var(--spacing-6);
   background: var(--glass-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -159,7 +166,7 @@ section {
 
 .hero-value {
   position: relative;
-  margin-top: 80px;
+  margin-top: 16px;
 }
 
 .currency {
@@ -646,7 +653,7 @@ section {
 
 /* ─── Analytics Segmented Toggle ─── */
 .analytics-toggle-wrap {
-  padding-top: 80px;
+  padding-top: 16px;
   padding-bottom: 4px;
 }
 
