@@ -4,12 +4,12 @@ const CACHE_NAME = 'atler-v4';
 // Assets to pre-cache on install (shell of the app)
 const STATIC_ASSETS = [
   '/index.html',
-  '/style.css',
-  '/script.js',
+  '/style.css?v=7',
+  '/script.js?v=9',
   '/manifest.json',
-  // Supabase client — biggest perf offender, cache it
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js',
 ];
+
 
 // ── Install: pre-cache the app shell ──────────────────────────────
 self.addEventListener('install', event => {
