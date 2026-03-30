@@ -461,6 +461,7 @@ function renderApp() {
     avatarInput.value = profile.avatar;
 
     let totalMonthly = 0;
+    subscriptions.forEach(sub => { totalMonthly += getMonthlyCost(sub); });
 
     const portfolioList  = document.getElementById('portfolio-list');
     const upcomingScroll = document.getElementById('upcoming-scroll');
@@ -489,10 +490,12 @@ function renderApp() {
     const mixedItems = [...subItems, ...expItems]
         .sort((a, b) => b._sortDate - a._sortDate);
 
-    mixedItems.forEach(entry => {
+    // Show only the 5 most recent items in The Money Pit
+    const visibleItems = mixedItems.slice(0, 5);
+
+    visibleItems.forEach(entry => {
         if (entry._type === 'sub') {
             const sub = entry.data;
-            totalMonthly += getMonthlyCost(sub);
             const color = colorFromName(sub.name);
 
             const item = document.createElement('div');
@@ -508,26 +511,12 @@ function renderApp() {
                         <div class="list-subtitle">${formatCycle(sub.cycle)}</div>
                     </div>
                 </div>
-                <div class="text-right" style="display: flex; align-items: center; justify-content: flex-end; gap: 12px;">
-                    <div style="text-align: right;">
-                        <div class="list-price">₹${parseFloat(sub.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-                        <div class="list-date">${formatDate(sub.dateAdded)}</div>
-                    </div>
-                    <button class="icon-btn remove-btn" data-id="${sub.id}" style="color: var(--error); padding: 4px; border-radius: 50%; background: transparent; border: none; cursor: pointer;">
-                        <span class="material-symbols-outlined" style="font-size: 20px;">block</span>
-                    </button>
+                <div class="text-right">
+                    <div class="list-price">₹${parseFloat(sub.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                    <div class="list-date">${formatDate(sub.dateAdded)}</div>
                 </div>
             `;
-            item.addEventListener('click', e => {
-                if (e.target.closest('.remove-btn')) {
-                    e.stopPropagation();
-                    subscriptions = subscriptions.filter(s => s.id !== sub.id);
-                    saveState();
-                    renderApp();
-                    return;
-                }
-                viewDetails(sub.id);
-            });
+            item.addEventListener('click', () => viewDetails(sub.id));
             portfolioList.appendChild(item);
 
             // Upcoming mini card (subscriptions only)
@@ -549,7 +538,7 @@ function renderApp() {
                     <span class="material-symbols-outlined">payments</span>
                 </div>
                 <h3>${sub.name}</h3>
-                <p style="font-size: 0.85rem; color: ${textColor}; font-weight: 600;">${renewalText}</p>
+                <p style="font-size: 0.85rem; color: ${textColor}; font-weight: 600; white-space: nowrap;">${renewalText}</p>
             `;
             miniCard.addEventListener('click', () => viewDetails(sub.id));
             upcomingScroll.appendChild(miniCard);
@@ -578,6 +567,23 @@ function renderApp() {
         }
     });
 
+    // View all link — only shown when there are more than 5 items
+    if (mixedItems.length > 5) {
+        const viewAll = document.createElement('div');
+        viewAll.style.cssText = 'text-align: center; padding: 12px 0 4px;';
+        viewAll.innerHTML = `<a href="#" style="color: var(--primary); font-size: 0.85rem; font-weight: 600; text-decoration: none;">View all</a>`;
+        viewAll.querySelector('a').addEventListener('click', e => {
+            e.preventDefault();
+            analyticsView = 'expenses';
+            switchPage('analytics-page');
+            // Sync the toggle pill state
+            document.querySelectorAll('.seg-pill').forEach(p => {
+                p.classList.toggle('active', p.getAttribute('data-view') === 'expenses');
+            });
+        });
+        portfolioList.appendChild(viewAll);
+    }
+
     // Dashboard hero: subscriptions + this month's one-time expenses
     const now = new Date();
     const thisMonthExpenses = expenses
@@ -591,14 +597,6 @@ function renderApp() {
     // Analytics subscriptions view: monthly subscriptions only
     const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
     document.getElementById('ytd-spend').textContent = totalMonthly.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-    // Split line
-    const splitEl = document.getElementById('ytd-split');
-    if (splitEl) {
-        const subYearly = (totalMonthly * 12).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        const expTotal  = totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        splitEl.textContent = `Subscriptions ₹${subYearly} · One-time ₹${expTotal}`;
-    }
 
     renderAnalyticsView();
 }
