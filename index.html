@@ -1,33 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Atler</title>
 
-    <!-- PWA Manifest -->
+    <!-- PWA Manifest & iOS Support -->
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#0e0e0e">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Atler">
 
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@700;800;900&display=swap"
-        rel="stylesheet">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
 
-    <!-- Theme preload (must run before CSS paint) -->
+    <!-- Theme preload (must run before CSS paint to prevent flash) -->
     <script>
     (function () {
       const saved = localStorage.getItem('atler_theme');
       if (!saved) return;
-
       const themes = {
         default:  { primary:'#c0c1ff', primaryContainer:'#4b4dd8', primaryGlow:'rgba(192,193,255,0.4)', secondary:'#4edea3', secondaryGlow:'rgba(78,222,163,0.2)' },
         midnight: { primary:'#4fc3f7', primaryContainer:'#0d47a1', primaryGlow:'rgba(79,195,247,0.4)',  secondary:'#80deea', secondaryGlow:'rgba(128,222,234,0.2)' },
@@ -35,18 +30,14 @@
         forest:   { primary:'#81c784', primaryContainer:'#1b5e20', primaryGlow:'rgba(129,199,132,0.4)', secondary:'#aed581', secondaryGlow:'rgba(174,213,129,0.2)' },
         amber:    { primary:'#ffcc02', primaryContainer:'#e65100', primaryGlow:'rgba(255,204,2,0.4)',   secondary:'#ffb300', secondaryGlow:'rgba(255,179,0,0.2)' }
       };
-
       const t = themes[saved] || themes.default;
       const r = document.documentElement.style;
-      r.setProperty('--primary', t.primary);
-      r.setProperty('--primary-container', t.primaryContainer);
-      r.setProperty('--primary-glow', t.primaryGlow);
-      r.setProperty('--secondary', t.secondary);
-      r.setProperty('--secondary-glow', t.secondaryGlow);
+      ["primary","primary-container","primary-glow","secondary","secondary-glow"].forEach(k => {
+        const val = t[k.replace(/-([a-z])/g, g => g[1].toUpperCase())];
+        if(val) r.setProperty('--' + k, val);
+      });
     })();
     </script>
-
-  
 
     <link rel="stylesheet" href="./style.css?v=11">
 </head>
