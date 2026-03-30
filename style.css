@@ -766,24 +766,38 @@ section {
 }
 
 /* ─── Calendar Page ─── */
-.cal-header {
+/* ── Calendar ── */
+#calendar-page {
+  padding: 0;
+}
+
+.cal-card {
+  background: var(--surface-low);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.cal-modal-header {
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
-  margin-top: 8px;
+  padding: 16px 16px 12px;
 }
 
 .cal-month-title {
   font-family: var(--font-headline);
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   font-weight: 800;
   color: var(--on-surface);
   margin: 0;
+  text-align: center;
+  flex: 1;
 }
 
 .cal-nav-btn {
-  background: var(--surface-low);
+  background: var(--surface);
   border: none;
   color: var(--on-surface-variant);
   cursor: pointer;
@@ -794,25 +808,27 @@ section {
   align-items: center;
   justify-content: center;
   transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
 }
 
 .cal-nav-btn:hover {
-  background: var(--surface);
+  background: var(--surface-high);
   color: var(--primary);
 }
 
 .cal-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  margin-bottom: 6px;
+  padding: 0 12px 6px;
+  border-bottom: 1px solid var(--surface);
 }
 
 .cal-weekdays span {
   text-align: center;
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: var(--on-surface-variant);
   padding: 4px 0;
 }
@@ -820,11 +836,12 @@ section {
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  gap: 1px;
+  padding: 8px 12px 12px;
 }
 
 .cal-cell {
-  min-height: 52px;
+  min-height: 56px;
   border-radius: var(--radius-sm);
   display: flex;
   flex-direction: column;
@@ -840,7 +857,7 @@ section {
 }
 
 .cal-cell.has-events:hover {
-  background: var(--surface-low);
+  background: var(--surface);
 }
 
 .cal-cell.today .cal-date {
@@ -856,7 +873,7 @@ section {
 }
 
 .cal-cell.selected {
-  background: var(--surface-low);
+  background: var(--surface);
 }
 
 .cal-cell.other-month .cal-date {
@@ -864,7 +881,7 @@ section {
 }
 
 .cal-date {
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   font-weight: 600;
   color: var(--on-surface);
   width: 28px;
@@ -891,9 +908,9 @@ section {
   flex-shrink: 0;
 }
 
-/* Detail panel below calendar */
+/* Detail panel */
 .cal-detail {
-  margin-top: 16px;
+  margin-top: 12px;
   background: var(--surface-low);
   border-radius: var(--radius-lg);
   padding: 16px;
