@@ -1197,30 +1197,36 @@ async function withTimeout(promise, ms = 8000) {
     const loading = document.getElementById('app-loading');
     const authScreen = document.getElementById('auth-screen');
 
+    let session = null;
+
     try {
-        const { data: { session } } = await withTimeout(sb.auth.getSession(), 8000);
+        // try a few times before deciding user is logged out
+        for (let i = 0; i < 3; i++) {
+            const res = await sb.auth.getSession();
+            session = res?.data?.session || null;
+            if (session) break;
+            await new Promise(r => setTimeout(r, 500));
+        }
 
         if (session?.user) {
             currentUser = session.user;
             authScreen.classList.add('hidden');
 
-            try {
-                await withTimeout(loadAllData(), 10000);
-            } catch (_) {
-                // allow rendering even if network/data load fails
-            }
-
+            try { await loadAllData(); } catch (_) {}
             await renderApp();
             renderProfilePage();
         } else {
             authScreen.classList.remove('hidden');
         }
     } catch (_) {
+        // important: don't force logout UI on transient iOS startup issue
+        // keep loading briefly then show auth as fallback
         authScreen.classList.remove('hidden');
     } finally {
         loading.classList.add('hidden');
     }
 })();
+
 
 // AUTH STATE CHANGES
 sb.auth.onAuthStateChange(async (event, session) => {
