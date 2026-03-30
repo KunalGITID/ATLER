@@ -1000,6 +1000,16 @@ document.getElementById('calendar-link').addEventListener('click', e => { e.prev
 // ═══════════════════════════════════════════
 // APP INIT — AUTH STATE LISTENER
 // ═══════════════════════════════════════════
+// Fallback loader timeout
+setTimeout(() => {
+    const loading = document.getElementById('app-loading');
+    const authScreen = document.getElementById('auth-screen');
+    if (!loading.classList.contains('hidden')) {
+        loading.classList.add('hidden');
+        authScreen.classList.remove('hidden');
+    }
+}, 3000);
+
 sb.auth.onAuthStateChange(async (event, session) => {
     const loading  = document.getElementById('app-loading');
     const authScreen = document.getElementById('auth-screen');
