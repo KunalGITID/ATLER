@@ -95,7 +95,7 @@ h1, h2, h3, h4 {
 
 /* Top App Bar */
 .topbar {
-  position: sticky;
+  position: fixed;
   top: 0; left: 0; right: 0;
   display: flex;
   justify-content: space-between;
@@ -647,7 +647,7 @@ section {
 
 /* ─── Analytics Segmented Toggle ─── */
 .analytics-toggle-wrap {
-  padding-top: 80px; /* clears fixed topbar */
+  padding-top: 80px;
   padding-bottom: 4px;
 }
 
