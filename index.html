@@ -8,33 +8,70 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@700;800;900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=5">
+    <style>
+        #auth-screen {
+            position: fixed; inset: 0; background: var(--bg-color);
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; z-index: 9999; padding: 24px;
+        }
+        #auth-screen.hidden { display: none; }
+        .auth-logo { font-family: var(--font-headline); font-size: 2.5rem; font-weight: 900; color: var(--primary); letter-spacing: 0.05em; margin-bottom: 8px; }
+        .auth-tagline { font-size: 0.85rem; color: var(--on-surface-variant); margin-bottom: 48px; text-align: center; }
+        .auth-card { width: 100%; max-width: 400px; background: var(--surface-low); border-radius: var(--radius-lg); padding: 32px 28px; border: 1px solid var(--glass-border); }
+        .auth-tabs { display: flex; background: var(--surface); border-radius: var(--radius-full); padding: 4px; margin-bottom: 28px; gap: 2px; }
+        .auth-tab { flex: 1; padding: 8px 0; border: none; border-radius: var(--radius-full); background: transparent; color: var(--on-surface-variant); font-family: var(--font-headline); font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+        .auth-tab.active { background: var(--surface-high); color: var(--primary); }
+        .auth-input { width: 100%; background: var(--surface); border: 1px solid var(--glass-border); color: var(--on-surface); padding: 12px 16px; border-radius: var(--radius-md); font-size: 1rem; font-family: var(--font-body); margin-bottom: 14px; outline: none; transition: border-color 0.2s; }
+        .auth-input:focus { border-color: var(--primary); }
+        .auth-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, var(--primary-container), var(--primary)); color: #000; border: none; border-radius: var(--radius-full); font-size: 1rem; font-weight: 800; cursor: pointer; margin-top: 6px; font-family: var(--font-headline); transition: opacity 0.2s; }
+        .auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .auth-error { color: var(--error); font-size: 0.8rem; margin-top: 10px; text-align: center; min-height: 20px; }
+        #app-loading { position: fixed; inset: 0; background: var(--bg-color); display: flex; align-items: center; justify-content: center; z-index: 9998; flex-direction: column; gap: 16px; }
+        #app-loading.hidden { display: none; }
+        .spinner { width: 36px; height: 36px; border: 3px solid var(--surface-high); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { font-size: 0.85rem; color: var(--on-surface-variant); font-family: var(--font-headline); }
+    </style>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════
-     1. TOPBAR
-════════════════════════════════════════════ -->
+<div id="app-loading">
+    <div class="spinner"></div>
+    <span class="loading-text">Loading Atler...</span>
+</div>
+
+<div id="auth-screen" class="hidden">
+    <div class="auth-logo">ATŁ​ER</div>
+    <p class="auth-tagline">Your personal subscription tracker</p>
+    <div class="auth-card">
+        <div class="auth-tabs">
+            <button class="auth-tab active" id="tab-login">Sign In</button>
+            <button class="auth-tab" id="tab-signup">Sign Up</button>
+        </div>
+        <input type="email" class="auth-input" id="auth-email" placeholder="Email address" autocomplete="email">
+        <input type="password" class="auth-input" id="auth-password" placeholder="Password" autocomplete="current-password">
+        <div id="auth-name-group" style="display:none;">
+            <input type="text" class="auth-input" id="auth-name" placeholder="Your name" autocomplete="name">
+        </div>
+        <button class="auth-btn" id="auth-submit-btn">Sign In</button>
+        <div class="auth-error" id="auth-error"></div>
+    </div>
+</div>
+
 <header class="topbar">
     <div class="brand">
         <div class="avatar">
-            <img id="user-avatar-img"
-                 src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150"
-                 alt="User Profile">
+            <img id="user-avatar-img" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150" alt="User Profile">
         </div>
         <span id="user-display-name">Atler</span>
     </div>
     <span style="font-family:var(--font-headline);font-size:1.1rem;font-weight:900;color:var(--primary);letter-spacing:0.05em;">ATŁ​ER</span>
 </header>
 
-<!-- ═══════════════════════════════════════════
-     2. CONTAINER — page <main> tags ONLY
-════════════════════════════════════════════ -->
 <div class="container">
 
-    <!-- PAGE 1: Dashboard -->
     <main id="dashboard-page" class="page active">
-
         <section class="hero-value">
             <div class="bg-glow"></div>
             <div class="label">Monthly Expenditure</div>
@@ -47,40 +84,30 @@
                 <span>Tracking active subs</span>
             </div>
         </section>
-
         <section>
             <div class="section-header">
                 <h2>Upcoming Renewals</h2>
                 <a href="#" class="view-all" id="calendar-link">Calendar</a>
             </div>
             <div class="horizontal-scroll" id="upcoming-scroll">
-                <div style="padding:10px 20px;color:var(--on-surface-variant);font-size:0.8rem;">
-                    Add a subscription to see renewals.
-                </div>
+                <div style="padding:10px 20px;color:var(--on-surface-variant);font-size:0.8rem;">Add a subscription to see renewals.</div>
             </div>
         </section>
-
         <section>
             <h2>The Money Pit</h2>
             <div id="portfolio-list"></div>
         </section>
-
         <section class="insights-card" id="insights-card">
             <div class="label" style="margin-bottom:10px;position:relative;z-index:2;">Smart Insights</div>
             <div id="insights-content"></div>
         </section>
-
     </main>
 
-    <!-- PAGE 2: Subscription Details -->
     <main id="details-page" class="page">
-
         <section class="hero-value" style="margin-top:40px;">
             <div class="flex flex-col items-center">
                 <div class="list-icon-wrapper" style="width:80px;height:80px;margin-bottom:20px;">
-                    <img id="detail-img"
-                         src="https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=200"
-                         alt="Service">
+                    <img id="detail-img" src="https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=200" alt="Service">
                 </div>
                 <h2 id="detail-name">Service Name</h2>
                 <p class="label" id="detail-cycle">Cycle</p>
@@ -91,7 +118,6 @@
                 </div>
             </div>
         </section>
-
         <section>
             <h2>Billing Cycle</h2>
             <div class="list-item" style="cursor:default;">
@@ -108,25 +134,17 @@
                     <div class="list-date" style="color:var(--secondary);font-size:0.9rem;">Active</div>
                 </div>
             </div>
-            <button class="btn-primary" id="delete-sub-btn"
-                    style="background:var(--error-bg);color:var(--error);box-shadow:none;border:1px solid var(--error);margin-top:20px;">
-                Delete Subscription
-            </button>
+            <button class="btn-primary" id="delete-sub-btn" style="background:var(--error-bg);color:var(--error);box-shadow:none;border:1px solid var(--error);margin-top:20px;">Delete Subscription</button>
         </section>
-
     </main>
 
-    <!-- PAGE 3: Analytics -->
     <main id="analytics-page" class="page">
-
         <div class="analytics-toggle-wrap">
-            <div class="seg-toggle" id="analytics-seg-toggle">
+            <div class="seg-toggle">
                 <button class="seg-pill active" data-view="subscriptions">Subscriptions</button>
                 <button class="seg-pill" data-view="expenses">Expenses</button>
             </div>
         </div>
-
-        <!-- Subscriptions sub-view -->
         <div id="analytics-subs-view">
             <section class="hero-value" style="margin-top:20px;">
                 <div class="label">Monthly Subscriptions</div>
@@ -135,13 +153,9 @@
                     <h1 class="amount" id="ytd-spend">0.00</h1>
                 </div>
             </section>
-
             <section id="category-groups-container"></section>
-
-            <section id="manage-categories-section"
-                     style="margin-top:40px;padding-top:20px;border-top:1px solid var(--surface-low);">
-                <button class="btn" id="toggle-manage-categories-btn"
-                        style="display:flex;align-items:center;justify-content:center;gap:8px;background:transparent;color:var(--on-surface-variant);border:1px solid var(--surface-low);box-shadow:none;font-size:0.9rem;padding:8px 16px;width:100%;">
+            <section id="manage-categories-section" style="margin-top:40px;padding-top:20px;border-top:1px solid var(--surface-low);">
+                <button class="btn" id="toggle-manage-categories-btn" style="display:flex;align-items:center;justify-content:center;gap:8px;background:transparent;color:var(--on-surface-variant);border:1px solid var(--surface-low);box-shadow:none;font-size:0.9rem;padding:8px 16px;width:100%;">
                     <span class="material-symbols-outlined" style="font-size:18px;">tune</span>
                     Manage Categories
                 </button>
@@ -151,82 +165,51 @@
                     <h3 style="font-size:0.9rem;margin-bottom:10px;color:var(--on-surface-variant);">Recommended</h3>
                     <div id="preset-category-chips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;"></div>
                     <div class="input-group" style="display:flex;gap:8px;align-items:stretch;margin-bottom:0;">
-                        <input type="text" id="add-category-input"
-                               placeholder="Custom category..." style="flex:1;margin-bottom:0;">
+                        <input type="text" id="add-category-input" placeholder="Custom category..." style="flex:1;margin-bottom:0;">
                         <button class="btn" id="add-category-btn" style="white-space:nowrap;margin:0;">Add</button>
                     </div>
                 </div>
             </section>
         </div>
-
-        <!-- Expenses sub-view -->
         <div id="analytics-expenses-view" style="display:none;">
             <div class="expenses-month-total">
                 <div class="label" style="margin-bottom:6px;">Total Expenses</div>
                 <div class="expenses-total-amount">
                     <span class="currency" style="font-size:1.4rem;">₹</span>
-                    <span id="expenses-month-total-val"
-                          style="font-size:2.6rem;font-family:var(--font-headline);font-weight:800;letter-spacing:-0.04em;">
-                        0.00
-                    </span>
+                    <span id="expenses-month-total-val" style="font-size:2.6rem;font-family:var(--font-headline);font-weight:800;letter-spacing:-0.04em;">0.00</span>
                 </div>
             </div>
             <div id="expenses-list-container"></div>
         </div>
-
     </main>
 
-    <!-- PAGE 4: Calendar -->
     <main id="calendar-page" class="page">
-
         <div style="margin-bottom:12px;">
             <a href="#" id="cal-back-btn" style="color:var(--on-surface-variant);font-size:0.85rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">
                 <span class="material-symbols-outlined" style="font-size:16px;">arrow_back</span>
                 Back
             </a>
         </div>
-
         <div class="cal-card">
             <div class="cal-modal-header">
-                <button class="cal-nav-btn" id="cal-prev">
-                    <span class="material-symbols-outlined">chevron_left</span>
-                </button>
+                <button class="cal-nav-btn" id="cal-prev"><span class="material-symbols-outlined">chevron_left</span></button>
                 <h2 id="cal-month-label" class="cal-month-title"></h2>
-                <button class="cal-nav-btn" id="cal-next">
-                    <span class="material-symbols-outlined">chevron_right</span>
-                </button>
+                <button class="cal-nav-btn" id="cal-next"><span class="material-symbols-outlined">chevron_right</span></button>
             </div>
             <div class="cal-weekdays">
-                <span>Sun</span><span>Mon</span><span>Tue</span>
-                <span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
             </div>
             <div class="cal-grid" id="cal-grid"></div>
         </div>
-
         <div class="cal-detail" id="cal-detail" style="display:none;"></div>
-
     </main>
 
-    <!-- PAGE 5: Profile -->
     <main id="profile-page" class="page">
-
-        <!-- Avatar upload -->
         <section class="hero-value" style="text-align:center;">
             <div style="position:relative;display:inline-block;margin-bottom:20px;">
-                <div id="profile-avatar-circle" style="
-                    width:100px;height:100px;border-radius:50%;
-                    overflow:hidden;border:3px solid var(--primary);
-                    cursor:pointer;position:relative;margin:0 auto;
-                    background:var(--surface-high);">
-                    <img id="profile-avatar-preview"
-                         src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150"
-                         alt="Avatar"
-                         style="width:100%;height:100%;object-fit:cover;">
-                    <div style="
-                        position:absolute;bottom:0;left:0;right:0;
-                        background:rgba(0,0,0,0.5);
-                        display:flex;align-items:center;justify-content:center;
-                        height:32px;">
+                <div id="profile-avatar-circle" style="width:100px;height:100px;border-radius:50%;overflow:hidden;border:3px solid var(--primary);cursor:pointer;position:relative;margin:0 auto;background:var(--surface-high);">
+                    <img id="profile-avatar-preview" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150" alt="Avatar" style="width:100%;height:100%;object-fit:cover;">
+                    <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;height:32px;">
                         <span class="material-symbols-outlined" style="font-size:18px;color:#fff;">photo_camera</span>
                     </div>
                 </div>
@@ -235,104 +218,39 @@
             <h2 id="profile-display-name-hero" style="margin-bottom:4px;">Your Name</h2>
             <p class="label" style="text-transform:none;letter-spacing:normal;" id="profile-stats-line">0 subscriptions · ₹0/mo</p>
         </section>
-
-        <!-- Display Name -->
         <section>
             <div class="label" style="margin-bottom:12px;">Display Name</div>
             <div style="display:flex;gap:10px;align-items:center;">
-                <input type="text" id="profile-name"
-                       placeholder="Your Name"
-                       style="flex:1;background:var(--surface-low);border:1px solid var(--glass-border);
-                              color:var(--on-surface);padding:12px 16px;border-radius:var(--radius-md);
-                              font-size:1rem;font-family:var(--font-body);outline:none;">
-                <button id="profile-name-save"
-                        style="background:var(--primary-container);color:var(--primary);
-                               border:none;padding:12px 20px;border-radius:var(--radius-md);
-                               font-weight:700;font-size:0.85rem;cursor:pointer;white-space:nowrap;">
-                    Save
-                </button>
+                <input type="text" id="profile-name" placeholder="Your Name" style="flex:1;background:var(--surface-low);border:1px solid var(--glass-border);color:var(--on-surface);padding:12px 16px;border-radius:var(--radius-md);font-size:1rem;font-family:var(--font-body);outline:none;">
+                <button id="profile-name-save" style="background:var(--primary-container);color:var(--primary);border:none;padding:12px 20px;border-radius:var(--radius-md);font-weight:700;font-size:0.85rem;cursor:pointer;white-space:nowrap;">Save</button>
             </div>
         </section>
-
-        <!-- Theme -->
         <section>
             <div class="label" style="margin-bottom:16px;">Theme</div>
             <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
-
-                <div class="theme-chip" data-theme="default" style="text-align:center;cursor:pointer;">
-                    <div style="width:44px;height:44px;border-radius:12px;
-                                background:linear-gradient(135deg,#4b4dd8,#c0c1ff);
-                                margin:0 auto 6px;border:2px solid var(--primary);"></div>
-                    <span style="font-size:0.7rem;color:var(--on-surface-variant);">Default</span>
-                </div>
-
-                <div class="theme-chip" data-theme="midnight" style="text-align:center;cursor:pointer;">
-                    <div style="width:44px;height:44px;border-radius:12px;
-                                background:linear-gradient(135deg,#0d47a1,#4fc3f7);
-                                margin:0 auto 6px;border:2px solid transparent;"></div>
-                    <span style="font-size:0.7rem;color:var(--on-surface-variant);">Midnight</span>
-                </div>
-
-                <div class="theme-chip" data-theme="rose" style="text-align:center;cursor:pointer;">
-                    <div style="width:44px;height:44px;border-radius:12px;
-                                background:linear-gradient(135deg,#880e4f,#f48fb1);
-                                margin:0 auto 6px;border:2px solid transparent;"></div>
-                    <span style="font-size:0.7rem;color:var(--on-surface-variant);">Rose</span>
-                </div>
-
-                <div class="theme-chip" data-theme="forest" style="text-align:center;cursor:pointer;">
-                    <div style="width:44px;height:44px;border-radius:12px;
-                                background:linear-gradient(135deg,#1b5e20,#81c784);
-                                margin:0 auto 6px;border:2px solid transparent;"></div>
-                    <span style="font-size:0.7rem;color:var(--on-surface-variant);">Forest</span>
-                </div>
-
-                <div class="theme-chip" data-theme="amber" style="text-align:center;cursor:pointer;">
-                    <div style="width:44px;height:44px;border-radius:12px;
-                                background:linear-gradient(135deg,#e65100,#ffcc02);
-                                margin:0 auto 6px;border:2px solid transparent;"></div>
-                    <span style="font-size:0.7rem;color:var(--on-surface-variant);">Amber</span>
-                </div>
-
+                <div class="theme-chip" data-theme="default" style="text-align:center;cursor:pointer;"><div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#4b4dd8,#c0c1ff);margin:0 auto 6px;border:2px solid var(--primary);"></div><span style="font-size:0.7rem;color:var(--on-surface-variant);">Default</span></div>
+                <div class="theme-chip" data-theme="midnight" style="text-align:center;cursor:pointer;"><div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0d47a1,#4fc3f7);margin:0 auto 6px;border:2px solid transparent;"></div><span style="font-size:0.7rem;color:var(--on-surface-variant);">Midnight</span></div>
+                <div class="theme-chip" data-theme="rose" style="text-align:center;cursor:pointer;"><div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#880e4f,#f48fb1);margin:0 auto 6px;border:2px solid transparent;"></div><span style="font-size:0.7rem;color:var(--on-surface-variant);">Rose</span></div>
+                <div class="theme-chip" data-theme="forest" style="text-align:center;cursor:pointer;"><div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1b5e20,#81c784);margin:0 auto 6px;border:2px solid transparent;"></div><span style="font-size:0.7rem;color:var(--on-surface-variant);">Forest</span></div>
+                <div class="theme-chip" data-theme="amber" style="text-align:center;cursor:pointer;"><div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#e65100,#ffcc02);margin:0 auto 6px;border:2px solid transparent;"></div><span style="font-size:0.7rem;color:var(--on-surface-variant);">Amber</span></div>
             </div>
         </section>
-
-        <!-- Data Management -->
         <section>
             <div class="label" style="margin-bottom:16px;">Data Management</div>
             <div style="display:flex;flex-direction:column;gap:12px;">
-                <button id="export-data-btn"
-                        style="display:flex;align-items:center;gap:10px;
-                               background:var(--surface-low);border:1px solid var(--glass-border);
-                               color:var(--on-surface);padding:14px 16px;border-radius:var(--radius-md);
-                               font-size:0.95rem;font-family:var(--font-body);cursor:pointer;text-align:left;width:100%;">
-                    <span class="material-symbols-outlined" style="color:var(--secondary);">download</span>
-                    Export all data as JSON
-                </button>
-                <button id="clear-data-btn"
-                        style="display:flex;align-items:center;gap:10px;
-                               background:var(--error-bg);border:1px solid var(--error);
-                               color:var(--error);padding:14px 16px;border-radius:var(--radius-md);
-                               font-size:0.95rem;font-family:var(--font-body);cursor:pointer;text-align:left;width:100%;">
-                    <span class="material-symbols-outlined">delete_forever</span>
-                    Clear all data
-                </button>
+                <button id="export-data-btn" style="display:flex;align-items:center;gap:10px;background:var(--surface-low);border:1px solid var(--glass-border);color:var(--on-surface);padding:14px 16px;border-radius:var(--radius-md);font-size:0.95rem;font-family:var(--font-body);cursor:pointer;text-align:left;width:100%;"><span class="material-symbols-outlined" style="color:var(--secondary);">download</span>Export all data as JSON</button>
+                <button id="clear-data-btn" style="display:flex;align-items:center;gap:10px;background:var(--error-bg);border:1px solid var(--error);color:var(--error);padding:14px 16px;border-radius:var(--radius-md);font-size:0.95rem;font-family:var(--font-body);cursor:pointer;text-align:left;width:100%;"><span class="material-symbols-outlined">delete_forever</span>Clear all data</button>
+                <button id="signout-btn" style="display:flex;align-items:center;gap:10px;background:transparent;border:1px solid var(--surface-high);color:var(--on-surface-variant);padding:14px 16px;border-radius:var(--radius-md);font-size:0.95rem;font-family:var(--font-body);cursor:pointer;text-align:left;width:100%;"><span class="material-symbols-outlined">logout</span>Sign out</button>
             </div>
         </section>
-
-        <!-- hidden legacy form kept for JS compatibility -->
         <form id="profile-form" style="display:none;">
             <input type="text" id="profile-name-legacy">
             <input type="url" id="profile-avatar">
         </form>
-
     </main>
 
 </div>
 
-<!-- ═══════════════════════════════════════════
-     3. BOTTOM NAV
-════════════════════════════════════════════ -->
 <nav class="bottom-nav">
     <a href="#" class="nav-item active" data-target="dashboard-page">
         <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">dashboard</span>
@@ -348,101 +266,44 @@
     </a>
 </nav>
 
-<!-- ═══════════════════════════════════════════
-     4. FAB
-════════════════════════════════════════════ -->
 <div id="fab-overlay" class="fab-overlay"></div>
-
 <div class="fab-container" id="fab-container">
-    <div class="fab-option" id="fab-option-expense" style="--i:1;">
-        <span class="material-symbols-outlined">receipt_long</span>
-        <span class="fab-option-label">Expense</span>
-    </div>
-    <div class="fab-option" id="fab-option-sub" style="--i:2;">
-        <span class="material-symbols-outlined">subscriptions</span>
-        <span class="fab-option-label">Subscription</span>
-    </div>
-    <button class="fab-button" id="fab-btn">
-        <span class="material-symbols-outlined fab-icon">add</span>
-    </button>
+    <div class="fab-option" id="fab-option-expense" style="--i:1;"><span class="material-symbols-outlined">receipt_long</span><span class="fab-option-label">Expense</span></div>
+    <div class="fab-option" id="fab-option-sub" style="--i:2;"><span class="material-symbols-outlined">subscriptions</span><span class="fab-option-label">Subscription</span></div>
+    <button class="fab-button" id="fab-btn"><span class="material-symbols-outlined fab-icon">add</span></button>
 </div>
 
-<!-- ═══════════════════════════════════════════
-     5. BOTTOM SHEET MODAL
-════════════════════════════════════════════ -->
 <div id="add-sheet-overlay" class="sheet-overlay">
     <div id="add-sheet" class="bottom-sheet">
-
-        <div class="sheet-handle" id="sheet-handle">
-            <div class="sheet-pill"></div>
-        </div>
-
+        <div class="sheet-handle" id="sheet-handle"><div class="sheet-pill"></div></div>
         <div class="sheet-content">
-
-            <!-- Subscription form -->
             <div id="sheet-sub-form">
                 <h2 style="margin-bottom:4px;">Add New Subscription</h2>
-                <p class="label" style="text-transform:none;letter-spacing:normal;margin-bottom:24px;">
-                    Track your recurring expenses.
-                </p>
+                <p class="label" style="text-transform:none;letter-spacing:normal;margin-bottom:24px;">Track your recurring expenses.</p>
                 <form id="add-form">
-                    <div class="input-group">
-                        <label>Service Name</label>
-                        <input type="text" id="add-name"
-                               placeholder="e.g. Netflix, Spotify" autocomplete="off">
-                    </div>
-                    <div class="input-group">
-                        <label>Billing Cycle</label>
-                        <select id="add-cycle">
-                            <option value="Monthly">Monthly</option>
-                            <option value="Yearly">Yearly</option>
-                            <option value="Custom">Custom</option>
-                        </select>
-                    </div>
-                    <div class="input-group" id="custom-days-group" style="display:none;">
-                        <label>Renew every (days)</label>
-                        <input type="number" id="add-custom-days" placeholder="e.g. 90" min="1">
-                    </div>
-                    <div class="input-group">
-                        <label>Price (₹)</label>
-                        <input type="number" id="add-price" placeholder="0.00" step="0.01">
-                    </div>
-                    <div class="input-group">
-                        <label>Start Date (Optional)</label>
-                        <input type="date" id="add-start-date">
-                    </div>
+                    <div class="input-group"><label>Service Name</label><input type="text" id="add-name" placeholder="e.g. Netflix, Spotify" autocomplete="off"></div>
+                    <div class="input-group"><label>Billing Cycle</label><select id="add-cycle"><option value="Monthly">Monthly</option><option value="Yearly">Yearly</option><option value="Custom">Custom</option></select></div>
+                    <div class="input-group" id="custom-days-group" style="display:none;"><label>Renew every (days)</label><input type="number" id="add-custom-days" placeholder="e.g. 90" min="1"></div>
+                    <div class="input-group"><label>Price (₹)</label><input type="number" id="add-price" placeholder="0.00" step="0.01"></div>
+                    <div class="input-group"><label>Start Date (Optional)</label><input type="date" id="add-start-date"></div>
                     <button type="submit" class="btn-primary">Save Subscription</button>
                 </form>
             </div>
-
-            <!-- Expense form -->
             <div id="sheet-exp-form" style="display:none;">
                 <h2 style="margin-bottom:4px;">Add Expense</h2>
-                <p class="label" style="text-transform:none;letter-spacing:normal;margin-bottom:24px;">
-                    Log a one-time payment.
-                </p>
+                <p class="label" style="text-transform:none;letter-spacing:normal;margin-bottom:24px;">Log a one-time payment.</p>
                 <form id="add-expense-form">
-                    <div class="input-group">
-                        <label>Expense Name</label>
-                        <input type="text" id="exp-name"
-                               placeholder="e.g. Groceries, Cab ride" autocomplete="off">
-                    </div>
-                    <div class="input-group">
-                        <label>Amount (₹)</label>
-                        <input type="number" id="exp-amount" placeholder="0.00" step="0.01">
-                    </div>
-                    <div class="input-group">
-                        <label>Date</label>
-                        <input type="date" id="exp-date">
-                    </div>
+                    <div class="input-group"><label>Expense Name</label><input type="text" id="exp-name" placeholder="e.g. Groceries, Cab ride" autocomplete="off"></div>
+                    <div class="input-group"><label>Amount (₹)</label><input type="number" id="exp-amount" placeholder="0.00" step="0.01"></div>
+                    <div class="input-group"><label>Date</label><input type="date" id="exp-date"></div>
                     <button type="submit" class="btn-primary">Save Expense</button>
                 </form>
             </div>
-
         </div>
     </div>
 </div>
 
-<script src="script.js?v=5"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="script.js?v=6"></script>
 </body>
 </html>
