@@ -7,7 +7,7 @@
     <title>Atler</title>
 
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#0e0e0e">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -48,175 +48,7 @@
 
   
 
-    <style>
-        #auth-screen {
-            position: fixed;
-            inset: 0;
-            background: var(--bg-color);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            padding: 24px;
-        }
-
-        #auth-screen.hidden {
-            display: none;
-        }
-
-        .auth-logo {
-            font-family: var(--font-headline);
-            font-size: 2.5rem;
-            font-weight: 900;
-            color: var(--primary);
-            letter-spacing: 0.05em;
-            margin-bottom: 8px;
-        }
-
-        .auth-tagline {
-            font-size: 0.85rem;
-            color: var(--on-surface-variant);
-            margin-bottom: 48px;
-            text-align: center;
-        }
-
-        .auth-card {
-            width: 100%;
-            max-width: 400px;
-            background: var(--surface-low);
-            border-radius: var(--radius-lg);
-            padding: 32px 28px;
-            border: 1px solid var(--glass-border);
-        }
-
-        .auth-tabs {
-            display: flex;
-            background: var(--surface);
-            border-radius: var(--radius-full);
-            padding: 4px;
-            margin-bottom: 28px;
-            gap: 2px;
-        }
-
-        .auth-tab {
-            flex: 1;
-            padding: 8px 0;
-            border: none;
-            border-radius: var(--radius-full);
-            background: transparent;
-            color: var(--on-surface-variant);
-            font-family: var(--font-headline);
-            font-size: 0.85rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .auth-tab.active {
-            background: var(--surface-high);
-            color: var(--primary);
-        }
-
-        .auth-input {
-            width: 100%;
-            background: var(--surface);
-            border: 1px solid var(--glass-border);
-            color: var(--on-surface);
-            padding: 12px 16px;
-            border-radius: var(--radius-md);
-            font-size: 1rem;
-            font-family: var(--font-body);
-            margin-bottom: 14px;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        .auth-input:focus {
-            border-color: var(--primary);
-        }
-
-        .auth-btn {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, var(--primary-container), var(--primary));
-            color: #000;
-            border: none;
-            border-radius: var(--radius-full);
-            font-size: 1rem;
-            font-weight: 800;
-            cursor: pointer;
-            margin-top: 6px;
-            font-family: var(--font-headline);
-            transition: opacity 0.2s;
-        }
-
-        .auth-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .auth-error {
-            color: var(--error);
-            font-size: 0.8rem;
-            margin-top: 10px;
-            text-align: center;
-            min-height: 20px;
-        }
-
-        /* Custom boot loader */
-        #app-loading {
-            position: fixed;
-            inset: 0;
-            background: radial-gradient(1200px 600px at 20% 80%, rgba(75, 77, 216, 0.18), transparent 60%), var(--bg-color);
-            display: flex;
-            align-items: flex-end;
-            justify-content: flex-start;
-            z-index: 9998;
-            padding: 20px;
-        }
-
-        #app-loading.hidden {
-            display: none;
-        }
-
-        .boot-noise {
-            position: absolute;
-            left: 20px;
-            bottom: 72px;
-            width: min(80vw, 500px);
-            min-height: 48px;
-            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-            font-size: 12px;
-            line-height: 1.5;
-            color: rgba(192, 193, 255, 0.75);
-            letter-spacing: 0.04em;
-            white-space: pre-wrap;
-            user-select: none;
-        }
-
-        .boot-panel {
-            position: relative;
-            z-index: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .boot-brand {
-            font-family: var(--font-headline);
-            font-weight: 900;
-            font-size: 18px;
-            color: var(--primary);
-            letter-spacing: 0.08em;
-        }
-
-        .boot-status {
-            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-            font-size: 12px;
-            color: var(--on-surface-variant);
-        }
-    </style>
+    <link rel="stylesheet" href="./style.css?v=11">
 </head>
 
 
@@ -602,13 +434,13 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="script.js?v=9"></script>
+    <script src="./script.js?v=11"></script>
 
     <!-- Service Worker -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/sw.js').catch(function() {});
+                navigator.serviceWorker.register('./sw.js').catch(function() {});
             });
         }
     </script>
