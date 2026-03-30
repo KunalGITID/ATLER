@@ -51,7 +51,7 @@
         <section>
             <div class="section-header">
                 <h2>Upcoming Renewals</h2>
-                <a href="#" class="view-all">Calendar</a>
+                <a href="#" class="view-all" id="calendar-link">Calendar</a>
             </div>
             <div class="horizontal-scroll" id="upcoming-scroll">
                 <div style="padding:10px 20px;color:var(--on-surface-variant);font-size:0.8rem;">
@@ -180,7 +180,31 @@
 
     </main>
 
-    <!-- PAGE 4: Profile -->
+    <!-- PAGE 4: Calendar -->
+    <main id="calendar-page" class="page">
+
+        <div class="cal-header">
+            <button class="cal-nav-btn" id="cal-prev">
+                <span class="material-symbols-outlined">chevron_left</span>
+            </button>
+            <h2 id="cal-month-label" class="cal-month-title"></h2>
+            <button class="cal-nav-btn" id="cal-next">
+                <span class="material-symbols-outlined">chevron_right</span>
+            </button>
+        </div>
+
+        <div class="cal-weekdays">
+            <span>Sun</span><span>Mon</span><span>Tue</span>
+            <span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+        </div>
+
+        <div class="cal-grid" id="cal-grid"></div>
+
+        <div class="cal-detail" id="cal-detail" style="display:none;"></div>
+
+    </main>
+
+    <!-- PAGE 5: Profile -->
     <main id="profile-page" class="page">
 
         <section class="hero-value">
