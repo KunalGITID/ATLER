@@ -63,7 +63,7 @@
         </section>
 
         <section>
-            <h2>Active Portfolio</h2>
+            <h2>The Money Pit</h2>
             <div id="portfolio-list"></div>
         </section>
 
@@ -133,11 +133,12 @@
         <div id="analytics-subs-view">
 
             <section class="hero-value" style="margin-top:20px;">
-                <div class="label">Yearly Spend Estimate</div>
+                <div class="label">Monthly Subscriptions</div>
                 <div class="flex items-end gap-2 text-gradient">
                     <span class="currency">₹</span>
                     <h1 class="amount" id="ytd-spend">0.00</h1>
                 </div>
+                <div id="ytd-split" style="margin-top:8px;font-size:0.8rem;color:var(--on-surface-variant);"></div>
             </section>
 
             <section id="category-groups-container"></section>
@@ -167,7 +168,7 @@
         <!-- Expenses sub-view -->
         <div id="analytics-expenses-view" style="display:none;">
             <div class="expenses-month-total">
-                <div class="label" style="margin-bottom:6px;">This Month's Expenses</div>
+                <div class="label" style="margin-bottom:6px;">Total Expenses</div>
                 <div class="expenses-total-amount">
                     <span class="currency" style="font-size:1.4rem;">₹</span>
                     <span id="expenses-month-total-val"
