@@ -1182,21 +1182,32 @@ document.getElementById('calendar-link').addEventListener('click', e => { e.prev
 // ═══════════════════════════════════════════
 // APP INIT — AUTH STATE LISTENER
 // ═══════════════════════════════════════════
-setTimeout(() => {
-    const loading    = document.getElementById('app-loading');
-    const authScreen = document.getElementById('auth-screen');
-    if (!loading.classList.contains('hidden')) {
-        loading.classList.add('hidden');
-        authScreen.classList.remove('hidden');
-    }
-}, 3000);
+// ═══════════════════════════════════════════
+// APP INIT — replace the setTimeout block + onAuthStateChange
+// with this entire block
+// ═══════════════════════════════════════════
 
+// Step 1: Immediately check localStorage for an existing session.
+// If none found, show auth screen right away — no delay.
+// If one is found, keep the spinner and let onAuthStateChange handle it.
+(async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+        document.getElementById('app-loading').classList.add('hidden');
+        document.getElementById('auth-screen').classList.remove('hidden');
+    }
+    // If session exists, onAuthStateChange below will fire and load the app
+})();
+
+// Step 2: React to all auth state changes (login, logout, token refresh)
 sb.auth.onAuthStateChange(async (event, session) => {
     const loading    = document.getElementById('app-loading');
     const authScreen = document.getElementById('auth-screen');
 
     if (session?.user) {
         currentUser = session.user;
+
+        // If we came from a magic link / OAuth redirect, hide auth
         authScreen.classList.add('hidden');
         loading.classList.remove('hidden');
 
@@ -1205,10 +1216,16 @@ sb.auth.onAuthStateChange(async (event, session) => {
         loading.classList.add('hidden');
         await renderApp();
         renderProfilePage();
+
     } else {
+        // Signed out
         currentUser   = null;
         subscriptions = []; categories = []; expenses = [];
-        profile = { name:'Atler', avatar:'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150', theme:'default' };
+        profile = {
+            name:   'Atler',
+            avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
+            theme:  'default'
+        };
         loading.classList.add('hidden');
         authScreen.classList.remove('hidden');
     }
