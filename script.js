@@ -1180,7 +1180,6 @@ document.getElementById('cal-back-btn').addEventListener('click', e => { e.preve
 document.getElementById('calendar-link').addEventListener('click', e => { e.preventDefault(); switchPage('calendar-page'); });
 
 
-
 async function withTimeout(promise, ms = 8000) {
     let timer;
     const timeout = new Promise((_, reject) => {
@@ -1193,11 +1192,7 @@ async function withTimeout(promise, ms = 8000) {
     }
 }
 
-// ═══════════════════════════════════════════
-// APP INIT — paste this at the bottom of script.js
-// replacing the old setTimeout block + onAuthStateChange
-// ═══════════════════════════════════════════
-
+// APP INIT
 (async () => {
     const loading = document.getElementById('app-loading');
     const authScreen = document.getElementById('auth-screen');
@@ -1212,7 +1207,7 @@ async function withTimeout(promise, ms = 8000) {
             try {
                 await withTimeout(loadAllData(), 10000);
             } catch (_) {
-                // allow app to render even if network/data load fails
+                // allow rendering even if network/data load fails
             }
 
             await renderApp();
@@ -1227,6 +1222,7 @@ async function withTimeout(promise, ms = 8000) {
     }
 })();
 
+// AUTH STATE CHANGES
 sb.auth.onAuthStateChange(async (event, session) => {
     const loading = document.getElementById('app-loading');
     const authScreen = document.getElementById('auth-screen');
@@ -1248,7 +1244,6 @@ sb.auth.onAuthStateChange(async (event, session) => {
         } finally {
             loading.classList.add('hidden');
         }
-
         return;
     }
 
