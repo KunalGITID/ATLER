@@ -1003,3 +1003,192 @@ section {
   font-weight: 700;
   color: var(--on-surface);
 }
+
+/* ── Auth Screen ── */
+#auth-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 24px;
+}
+
+#auth-screen.hidden { display: none; }
+
+.auth-logo {
+  font-family: var(--font-headline);
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: var(--primary);
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.auth-tagline {
+  font-size: 0.85rem;
+  color: var(--on-surface-variant);
+  margin-bottom: 48px;
+  text-align: center;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface-low);
+  border-radius: var(--radius-lg);
+  padding: 32px 28px;
+  border: 1px solid var(--glass-border);
+}
+
+.auth-tabs {
+  display: flex;
+  background: var(--surface);
+  border-radius: var(--radius-full);
+  padding: 4px;
+  margin-bottom: 28px;
+  gap: 2px;
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 8px 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--on-surface-variant);
+  font-family: var(--font-headline);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.auth-tab.active { background: var(--surface-high); color: var(--primary); }
+
+.auth-input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  color: var(--on-surface);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-family: var(--font-body);
+  margin-bottom: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.auth-input:focus { border-color: var(--primary); }
+
+.auth-btn {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, var(--primary-container), var(--primary));
+  color: #000;
+  border: none;
+  border-radius: var(--radius-full);
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  margin-top: 6px;
+  font-family: var(--font-headline);
+  transition: opacity 0.2s;
+}
+
+.auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.auth-error {
+  color: var(--error);
+  font-size: 0.8rem;
+  margin-top: 10px;
+  text-align: center;
+  min-height: 20px;
+}
+
+/* ── App Loading (Terminal Vibe) ── */
+#app-loading {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(1200px 600px at 20% 80%, rgba(75, 77, 216, 0.15), transparent 60%), var(--bg-color);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  z-index: 10000;
+  padding: 240px;
+  overflow: hidden;
+}
+
+#app-loading::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 2;
+  background-size: 100% 4px, 3px 100%;
+  pointer-events: none;
+}
+
+#app-loading.hidden { display: none; pointer-events: none; }
+
+.boot-noise {
+  position: absolute;
+  left: 160px;
+  bottom: 480px;
+  width: min(80vw, 500px);
+  min-height: 48px;
+  font-family: 'ui-monospace', 'SFMono-Regular', 'Menlo', monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--primary);
+  opacity: 0.15;
+  letter-spacing: 0.04em;
+  white-space: pre-wrap;
+  user-select: none;
+  filter: blur(0.5px);
+}
+
+.boot-panel {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 32px;
+  text-align: left;
+}
+
+.boot-brand {
+  font-family: var(--font-headline);
+  font-weight: 950;
+  font-size: clamp(28rem, 100vw, 40rem);
+  color: var(--primary);
+  letter-spacing: -0.06em;
+  text-shadow: 0 0 120px var(--primary-glow);
+  line-height: 0.7;
+}
+
+.boot-status {
+  font-family: 'ui-monospace', 'SFMono-Regular', 'Menlo', monospace;
+  font-size: clamp(9.6rem, 32vw, 14rem);
+  font-weight: 900;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.char-noise {
+  opacity: 0.3;
+}
+
+.char-decoded {
+  background: var(--primary);
+  color: var(--bg-color);
+  padding: 0 6px;
+  border-radius: 2px;
+}
