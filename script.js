@@ -1178,65 +1178,93 @@ document.getElementById('cal-prev').addEventListener('click', () => { calMonth--
 document.getElementById('cal-next').addEventListener('click', () => { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCalendar(); });
 document.getElementById('cal-back-btn').addEventListener('click', e => { e.preventDefault(); switchPage('dashboard-page'); });
 document.getElementById('calendar-link').addEventListener('click', e => { e.preventDefault(); switchPage('calendar-page'); });
+
+
+
+async function withTimeout(promise, ms = 8000) {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('timeout')), ms);
+    });
+    try {
+        return await Promise.race([promise, timeout]);
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
 // ═══════════════════════════════════════════
 // APP INIT — paste this at the bottom of script.js
 // replacing the old setTimeout block + onAuthStateChange
 // ═══════════════════════════════════════════
 
 (async () => {
-    const loading    = document.getElementById('app-loading');
+    const loading = document.getElementById('app-loading');
     const authScreen = document.getElementById('auth-screen');
 
-    // getSession() reads from localStorage — works even offline, no network needed
-    const { data: { session } } = await sb.auth.getSession();
+    try {
+        const { data: { session } } = await withTimeout(sb.auth.getSession(), 8000);
 
-    if (session?.user) {
-        // Already logged in (resume from background, page refresh, etc.)
-        // Load app directly — do NOT wait for onAuthStateChange
-        currentUser = session.user;
-        try {
-            await loadAllData();
+        if (session?.user) {
+            currentUser = session.user;
+            authScreen.classList.add('hidden');
+
+            try {
+                await withTimeout(loadAllData(), 10000);
+            } catch (_) {
+                // allow app to render even if network/data load fails
+            }
+
             await renderApp();
             renderProfilePage();
-        } catch (e) {
-            // Network failed (offline) — still show app with cached state
-            await renderApp();
-            renderProfilePage();
+        } else {
+            authScreen.classList.remove('hidden');
         }
-        loading.classList.add('hidden');
-    } else {
-        // No session — show auth immediately
-        loading.classList.add('hidden');
+    } catch (_) {
         authScreen.classList.remove('hidden');
+    } finally {
+        loading.classList.add('hidden');
     }
 })();
 
-// Only handles NEW sign-ins and sign-outs (not initial load)
 sb.auth.onAuthStateChange(async (event, session) => {
-    const loading    = document.getElementById('app-loading');
+    const loading = document.getElementById('app-loading');
     const authScreen = document.getElementById('auth-screen');
 
     if (event === 'SIGNED_IN' && session?.user) {
-        // User just signed in fresh (not a resume)
-        if (currentUser?.id === session.user.id) return; // already loaded above, skip
+        if (currentUser?.id === session.user.id) return;
+
         currentUser = session.user;
         authScreen.classList.add('hidden');
         loading.classList.remove('hidden');
-        await loadAllData();
-        loading.classList.add('hidden');
-        await renderApp();
-        renderProfilePage();
 
-    } else if (event === 'SIGNED_OUT') {
-        currentUser   = null;
-        subscriptions = []; categories = []; expenses = [];
+        try {
+            await withTimeout(loadAllData(), 10000);
+            await renderApp();
+            renderProfilePage();
+        } catch (_) {
+            await renderApp();
+            renderProfilePage();
+        } finally {
+            loading.classList.add('hidden');
+        }
+
+        return;
+    }
+
+    if (event === 'SIGNED_OUT') {
+        currentUser = null;
+        subscriptions = [];
+        categories = [];
+        expenses = [];
         profile = {
-            name:   'Atler',
+            name: 'Atler',
             avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
-            theme:  'default'
+            theme: 'default'
         };
         loading.classList.add('hidden');
         authScreen.classList.remove('hidden');
     }
-    // TOKEN_REFRESHED, USER_UPDATED etc. — no action needed
 });
+
+
