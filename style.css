@@ -50,7 +50,7 @@ body {
   color: var(--on-surface);
   font-family: var(--font-body);
   line-height: 1.5;
-  overflow-x: hidden;
+  overflow-x: clip;
   padding-bottom: 120px;
 }
 
@@ -441,8 +441,8 @@ section {
 
 .fab-container {
   position: fixed;
-  bottom: calc(var(--spacing-4) + 80px);
-  right: var(--spacing-6);
+  bottom: 90px;
+  right: 24px;
   z-index: 99;
   display: flex;
   flex-direction: column;
@@ -453,7 +453,7 @@ section {
 .fab-button {
   width: 56px;
   height: 56px;
-  border-radius: 50%;
+  border-radius: 16px;
   border: none;
   background: linear-gradient(135deg, var(--primary-container), var(--primary));
   color: #000;
