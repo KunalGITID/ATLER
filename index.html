@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -15,29 +16,173 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@700;800;900&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@700;800;900&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet">
 
     <!-- Theme preload (must run before CSS paint to prevent flash) -->
     <script>
-    (function () {
-      const saved = localStorage.getItem('atler_theme');
-      if (!saved) return;
-      const themes = {
-        default:  { primary:'#c0c1ff', primaryContainer:'#4b4dd8', primaryGlow:'rgba(192,193,255,0.4)', secondary:'#4edea3', secondaryGlow:'rgba(78,222,163,0.2)' },
-        midnight: { primary:'#4fc3f7', primaryContainer:'#0d47a1', primaryGlow:'rgba(79,195,247,0.4)',  secondary:'#80deea', secondaryGlow:'rgba(128,222,234,0.2)' },
-        rose:     { primary:'#f48fb1', primaryContainer:'#880e4f', primaryGlow:'rgba(244,143,177,0.4)', secondary:'#f06292', secondaryGlow:'rgba(240,98,146,0.2)' },
-        forest:   { primary:'#81c784', primaryContainer:'#1b5e20', primaryGlow:'rgba(129,199,132,0.4)', secondary:'#aed581', secondaryGlow:'rgba(174,213,129,0.2)' },
-        amber:    { primary:'#ffcc02', primaryContainer:'#e65100', primaryGlow:'rgba(255,204,2,0.4)',   secondary:'#ffb300', secondaryGlow:'rgba(255,179,0,0.2)' },
-        slate:    { primary:'#94a3b8', primaryContainer:'#334155', primaryGlow:'rgba(148,163,184,0.3)', secondary:'#7dd3fc', secondaryGlow:'rgba(125,211,252,0.2)' }
-      };
-      const t = themes[saved] || themes.default;
-      const r = document.documentElement.style;
-      ["primary","primary-container","primary-glow","secondary","secondary-glow"].forEach(k => {
-        const val = t[k.replace(/-([a-z])/g, g => g[1].toUpperCase())];
-        if(val) r.setProperty('--' + k, val);
-      });
-    })();
+        (function () {
+            const saved = localStorage.getItem('atler_theme') || 'default';
+
+            const DARK_SURFACES = {
+                bg: '#0e0e0e',
+                surfaceLow: '#1c1b1b',
+                surface: '#201f1f',
+                surfaceHigh: '#2a2a2a',
+                onSurface: '#e5e2e1',
+                onSurfaceVariant: '#c7c4d8',
+                glassBg: 'rgba(19,19,19,0.6)',
+                glassBorder: 'rgba(255,255,255,0.05)',
+                error: '#ffb4ab',
+                errorBg: 'rgba(255,180,171,0.1)',
+                insightsText: 'rgba(255,255,255,0.8)',
+                insightsDivider: 'rgba(255,255,255,0.1)',
+                navBg: 'rgba(19,19,19,0.85)',
+                navShadow: '0 -10px 40px rgba(0,0,0,0.5)'
+            };
+
+            const themes = {
+                default: {
+                    ...DARK_SURFACES,
+                    primary: '#c0c1ff',
+                    primaryContainer: '#4b4dd8',
+                    primaryGlow: 'rgba(192,193,255,0.4)',
+                    secondary: '#4edea3',
+                    secondaryGlow: 'rgba(78,222,163,0.2)'
+                },
+                midnight: {
+                    ...DARK_SURFACES,
+                    primary: '#4fc3f7',
+                    primaryContainer: '#0d47a1',
+                    primaryGlow: 'rgba(79,195,247,0.4)',
+                    secondary: '#80deea',
+                    secondaryGlow: 'rgba(128,222,234,0.2)'
+                },
+                forest: {
+                    ...DARK_SURFACES,
+                    primary: '#81c784',
+                    primaryContainer: '#1b5e20',
+                    primaryGlow: 'rgba(129,199,132,0.4)',
+                    secondary: '#aed581',
+                    secondaryGlow: 'rgba(174,213,129,0.2)'
+                },
+                paper: {
+                    primary: '#1A1A1A',
+                    primaryContainer: '#E0E0E0',
+                    primaryGlow: 'rgba(26,26,26,0.08)',
+                    secondary: '#555555',
+                    secondaryGlow: 'rgba(85,85,85,0.08)',
+                    bg: '#F5F5F5',
+                    surfaceLow: '#EBEBEB',
+                    surface: '#F0F0F0',
+                    surfaceHigh: '#E2E2E2',
+                    onSurface: '#1A1A1A',
+                    onSurfaceVariant: '#888888',
+                    glassBg: 'rgba(245,245,245,0.88)',
+                    glassBorder: 'rgba(0,0,0,0.08)',
+                    error: '#cc2222',
+                    errorBg: 'rgba(204,34,34,0.08)',
+                    insightsText: 'rgba(0,0,0,0.65)',
+                    insightsDivider: 'rgba(0,0,0,0.10)',
+                    navBg: 'rgba(245,245,245,0.92)',
+                    navShadow: '0 -10px 40px rgba(0,0,0,0.08)'
+                },
+                void: {
+                    primary: '#E05A4E',
+                    primaryContainer: '#2A1210',
+                    primaryGlow: 'rgba(224,90,78,0.35)',
+                    secondary: '#C04840',
+                    secondaryGlow: 'rgba(192,72,64,0.2)',
+                    bg: '#0D0D0D',
+                    surfaceLow: '#141414',
+                    surface: '#1C1C1C',
+                    surfaceHigh: '#252525',
+                    onSurface: '#E8E8E8',
+                    onSurfaceVariant: '#888888',
+                    glassBg: 'rgba(13,13,13,0.75)',
+                    glassBorder: 'rgba(255,255,255,0.06)',
+                    error: '#ff6b6b',
+                    errorBg: 'rgba(255,107,107,0.1)',
+                    insightsText: 'rgba(232,232,232,0.8)',
+                    insightsDivider: 'rgba(224,90,78,0.25)',
+                    navBg: 'rgba(13,13,13,0.9)',
+                    navShadow: '0 -10px 40px rgba(0,0,0,0.7)'
+                },
+                inferno: {
+                    primary: '#FF6A00',
+                    primaryContainer: '#1F1000',
+                    primaryGlow: 'rgba(255,106,0,0.4)',
+                    secondary: '#00FFB2',
+                    secondaryGlow: 'rgba(0,255,178,0.2)',
+                    bg: '#0A0A0A',
+                    surfaceLow: '#111111',
+                    surface: '#161616',
+                    surfaceHigh: '#1A1A1A',
+                    onSurface: '#EFEFEF',
+                    onSurfaceVariant: '#444444',
+                    glassBg: 'rgba(10,10,10,0.78)',
+                    glassBorder: 'rgba(255,106,0,0.12)',
+                    error: '#ff6b6b',
+                    errorBg: 'rgba(255,107,107,0.1)',
+                    insightsText: 'rgba(239,239,239,0.82)',
+                    insightsDivider: 'rgba(255,106,0,0.3)',
+                    navBg: 'rgba(10,10,10,0.92)',
+                    navShadow: '0 -10px 40px rgba(255,106,0,0.12)'
+                },
+                slate: {
+                    primary: '#94a3b8',
+                    primaryContainer: '#334155',
+                    primaryGlow: 'rgba(148,163,184,0.3)',
+                    secondary: '#7dd3fc',
+                    secondaryGlow: 'rgba(125,211,252,0.2)',
+                    bg: '#0f172a',
+                    surfaceLow: '#1e293b',
+                    surface: '#263348',
+                    surfaceHigh: '#334155',
+                    onSurface: '#e2e8f0',
+                    onSurfaceVariant: '#94a3b8',
+                    glassBg: 'rgba(15,23,42,0.75)',
+                    glassBorder: 'rgba(148,163,184,0.1)',
+                    error: '#fca5a5',
+                    errorBg: 'rgba(252,165,165,0.1)',
+                    insightsText: 'rgba(226,232,240,0.8)',
+                    insightsDivider: 'rgba(148,163,184,0.2)',
+                    navBg: 'rgba(15,23,42,0.92)',
+                    navShadow: '0 -10px 40px rgba(0,0,0,0.7)'
+                }
+            };
+
+            const t = themes[saved] || themes.default;
+            const r = document.documentElement.style;
+
+            r.setProperty('--primary', t.primary);
+            r.setProperty('--primary-container', t.primaryContainer);
+            r.setProperty('--primary-glow', t.primaryGlow);
+            r.setProperty('--secondary', t.secondary);
+            r.setProperty('--secondary-glow', t.secondaryGlow);
+            r.setProperty('--bg-color', t.bg);
+            r.setProperty('--surface-low', t.surfaceLow);
+            r.setProperty('--surface', t.surface);
+            r.setProperty('--surface-high', t.surfaceHigh);
+            r.setProperty('--on-surface', t.onSurface);
+            r.setProperty('--on-surface-variant', t.onSurfaceVariant);
+            r.setProperty('--glass-bg', t.glassBg);
+            r.setProperty('--glass-border', t.glassBorder);
+            r.setProperty('--error', t.error);
+            r.setProperty('--error-bg', t.errorBg);
+            r.setProperty('--insights-text', t.insightsText);
+            r.setProperty('--insights-divider', t.insightsDivider);
+            r.setProperty('--nav-bg', t.navBg);
+            r.setProperty('--nav-shadow', t.navShadow);
+
+            document.documentElement.style.backgroundColor = t.bg;
+            document.documentElement.style.color = t.onSurface;
+            document.documentElement.style.colorScheme = t.bg === '#F5F5F5' ? 'light' : 'dark';
+            document.body && (document.body.style.backgroundColor = t.bg);
+        })();
     </script>
 
     <link rel="stylesheet" href="./style.css?v=11">
@@ -45,13 +190,14 @@
 
 
 <body>
-<div id="app-loading">
-  <div class="boot-noise" id="boot-noise"></div>
-  <div class="boot-panel">
-    <div class="boot-brand">ATŁER</div>
-    <div class="boot-status" id="boot-status">Initializing...</div>
-  </div>
-</div>
+    <div id="offline-banner">No internet connection — changes may not save</div>
+    <div id="app-loading" class="hidden">
+        <div class="boot-noise" id="boot-noise"></div>
+        <div class="boot-panel">
+            <div class="boot-brand">ATŁER</div>
+            <div class="boot-status" id="boot-status">Initializing...</div>
+        </div>
+    </div>
 
 
     <div id="auth-screen" class="hidden">
@@ -105,7 +251,6 @@
             <section>
                 <div class="section-header">
                     <h2>Upcoming Renewals</h2>
-                    <a href="#" class="view-all" id="calendar-link">Calendar</a>
                 </div>
                 <div class="horizontal-scroll" id="upcoming-scroll">
                     <div style="padding:10px 20px;color:var(--on-surface-variant);font-size:0.8rem;">Add a subscription
@@ -113,24 +258,7 @@
                 </div>
             </section>
             <section>
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-                    <h2 style="margin-bottom:0;">The Money Pit</h2>
-                </div>
-                <div id="dash-search-bar" style="display:none;margin-bottom:12px;">
-                    <div style="display:flex;gap:8px;align-items:center;">
-                        <div style="position:relative;flex:1;">
-                            <span class="material-symbols-outlined" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--on-surface-variant);pointer-events:none;">search</span>
-                            <input type="text" id="dash-search-input" placeholder="Search..." autocomplete="off"
-                                style="width:100%;background:var(--surface-low);border:1px solid var(--glass-border);color:var(--on-surface);padding:10px 12px 10px 36px;border-radius:var(--radius-md);font-size:0.9rem;font-family:var(--font-body);outline:none;">
-                        </div>
-                        <select id="dash-filter-select"
-                            style="background:var(--surface-low);border:1px solid var(--glass-border);color:var(--on-surface);padding:10px 12px;border-radius:var(--radius-md);font-size:0.85rem;font-family:var(--font-body);outline:none;cursor:pointer;flex-shrink:0;">
-                            <option value="all">All</option>
-                            <option value="subscriptions">Subs</option>
-                            <option value="expenses">Expenses</option>
-                        </select>
-                    </div>
-                </div>
+                <h2>The Money Pit</h2>
                 <div id="portfolio-list"></div>
             </section>
             <section class="insights-card" id="insights-card">
@@ -141,6 +269,12 @@
 
         <!-- DETAILS PAGE -->
         <main id="details-page" class="page">
+            <div class="secondary-page-header">
+                <button type="button" class="back-btn" data-back-button>
+                    <span class="material-symbols-outlined">arrow_back</span>
+                    Back
+                </button>
+            </div>
             <section class="hero-value" style="margin-top:40px;">
                 <div class="flex flex-col items-center">
                     <div class="list-icon-wrapper" style="width:80px;height:80px;margin-bottom:20px;">
@@ -198,6 +332,45 @@
                 <button class="btn-primary" id="delete-sub-btn"
                     style="background:var(--error-bg);color:var(--error);box-shadow:none;border:1px solid var(--error);margin-top:12px;">
                     Delete Subscription
+                </button>
+            </section>
+        </main>
+
+        <!-- EXPENSE DETAILS PAGE -->
+        <main id="expense-details-page" class="page">
+            <div class="secondary-page-header">
+                <button type="button" class="back-btn" data-back-button>
+                    <span class="material-symbols-outlined">arrow_back</span>
+                    Back
+                </button>
+            </div>
+            <section class="hero-value" style="margin-top:40px;">
+                <div class="flex flex-col items-center">
+                    <div class="list-icon-wrapper expense-detail-icon">
+                        <span class="material-symbols-outlined">receipt_long</span>
+                    </div>
+                    <h2 id="expense-detail-name">Expense</h2>
+                    <p class="label" id="expense-detail-date">Date</p>
+                    <div class="flex items-end gap-2 text-gradient" style="justify-content:center;margin-top:20px;">
+                        <span class="currency" style="font-size:1.5rem;">₹</span>
+                        <h1 class="amount" id="expense-detail-amount" style="font-size:3rem;">0.00</h1>
+                    </div>
+                </div>
+            </section>
+            <section>
+                <div class="expense-detail-card">
+                    <div class="expense-detail-row">
+                        <span class="label">Logged On</span>
+                        <span id="expense-detail-date-full">-</span>
+                    </div>
+                    <div class="expense-detail-row">
+                        <span class="label">Entry Type</span>
+                        <span id="expense-detail-type">Manual</span>
+                    </div>
+                </div>
+                <button class="btn-primary" id="delete-expense-btn"
+                    style="background:var(--error-bg);color:var(--error);box-shadow:none;border:1px solid var(--error);margin-top:12px;">
+                    Delete Expense
                 </button>
             </section>
         </main>
@@ -260,40 +433,8 @@
                             style="font-size:2.6rem;font-family:var(--font-headline);font-weight:800;letter-spacing:-0.04em;">0.00</span>
                     </div>
                 </div>
-                <div id="exp-search-bar" style="display:none;margin-bottom:12px;">
-                    <div style="position:relative;">
-                        <span class="material-symbols-outlined" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--on-surface-variant);pointer-events:none;">search</span>
-                        <input type="text" id="exp-search-input" placeholder="Search expenses..." autocomplete="off"
-                            style="width:100%;background:var(--surface-low);border:1px solid var(--glass-border);color:var(--on-surface);padding:10px 12px 10px 36px;border-radius:var(--radius-md);font-size:0.9rem;font-family:var(--font-body);outline:none;">
-                    </div>
-                </div>
                 <div id="expenses-list-container"></div>
             </div>
-        </main>
-
-        <!-- CALENDAR -->
-        <main id="calendar-page" class="page">
-            <div style="margin-bottom:12px;">
-                <a href="#" id="cal-back-btn"
-                    style="color:var(--on-surface-variant);font-size:0.85rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">
-                    <span class="material-symbols-outlined" style="font-size:16px;">arrow_back</span>
-                    Back
-                </a>
-            </div>
-            <div class="cal-card">
-                <div class="cal-modal-header">
-                    <button class="cal-nav-btn" id="cal-prev"><span
-                            class="material-symbols-outlined">chevron_left</span></button>
-                    <h2 id="cal-month-label" class="cal-month-title"></h2>
-                    <button class="cal-nav-btn" id="cal-next"><span
-                            class="material-symbols-outlined">chevron_right</span></button>
-                </div>
-                <div class="cal-weekdays">
-                    <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
-                </div>
-                <div class="cal-grid" id="cal-grid"></div>
-            </div>
-            <div class="cal-detail" id="cal-detail" style="display:none;"></div>
         </main>
 
         <!-- PROFILE -->
@@ -327,55 +468,81 @@
                 </div>
             </section>
             <!-- Currency — collapsible -->
-            <section>
-                <button class="profile-collapse-header" id="currency-toggle" aria-expanded="false" onclick="toggleProfileSection('currency-body','currency-chevron')">
+            <section class="profile-collapse-section">
+                <button class="profile-collapse-header" id="currency-toggle" aria-expanded="false"
+                    onclick="toggleProfileSection('currency-body','currency-chevron')">
                     <span class="label" style="margin:0;">Currency</span>
-                    <span class="material-symbols-outlined profile-collapse-chevron" id="currency-chevron">chevron_right</span>
+                    <span class="material-symbols-outlined profile-collapse-chevron"
+                        id="currency-chevron">chevron_right</span>
                 </button>
-                <div id="currency-body" style="display:none;padding-top:14px;">
+                <div id="currency-body" class="profile-collapse-body">
                     <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                        <button class="currency-pill" data-currency="INR" style="background:var(--surface-low);border:2px solid var(--primary);color:var(--primary);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">₹ INR</button>
-                        <button class="currency-pill" data-currency="USD" style="background:var(--surface-low);border:2px solid var(--glass-border);color:var(--on-surface-variant);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">$ USD</button>
-                        <button class="currency-pill" data-currency="EUR" style="background:var(--surface-low);border:2px solid var(--glass-border);color:var(--on-surface-variant);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">€ EUR</button>
-                        <button class="currency-pill" data-currency="GBP" style="background:var(--surface-low);border:2px solid var(--glass-border);color:var(--on-surface-variant);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">£ GBP</button>
+                        <button class="currency-pill" data-currency="INR"
+                            style="background:var(--surface-low);border:2px solid var(--primary);color:var(--primary);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">₹
+                            INR</button>
+                        <button class="currency-pill" data-currency="USD"
+                            style="background:var(--surface-low);border:2px solid var(--glass-border);color:var(--on-surface-variant);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">$
+                            USD</button>
+                        <button class="currency-pill" data-currency="EUR"
+                            style="background:var(--surface-low);border:2px solid var(--glass-border);color:var(--on-surface-variant);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">€
+                            EUR</button>
+                        <button class="currency-pill" data-currency="GBP"
+                            style="background:var(--surface-low);border:2px solid var(--glass-border);color:var(--on-surface-variant);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">£
+                            GBP</button>
                     </div>
                 </div>
             </section>
 
             <!-- Theme — collapsible -->
-            <section>
-                <button class="profile-collapse-header" id="theme-toggle" aria-expanded="false" onclick="toggleProfileSection('theme-body','theme-chevron')">
+            <section class="profile-collapse-section">
+                <button class="profile-collapse-header" id="theme-toggle" aria-expanded="false"
+                    onclick="toggleProfileSection('theme-body','theme-chevron')">
                     <span class="label" style="margin:0;">Theme</span>
-                    <span class="material-symbols-outlined profile-collapse-chevron" id="theme-chevron">chevron_right</span>
+                    <span class="material-symbols-outlined profile-collapse-chevron"
+                        id="theme-chevron">chevron_right</span>
                 </button>
-                <div id="theme-body" style="display:none;padding-top:14px;">
+                <div id="theme-body" class="profile-collapse-body">
                     <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
                         <div class="theme-chip" data-theme="default" style="text-align:center;cursor:pointer;">
-                            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#4b4dd8,#c0c1ff);margin:0 auto 6px;border:2px solid var(--primary);"></div>
+                            <div
+                                style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#4b4dd8,#c0c1ff);margin:0 auto 6px;border:2px solid var(--primary);">
+                            </div>
                             <span style="font-size:0.7rem;color:var(--on-surface-variant);">Default</span>
                         </div>
                         <div class="theme-chip" data-theme="midnight" style="text-align:center;cursor:pointer;">
-                            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0d47a1,#4fc3f7);margin:0 auto 6px;border:2px solid transparent;"></div>
+                            <div
+                                style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0d47a1,#4fc3f7);margin:0 auto 6px;border:2px solid transparent;">
+                            </div>
                             <span style="font-size:0.7rem;color:var(--on-surface-variant);">Midnight</span>
                         </div>
                         <div class="theme-chip" data-theme="forest" style="text-align:center;cursor:pointer;">
-                            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1b5e20,#81c784);margin:0 auto 6px;border:2px solid transparent;"></div>
+                            <div
+                                style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1b5e20,#81c784);margin:0 auto 6px;border:2px solid transparent;">
+                            </div>
                             <span style="font-size:0.7rem;color:var(--on-surface-variant);">Forest</span>
                         </div>
                         <div class="theme-chip" data-theme="paper" style="text-align:center;cursor:pointer;">
-                            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#E0E0E0,#F5F5F5);margin:0 auto 6px;border:2px solid transparent;"></div>
+                            <div
+                                style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#E0E0E0,#F5F5F5);margin:0 auto 6px;border:2px solid transparent;">
+                            </div>
                             <span style="font-size:0.7rem;color:var(--on-surface-variant);">Paper</span>
                         </div>
                         <div class="theme-chip" data-theme="void" style="text-align:center;cursor:pointer;">
-                            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0D0D0D,#E05A4E);margin:0 auto 6px;border:2px solid transparent;"></div>
+                            <div
+                                style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0D0D0D,#E05A4E);margin:0 auto 6px;border:2px solid transparent;">
+                            </div>
                             <span style="font-size:0.7rem;color:var(--on-surface-variant);">Void</span>
                         </div>
                         <div class="theme-chip" data-theme="inferno" style="text-align:center;cursor:pointer;">
-                            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#FF6A00,#00FFB2);margin:0 auto 6px;border:2px solid transparent;"></div>
+                            <div
+                                style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#FF6A00,#00FFB2);margin:0 auto 6px;border:2px solid transparent;">
+                            </div>
                             <span style="font-size:0.7rem;color:var(--on-surface-variant);">Inferno</span>
                         </div>
                         <div class="theme-chip" data-theme="slate" style="text-align:center;cursor:pointer;">
-                            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0f172a,#94a3b8);margin:0 auto 6px;border:2px solid transparent;"></div>
+                            <div
+                                style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0f172a,#94a3b8);margin:0 auto 6px;border:2px solid transparent;">
+                            </div>
                             <span style="font-size:0.7rem;color:var(--on-surface-variant);">Slate</span>
                         </div>
                     </div>
@@ -383,27 +550,40 @@
             </section>
 
             <!-- Notifications — collapsible -->
-            <section>
-                <button class="profile-collapse-header" id="notif-section-toggle" aria-expanded="false" onclick="toggleProfileSection('notif-body','notif-section-chevron')">
+            <section class="profile-collapse-section">
+                <button class="profile-collapse-header" id="notif-section-toggle" aria-expanded="false"
+                    onclick="toggleProfileSection('notif-body','notif-section-chevron')">
                     <span class="label" style="margin:0;">Notifications</span>
-                    <span class="material-symbols-outlined profile-collapse-chevron" id="notif-section-chevron">chevron_right</span>
+                    <span class="material-symbols-outlined profile-collapse-chevron"
+                        id="notif-section-chevron">chevron_right</span>
                 </button>
-                <div id="notif-body" style="display:none;padding-top:14px;">
-                    <div style="background:var(--surface-low);border:1px solid var(--glass-border);border-radius:var(--radius-md);overflow:hidden;">
-                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;">
+                <div id="notif-body" class="profile-collapse-body">
+                    <div
+                        style="background:var(--surface-low);border:1px solid var(--glass-border);border-radius:var(--radius-md);overflow:hidden;">
+                        <div
+                            style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;">
                             <div style="display:flex;align-items:center;gap:14px;">
-                                <div id="notif-icon-wrap" style="width:40px;height:40px;border-radius:var(--radius-md);background:var(--primary-container);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                                    <span class="material-symbols-outlined" style="font-size:20px;color:var(--primary);">notifications</span>
+                                <div id="notif-icon-wrap"
+                                    style="width:40px;height:40px;border-radius:var(--radius-md);background:var(--primary-container);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <span class="material-symbols-outlined"
+                                        style="font-size:20px;color:var(--primary);">notifications</span>
                                 </div>
                                 <div>
-                                    <div style="font-size:0.95rem;color:var(--on-surface);font-weight:600;">Renewal Reminders</div>
-                                    <div id="notif-status" style="font-size:0.75rem;color:var(--on-surface-variant);margin-top:3px;">Not enabled</div>
+                                    <div style="font-size:0.95rem;color:var(--on-surface);font-weight:600;">Renewal
+                                        Reminders</div>
+                                    <div id="notif-status"
+                                        style="font-size:0.75rem;color:var(--on-surface-variant);margin-top:3px;">Not
+                                        enabled</div>
                                 </div>
                             </div>
-                            <button id="notif-toggle-btn" style="background:var(--primary-container);color:var(--primary);border:none;padding:10px 18px;border-radius:var(--radius-md);font-weight:700;font-size:0.82rem;cursor:pointer;white-space:nowrap;font-family:var(--font-body);">Enable</button>
+                            <button id="notif-toggle-btn"
+                                style="background:var(--primary-container);color:var(--primary);border:none;padding:10px 18px;border-radius:var(--radius-md);font-weight:700;font-size:0.82rem;cursor:pointer;white-space:nowrap;font-family:var(--font-body);">Enable</button>
                         </div>
-                        <div style="padding:12px 16px 14px;font-size:0.78rem;color:var(--on-surface-variant);line-height:1.5;border-top:1px solid var(--glass-border);">
-                            Get reminded <strong style="color:var(--on-surface);">3 days</strong> and <strong style="color:var(--on-surface);">1 day</strong> before any subscription renews so you're never caught off guard.
+                        <div
+                            style="padding:12px 16px 14px;font-size:0.78rem;color:var(--on-surface-variant);line-height:1.5;border-top:1px solid var(--glass-border);">
+                            Get reminded <strong style="color:var(--on-surface);">3 days</strong> and <strong
+                                style="color:var(--on-surface);">1 day</strong> before any subscription renews so you're
+                            never caught off guard.
                         </div>
                     </div>
                 </div>
@@ -413,7 +593,8 @@
                 <div style="display:flex;flex-direction:column;gap:12px;">
                     <button id="open-data-modal-btn"
                         style="display:flex;align-items:center;gap:10px;background:var(--surface-low);border:1px solid var(--glass-border);color:var(--on-surface);padding:14px 16px;border-radius:var(--radius-md);font-size:0.95rem;font-family:var(--font-body);cursor:pointer;text-align:left;width:100%;"><span
-                            class="material-symbols-outlined" style="color:var(--secondary);">import_export</span>Import / Export</button>
+                            class="material-symbols-outlined" style="color:var(--secondary);">import_export</span>Import
+                        / Export</button>
                     <button id="signout-btn"
                         style="display:flex;align-items:center;gap:10px;background:transparent;border:1px solid var(--surface-high);color:var(--on-surface-variant);padding:14px 16px;border-radius:var(--radius-md);font-size:0.95rem;font-family:var(--font-body);cursor:pointer;text-align:left;width:100%;"><span
                             class="material-symbols-outlined">logout</span>Sign out</button>
@@ -498,39 +679,62 @@
     </div>
 
     <!-- Data Management Modal -->
-    <div id="data-modal-overlay" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;">
-        <div id="data-modal" style="background:var(--surface-low);border-radius:var(--radius-lg);padding:24px;width:calc(100% - 48px);max-width:320px;display:flex;flex-direction:column;gap:10px;">
-            <div style="font-size:1rem;font-weight:800;font-family:var(--font-display);color:var(--on-surface);margin-bottom:6px;">Data Management</div>
-            <button id="dm-export-btn" style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--glass-border);color:var(--on-surface);padding:14px 16px;border-radius:var(--radius-md);font-size:0.92rem;font-family:var(--font-body);cursor:pointer;width:100%;text-align:left;">
-                <span class="material-symbols-outlined" style="font-size:20px;color:var(--secondary);">download</span>Export as JSON
+    <div id="data-modal-overlay"
+        style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;">
+        <div id="data-modal"
+            style="background:var(--surface-low);border-radius:var(--radius-lg);padding:24px;width:calc(100% - 48px);max-width:320px;display:flex;flex-direction:column;gap:10px;">
+            <div
+                style="font-size:1rem;font-weight:800;font-family:var(--font-display);color:var(--on-surface);margin-bottom:6px;">
+                Data Management</div>
+            <button id="dm-export-btn"
+                style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--glass-border);color:var(--on-surface);padding:14px 16px;border-radius:var(--radius-md);font-size:0.92rem;font-family:var(--font-body);cursor:pointer;width:100%;text-align:left;">
+                <span class="material-symbols-outlined"
+                    style="font-size:20px;color:var(--secondary);">download</span>Export as JSON
             </button>
-            <button id="dm-import-btn" style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--glass-border);color:var(--on-surface);padding:14px 16px;border-radius:var(--radius-md);font-size:0.92rem;font-family:var(--font-body);cursor:pointer;width:100%;text-align:left;">
-                <span class="material-symbols-outlined" style="font-size:20px;color:var(--primary);">upload</span>Import from JSON
+            <button id="dm-import-btn"
+                style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--glass-border);color:var(--on-surface);padding:14px 16px;border-radius:var(--radius-md);font-size:0.92rem;font-family:var(--font-body);cursor:pointer;width:100%;text-align:left;">
+                <span class="material-symbols-outlined" style="font-size:20px;color:var(--primary);">upload</span>Import
+                from JSON
             </button>
             <input type="file" id="import-file-input" accept=".json" style="display:none;">
-            <button id="dm-clear-btn" style="display:flex;align-items:center;gap:12px;background:var(--error-bg);border:1px solid var(--error);color:var(--error);padding:14px 16px;border-radius:var(--radius-md);font-size:0.92rem;font-family:var(--font-body);cursor:pointer;width:100%;text-align:left;">
+            <button id="dm-clear-btn"
+                style="display:flex;align-items:center;gap:12px;background:var(--error-bg);border:1px solid var(--error);color:var(--error);padding:14px 16px;border-radius:var(--radius-md);font-size:0.92rem;font-family:var(--font-body);cursor:pointer;width:100%;text-align:left;">
                 <span class="material-symbols-outlined" style="font-size:20px;">delete_forever</span>Clear All Data
             </button>
-            <button id="dm-cancel-btn" style="display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--surface-high);color:var(--on-surface-variant);padding:12px 16px;border-radius:var(--radius-md);font-size:0.92rem;font-family:var(--font-body);cursor:pointer;width:100%;">
+            <button id="dm-cancel-btn"
+                style="display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--surface-high);color:var(--on-surface-variant);padding:12px 16px;border-radius:var(--radius-md);font-size:0.92rem;font-family:var(--font-body);cursor:pointer;width:100%;">
                 Cancel
             </button>
         </div>
     </div>
 
     <!-- Notification permission prompt -->
-    <div id="notif-prompt-overlay" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.65);align-items:flex-end;justify-content:center;">
-        <div style="background:var(--surface);border-radius:28px 28px 0 0;padding:32px 24px 48px;width:100%;max-width:480px;margin:0 auto;animation:slideUp 0.3s ease;">
-            <div style="width:40px;height:4px;background:var(--surface-high);border-radius:2px;margin:0 auto 28px;"></div>
+    <div id="notif-prompt-overlay"
+        style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.65);align-items:flex-end;justify-content:center;">
+        <div
+            style="background:var(--surface);border-radius:28px 28px 0 0;padding:32px 24px 48px;width:100%;max-width:480px;margin:0 auto;animation:slideUp 0.3s ease;">
+            <div style="width:40px;height:4px;background:var(--surface-high);border-radius:2px;margin:0 auto 28px;">
+            </div>
             <div style="text-align:center;margin-bottom:28px;">
-                <div style="width:72px;height:72px;border-radius:50%;background:var(--primary-container);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;">
-                    <span class="material-symbols-outlined" style="font-size:36px;color:var(--primary);">notifications_active</span>
+                <div
+                    style="width:72px;height:72px;border-radius:50%;background:var(--primary-container);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;">
+                    <span class="material-symbols-outlined"
+                        style="font-size:36px;color:var(--primary);">notifications_active</span>
                 </div>
-                <h3 style="font-family:var(--font-display);font-size:1.3rem;font-weight:800;margin:0 0 10px;">Never miss a renewal</h3>
-                <p style="color:var(--on-surface-variant);font-size:0.9rem;line-height:1.6;margin:0;">Atler can remind you <strong style="color:var(--on-surface);">3 days</strong> and <strong style="color:var(--on-surface);">1 day</strong> before any subscription renews — so you're always in control.</p>
+                <h3 style="font-family:var(--font-display);font-size:1.3rem;font-weight:800;margin:0 0 10px;">Never miss
+                    a renewal</h3>
+                <p style="color:var(--on-surface-variant);font-size:0.9rem;line-height:1.6;margin:0;">Atler can remind
+                    you <strong style="color:var(--on-surface);">3 days</strong> and <strong
+                        style="color:var(--on-surface);">1 day</strong> before any subscription renews — so you're
+                    always in control.</p>
             </div>
             <div style="display:flex;flex-direction:column;gap:10px;">
-                <button id="notif-prompt-allow" style="background:var(--primary);color:#0e0e0e;border:none;padding:16px;border-radius:var(--radius-md);font-weight:800;font-size:1rem;cursor:pointer;font-family:var(--font-display);width:100%;">Allow Notifications</button>
-                <button id="notif-prompt-skip" style="background:transparent;color:var(--on-surface-variant);border:none;padding:14px;border-radius:var(--radius-md);font-size:0.9rem;cursor:pointer;font-family:var(--font-body);width:100%;">Maybe Later</button>
+                <button id="notif-prompt-allow"
+                    style="background:var(--primary);color:#0e0e0e;border:none;padding:16px;border-radius:var(--radius-md);font-weight:800;font-size:1rem;cursor:pointer;font-family:var(--font-display);width:100%;">Allow
+                    Notifications</button>
+                <button id="notif-prompt-skip"
+                    style="background:transparent;color:var(--on-surface-variant);border:none;padding:14px;border-radius:var(--radius-md);font-size:0.9rem;cursor:pointer;font-family:var(--font-body);width:100%;">Maybe
+                    Later</button>
             </div>
         </div>
     </div>
@@ -540,11 +744,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <script src="./script.js?v=11"></script>
 
-    <!-- Service Worker -->
+    <!-- Service Worker reset -->
     <script>
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-                navigator.serviceWorker.register('./sw.js').catch(function() {});
+            window.addEventListener('load', async function () {
+                try {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(regs.map(reg => reg.unregister()));
+                } catch (_) { }
             });
         }
     </script>
