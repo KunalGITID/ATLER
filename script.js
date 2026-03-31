@@ -16,36 +16,116 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
 // GLOBAL STATE
 // ═══════════════════════════════════════════
 let currentUser   = null;
-let profile       = { name: 'Atler', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150', theme: 'default' };
+let profile       = { name: 'Atler', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150', theme: 'default', lastNotified: null, currency: 'INR' };
 let subscriptions = [];
 let categories    = [];
 let expenses      = [];
 let activeSubId   = null;
 let analyticsView = 'subscriptions';
+let activeSwipeRow = null;
 
 const presetCategories = ['Entertainment','Productivity','Utilities','Health','Food','Education'];
 const navItems = document.querySelectorAll('.nav-item');
 
+let _toastTimer = null;
+function showToast(message, duration = 2200) {
+    const el = document.getElementById('toast');
+    if (!el) return;
+    clearTimeout(_toastTimer);
+    el.textContent = message;
+    el.style.opacity   = '1';
+    el.style.transform = 'translateX(-50%) translateY(0)';
+    _toastTimer = setTimeout(() => {
+        el.style.opacity   = '0';
+        el.style.transform = 'translateX(-50%) translateY(-12px)';
+    }, duration);
+}
+
+function snapRowBack(rowEl) {
+    rowEl.style.transition = 'transform 0.3s ease';
+    rowEl.style.transform  = 'translateX(0)';
+    if (activeSwipeRow === rowEl) activeSwipeRow = null;
+}
+
+document.addEventListener('touchstart', e => {
+    if (!activeSwipeRow) return;
+    const wrapper = activeSwipeRow.parentElement;
+    if (wrapper && wrapper.contains(e.target)) return;
+    snapRowBack(activeSwipeRow);
+}, { passive: true });
+
 // ═══════════════════════════════════════════
 // THEMES
 // ═══════════════════════════════════════════
+const DARK_SURFACES = {
+    bg: '#0e0e0e', surfaceLow: '#1c1b1b', surface: '#201f1f', surfaceHigh: '#2a2a2a',
+    onSurface: '#e5e2e1', onSurfaceVariant: '#c7c4d8',
+    glassBg: 'rgba(19,19,19,0.6)', glassBorder: 'rgba(255,255,255,0.05)',
+    error: '#ffb4ab', errorBg: 'rgba(255,180,171,0.1)',
+    insightsText: 'rgba(255,255,255,0.8)', insightsDivider: 'rgba(255,255,255,0.1)',
+    navBg: 'rgba(19,19,19,0.85)', navShadow: '0 -10px 40px rgba(0,0,0,0.5)',
+};
+
 const themes = {
-    default:  { primary:'#c0c1ff', primaryContainer:'#4b4dd8', primaryGlow:'rgba(192,193,255,0.4)', secondary:'#4edea3', secondaryGlow:'rgba(78,222,163,0.2)' },
-    midnight: { primary:'#4fc3f7', primaryContainer:'#0d47a1', primaryGlow:'rgba(79,195,247,0.4)',  secondary:'#80deea', secondaryGlow:'rgba(128,222,234,0.2)' },
-    rose:     { primary:'#f48fb1', primaryContainer:'#880e4f', primaryGlow:'rgba(244,143,177,0.4)', secondary:'#f06292', secondaryGlow:'rgba(240,98,146,0.2)' },
-    forest:   { primary:'#81c784', primaryContainer:'#1b5e20', primaryGlow:'rgba(129,199,132,0.4)', secondary:'#aed581', secondaryGlow:'rgba(174,213,129,0.2)' },
-    amber:    { primary:'#ffcc02', primaryContainer:'#e65100', primaryGlow:'rgba(255,204,2,0.4)',   secondary:'#ffb300', secondaryGlow:'rgba(255,179,0,0.2)' },
+    default:  { ...DARK_SURFACES, primary:'#c0c1ff', primaryContainer:'#4b4dd8', primaryGlow:'rgba(192,193,255,0.4)', secondary:'#4edea3', secondaryGlow:'rgba(78,222,163,0.2)' },
+    midnight: { ...DARK_SURFACES, primary:'#4fc3f7', primaryContainer:'#0d47a1', primaryGlow:'rgba(79,195,247,0.4)',  secondary:'#80deea', secondaryGlow:'rgba(128,222,234,0.2)' },
+    forest:   { ...DARK_SURFACES, primary:'#81c784', primaryContainer:'#1b5e20', primaryGlow:'rgba(129,199,132,0.4)', secondary:'#aed581', secondaryGlow:'rgba(174,213,129,0.2)' },
+    paper: {
+        primary: '#1A1A1A', primaryContainer: '#E0E0E0', primaryGlow: 'rgba(26,26,26,0.08)',
+        secondary: '#555555', secondaryGlow: 'rgba(85,85,85,0.08)',
+        bg: '#F5F5F5', surfaceLow: '#EBEBEB', surface: '#F0F0F0', surfaceHigh: '#E2E2E2',
+        onSurface: '#1A1A1A', onSurfaceVariant: '#888888',
+        glassBg: 'rgba(245,245,245,0.88)', glassBorder: 'rgba(0,0,0,0.08)',
+        error: '#cc2222', errorBg: 'rgba(204,34,34,0.08)',
+        insightsText: 'rgba(0,0,0,0.65)', insightsDivider: 'rgba(0,0,0,0.10)',
+        navBg: 'rgba(245,245,245,0.92)', navShadow: '0 -10px 40px rgba(0,0,0,0.08)',
+    },
+    void: {
+        primary: '#E05A4E', primaryContainer: '#2A1210', primaryGlow: 'rgba(224,90,78,0.35)',
+        secondary: '#C04840', secondaryGlow: 'rgba(192,72,64,0.2)',
+        bg: '#0D0D0D', surfaceLow: '#141414', surface: '#1C1C1C', surfaceHigh: '#252525',
+        onSurface: '#E8E8E8', onSurfaceVariant: '#888888',
+        glassBg: 'rgba(13,13,13,0.75)', glassBorder: 'rgba(255,255,255,0.06)',
+        error: '#ff6b6b', errorBg: 'rgba(255,107,107,0.1)',
+        insightsText: 'rgba(232,232,232,0.8)', insightsDivider: 'rgba(224,90,78,0.25)',
+        navBg: 'rgba(13,13,13,0.9)', navShadow: '0 -10px 40px rgba(0,0,0,0.7)',
+    },
+    inferno: {
+        primary: '#FF6A00', primaryContainer: '#1F1000', primaryGlow: 'rgba(255,106,0,0.4)',
+        secondary: '#00FFB2', secondaryGlow: 'rgba(0,255,178,0.2)',
+        bg: '#0A0A0A', surfaceLow: '#111111', surface: '#161616', surfaceHigh: '#1A1A1A',
+        onSurface: '#EFEFEF', onSurfaceVariant: '#444444',
+        glassBg: 'rgba(10,10,10,0.78)', glassBorder: 'rgba(255,106,0,0.12)',
+        error: '#ff6b6b', errorBg: 'rgba(255,107,107,0.1)',
+        insightsText: 'rgba(239,239,239,0.82)', insightsDivider: 'rgba(255,106,0,0.3)',
+        navBg: 'rgba(10,10,10,0.92)', navShadow: '0 -10px 40px rgba(255,106,0,0.12)',
+    },
 };
 
 function applyTheme(name) {
     const t = themes[name] || themes.default;
     const r = document.documentElement.style;
 
-    r.setProperty('--primary', t.primary);
+    r.setProperty('--primary',           t.primary);
     r.setProperty('--primary-container', t.primaryContainer);
-    r.setProperty('--primary-glow', t.primaryGlow);
-    r.setProperty('--secondary', t.secondary);
-    r.setProperty('--secondary-glow', t.secondaryGlow);
+    r.setProperty('--primary-glow',      t.primaryGlow);
+    r.setProperty('--secondary',         t.secondary);
+    r.setProperty('--secondary-glow',    t.secondaryGlow);
+
+    r.setProperty('--bg-color',          t.bg);
+    r.setProperty('--surface-low',       t.surfaceLow);
+    r.setProperty('--surface',           t.surface);
+    r.setProperty('--surface-high',      t.surfaceHigh);
+    r.setProperty('--on-surface',        t.onSurface);
+    r.setProperty('--on-surface-variant',t.onSurfaceVariant);
+    r.setProperty('--glass-bg',          t.glassBg);
+    r.setProperty('--glass-border',      t.glassBorder);
+    r.setProperty('--error',             t.error);
+    r.setProperty('--error-bg',          t.errorBg);
+    r.setProperty('--insights-text',     t.insightsText);
+    r.setProperty('--insights-divider',  t.insightsDivider);
+    r.setProperty('--nav-bg',            t.navBg);
+    r.setProperty('--nav-shadow',        t.navShadow);
 
     document.querySelectorAll('.theme-chip').forEach(chip => {
         const dot = chip.querySelector('div');
@@ -58,7 +138,7 @@ function applyTheme(name) {
     });
 
     profile.theme = name;
-    localStorage.setItem('atler_theme', name); // persist for instant theme on next launch
+    localStorage.setItem('atler_theme', name);
 }
 
 // ═══════════════════════════════════════════
@@ -142,9 +222,11 @@ async function loadAllData() {
 
     if (profRes.data) {
         profile = {
-            name:   profRes.data.name   || 'Atler',
-            avatar: profRes.data.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
-            theme:  profRes.data.theme  || 'default',
+            name:         profRes.data.name   || 'Atler',
+            avatar:       profRes.data.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
+            theme:        profRes.data.theme  || 'default',
+            lastNotified: profRes.data.last_notified || null,
+            currency:     profRes.data.currency || 'INR',
         };
     }
 
@@ -180,10 +262,12 @@ async function loadAllData() {
 async function saveProfile() {
     if (!currentUser) return;
     await sb.from('profiles').upsert({
-        user_id: currentUser.id,
-        name:    profile.name,
-        avatar:  profile.avatar,
-        theme:   profile.theme,
+        user_id:       currentUser.id,
+        name:          profile.name,
+        avatar:        profile.avatar,
+        theme:         profile.theme,
+        last_notified: profile.lastNotified || null,
+        currency:      profile.currency || 'INR',
     });
 }
 
@@ -274,6 +358,20 @@ function formatDate(ds) {
     return new Date(ds).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
 }
 function todayISO() { return new Date().toISOString().split('T')[0]; }
+
+// ═══════════════════════════════════════════
+// CURRENCY HELPERS
+// ═══════════════════════════════════════════
+function getCurrencySymbol() {
+    const symbols = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
+    return symbols[profile.currency] || '₹';
+}
+function formatAmount(amount) {
+    const locales = { INR: 'en-IN', USD: 'en-US', EUR: 'de-DE', GBP: 'en-GB' };
+    const locale  = locales[profile.currency] || 'en-IN';
+    return parseFloat(amount).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function getMonthlyCost(sub) {
     const price = parseFloat(sub.price);
     if (sub.cycle === 'Yearly')  return price / 12;
@@ -362,6 +460,8 @@ navItems.forEach(item => {
     });
 });
 
+document.getElementById('user-avatar-img').addEventListener('click', () => switchPage('profile-page'));
+
 // ═══════════════════════════════════════════
 // DETAILS PAGE
 // ═══════════════════════════════════════════
@@ -407,7 +507,10 @@ document.getElementById('edit-form').addEventListener('submit', async e => {
         if (!days || days <= 0) return;
         cycle = days;
     }
-    sub.name      = document.getElementById('edit-name').value.trim() || sub.name;
+    const editedName = document.getElementById('edit-name').value.trim() || sub.name;
+    const duplicate  = subscriptions.find(s => s.id !== activeSubId && s.name.toLowerCase().trim() === editedName.toLowerCase().trim());
+    if (duplicate && !confirm(`Another subscription called ${editedName} already exists. Save anyway?`)) return;
+    sub.name      = editedName;
     sub.cycle     = cycle;
     sub.price     = parseFloat(document.getElementById('edit-price').value).toFixed(2);
     sub.startDate = document.getElementById('edit-start-date').value || sub.startDate;
@@ -418,6 +521,7 @@ document.getElementById('edit-form').addEventListener('submit', async e => {
     document.getElementById('detail-cycle').textContent = formatCycle(sub.cycle) + ' Plan';
     document.getElementById('detail-price').textContent = parseFloat(sub.price).toFixed(2);
 
+    showToast('Saved');
     const btn = e.target.querySelector('button[type="submit"]');
     btn.textContent = 'Saved ✓';
     setTimeout(() => { btn.textContent = 'Save Changes'; }, 1500);
@@ -431,6 +535,7 @@ document.getElementById('pause-sub-btn').addEventListener('click', async () => {
     await upsertSubscription(sub);
     document.getElementById('pause-icon').textContent  = sub.paused ? 'play_arrow' : 'pause';
     document.getElementById('pause-label').textContent = sub.paused ? 'Resume Subscription' : 'Pause Subscription';
+    showToast(sub.paused ? 'Paused' : 'Resumed');
 });
 
 // Delete button
@@ -439,6 +544,105 @@ document.getElementById('delete-sub-btn').addEventListener('click', async () => 
     await deleteSubscription(activeSubId);
     subscriptions = subscriptions.filter(s => s.id !== activeSubId);
     switchPage('dashboard-page');
+});
+
+// ═══════════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════════
+async function scheduleRenewalNotifications() {
+    if (!currentUser || !('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (profile.lastNotified === todayStr) return;
+
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const activeSubs = subscriptions.filter(s => !s.paused);
+
+    for (const sub of activeSubs) {
+        const anchor   = sub.startDate || sub.dateAdded;
+        const next     = getNextRenewalDate(anchor, sub.cycle);
+        const diffDays = Math.ceil((next - today) / 86400000);
+        if (diffDays === 3 || diffDays === 1) {
+            const price = formatAmount(sub.price);
+            new Notification('Atler — Renewal Reminder', {
+                body: `${sub.name} renews in ${diffDays} day${diffDays > 1 ? 's' : ''} — ${getCurrencySymbol()}${price}`,
+                icon: '/icon-192.png',
+            });
+        }
+    }
+
+    profile.lastNotified = todayStr;
+    await saveProfile();
+}
+
+function renderNotificationStatus() {
+    const btn      = document.getElementById('notif-toggle-btn');
+    const status   = document.getElementById('notif-status');
+    const iconWrap = document.getElementById('notif-icon-wrap');
+    if (!btn || !status) return;
+
+    if (!('Notification' in window)) {
+        status.textContent = 'Not supported in this browser';
+        btn.style.display  = 'none';
+        return;
+    }
+
+    const perm = Notification.permission;
+    if (perm === 'granted') {
+        status.textContent      = 'Enabled — reminders active';
+        status.style.color      = 'var(--secondary)';
+        btn.textContent         = 'On';
+        btn.disabled            = true;
+        btn.style.background    = 'var(--secondary)';
+        btn.style.color         = '#0e0e0e';
+        btn.style.opacity       = '1';
+        btn.style.cursor        = 'default';
+        if (iconWrap) iconWrap.style.background = 'rgba(78,222,163,0.15)';
+    } else if (perm === 'denied') {
+        status.textContent      = 'Blocked — allow in browser settings';
+        status.style.color      = 'var(--error)';
+        btn.textContent         = 'Blocked';
+        btn.disabled            = true;
+        btn.style.background    = 'var(--error-bg)';
+        btn.style.color         = 'var(--error)';
+        btn.style.opacity       = '1';
+        btn.style.cursor        = 'default';
+        if (iconWrap) iconWrap.style.background = 'var(--error-bg)';
+    } else {
+        status.textContent      = 'Not enabled';
+        status.style.color      = 'var(--on-surface-variant)';
+        btn.textContent         = 'Enable';
+        btn.disabled            = false;
+        btn.style.background    = 'var(--primary-container)';
+        btn.style.color         = 'var(--primary)';
+        btn.style.opacity       = '1';
+        btn.style.cursor        = 'pointer';
+        if (iconWrap) iconWrap.style.background = 'var(--primary-container)';
+    }
+}
+
+function showNotificationPrompt() {
+    if (!('Notification' in window) || Notification.permission !== 'default') return;
+    const overlay = document.getElementById('notif-prompt-overlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+}
+
+function hideNotificationPrompt() {
+    const overlay = document.getElementById('notif-prompt-overlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+document.getElementById('notif-prompt-allow').addEventListener('click', async () => {
+    hideNotificationPrompt();
+    const perm = await Notification.requestPermission();
+    renderNotificationStatus();
+    if (perm === 'granted') await scheduleRenewalNotifications();
+});
+
+document.getElementById('notif-prompt-skip').addEventListener('click', () => {
+    hideNotificationPrompt();
 });
 
 // ═══════════════════════════════════════════
@@ -454,10 +658,24 @@ function renderProfilePage() {
     const statsLine = document.getElementById('profile-stats-line');
     if (statsLine) {
         const totalMonthly = subscriptions.filter(s => !s.paused).reduce((s, sub) => s + getMonthlyCost(sub), 0);
-        statsLine.textContent = `${subscriptions.length} subscription${subscriptions.length !== 1 ? 's' : ''} · ₹${totalMonthly.toLocaleString('en-IN', { minimumFractionDigits:2, maximumFractionDigits:2 })}/mo`;
+        statsLine.textContent = `${subscriptions.length} subscription${subscriptions.length !== 1 ? 's' : ''} · ${getCurrencySymbol()}${formatAmount(totalMonthly)}/mo`;
     }
     applyTheme(profile.theme || 'default');
+    renderNotificationStatus();
+    document.querySelectorAll('.currency-pill').forEach(pill => {
+        pill.style.border = pill.dataset.currency === (profile.currency || 'INR')
+            ? '2px solid var(--primary)'
+            : '2px solid var(--glass-border)';
+        pill.style.color = pill.dataset.currency === (profile.currency || 'INR')
+            ? 'var(--primary)'
+            : 'var(--on-surface-variant)';
+    });
 }
+
+document.getElementById('notif-toggle-btn').addEventListener('click', async () => {
+    if (!('Notification' in window) || Notification.permission !== 'default') return;
+    showNotificationPrompt();
+});
 
 document.getElementById('profile-avatar-circle').addEventListener('click', () => {
     document.getElementById('avatar-file-input').click();
@@ -495,21 +713,80 @@ document.querySelectorAll('.theme-chip').forEach(chip => {
     });
 });
 
-document.getElementById('export-data-btn').addEventListener('click', () => {
+document.querySelectorAll('.currency-pill').forEach(pill => {
+    pill.addEventListener('click', async () => {
+        profile.currency = pill.dataset.currency;
+        await saveProfile();
+        renderProfilePage();
+        renderApp();
+    });
+});
+
+// ═══════════════════════════════════════════
+// DATA MANAGEMENT MODAL
+// ═══════════════════════════════════════════
+const dataModalOverlay = document.getElementById('data-modal-overlay');
+
+function openDataModal()  { dataModalOverlay.style.display = 'flex'; }
+function closeDataModal() { dataModalOverlay.style.display = 'none'; }
+
+document.getElementById('open-data-modal-btn').addEventListener('click', openDataModal);
+document.getElementById('dm-cancel-btn').addEventListener('click', closeDataModal);
+dataModalOverlay.addEventListener('click', e => { if (e.target === dataModalOverlay) closeDataModal(); });
+
+document.getElementById('dm-export-btn').addEventListener('click', () => {
     const data = { profile, subscriptions, categories, expenses, exportedAt: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href = url; a.download = `atler-backup-${todayISO()}.json`; a.click();
     URL.revokeObjectURL(url);
+    closeDataModal();
 });
 
-document.getElementById('clear-data-btn').addEventListener('click', async () => {
+document.getElementById('dm-import-btn').addEventListener('click', () => {
+    document.getElementById('import-file-input').click();
+});
+
+document.getElementById('import-file-input').addEventListener('change', function () {
+    const file = this.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async function (e) {
+        let parsed;
+        try { parsed = JSON.parse(e.target.result); } catch {
+            alert('Invalid JSON file.'); return;
+        }
+        if (!Array.isArray(parsed.subscriptions)) {
+            alert('Invalid backup file — missing subscriptions array.'); return;
+        }
+        if (!confirm('This will replace all your current data. Continue?')) return;
+        closeDataModal();
+        await clearAllData();
+        for (const sub of (parsed.subscriptions || [])) await upsertSubscription(sub);
+        for (const cat of (parsed.categories   || [])) await upsertCategory(cat);
+        for (const exp of (parsed.expenses      || [])) await insertExpense(exp);
+        if (parsed.profile) {
+            profile.name   = parsed.profile.name   || profile.name;
+            profile.avatar = parsed.profile.avatar || profile.avatar;
+        }
+        await saveProfile();
+        await loadAllData();
+        await renderApp();
+        renderProfilePage();
+        showToast('Imported successfully');
+    };
+    reader.readAsText(file);
+    this.value = '';
+});
+
+document.getElementById('dm-clear-btn').addEventListener('click', async () => {
     if (!confirm('This will delete all your subscriptions, expenses and categories. Your profile will be kept. Continue?')) return;
+    closeDataModal();
     await clearAllData();
     await renderApp();
     renderProfilePage();
-    alert('All data cleared. Profile kept.');
+    showToast('All data cleared');
 });
 
 // ═══════════════════════════════════════════
@@ -538,6 +815,12 @@ addForm.addEventListener('submit', async e => {
     if (cycle === 'Custom') {
         if (!customDays || parseInt(customDays) <= 0) return;
         cycle = parseInt(customDays);
+    }
+    const existing = subscriptions.find(s => s.name.toLowerCase().trim() === name.toLowerCase().trim());
+    if (existing) {
+        const existingPrice = getCurrencySymbol() + formatAmount(existing.price);
+        const existingCycle = formatCycle(existing.cycle);
+        if (!confirm(`You already have ${existing.name} at ${existingPrice}/${existingCycle}. Add another anyway?`)) return;
     }
     const newSub = {
         id:        Date.now().toString(),
@@ -657,8 +940,9 @@ function renderAnalyticsView() {
 function renderExpensesView() {
     const container = document.getElementById('expenses-list-container');
     container.innerHTML = '';
+    activeSwipeRow = null;
     const total = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
-    document.getElementById('expenses-month-total-val').textContent = total.toLocaleString('en-IN', { minimumFractionDigits:2, maximumFractionDigits:2 });
+    document.getElementById('expenses-month-total-val').textContent = formatAmount(total);
     if (expenses.length === 0) { container.innerHTML = `<div class="expenses-empty">No expenses logged yet.<br>Tap (+) to add one.</div>`; return; }
     const sorted = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
     const todayStr = todayISO();
@@ -675,11 +959,79 @@ function renderExpensesView() {
         dayLabel.className = 'exp-day-label'; dayLabel.textContent = group.label;
         container.appendChild(dayLabel);
         group.items.forEach(exp => {
-            const row = document.createElement('div'); row.className = 'exp-row';
-            const nameSpan = document.createElement('span'); nameSpan.className = 'exp-name'; nameSpan.textContent = exp.name;
-            const amtSpan  = document.createElement('span'); amtSpan.className = 'exp-amount'; amtSpan.textContent = '₹' + parseFloat(exp.amount).toLocaleString('en-IN', { minimumFractionDigits:2, maximumFractionDigits:2 });
-            row.appendChild(nameSpan); row.appendChild(amtSpan);
-            container.appendChild(row);
+            if (exp.type === 'manual') {
+                // ── Swipeable wrapper ──────────────────────────────────
+                const wrapper = document.createElement('div');
+                wrapper.style.cssText = 'position:relative;overflow:hidden;border-radius:var(--radius-md);';
+
+                // Delete backdrop (always behind the row)
+                const backdrop = document.createElement('div');
+                backdrop.style.cssText = 'position:absolute;inset:0;background:var(--error-bg);border:1px solid var(--error);color:var(--error);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;cursor:pointer;';
+                backdrop.innerHTML = '<span class="material-symbols-outlined">delete</span>';
+
+                // Swipeable row
+                const row = document.createElement('div');
+                row.className = 'exp-row';
+                row.style.cssText = 'position:relative;z-index:1;';
+                const nameSpan = document.createElement('span'); nameSpan.className = 'exp-name'; nameSpan.textContent = exp.name;
+                const amtSpan  = document.createElement('span'); amtSpan.className = 'exp-amount'; amtSpan.textContent = getCurrencySymbol() + formatAmount(exp.amount);
+                row.appendChild(nameSpan); row.appendChild(amtSpan);
+
+                // Touch state
+                let startX = 0, startY = 0, curX = 0, swiping = false;
+
+                row.addEventListener('touchstart', e => {
+                    if (activeSwipeRow && activeSwipeRow !== row) snapRowBack(activeSwipeRow);
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                    curX = 0; swiping = false;
+                    row.style.transition = '';
+                }, { passive: true });
+
+                row.addEventListener('touchmove', e => {
+                    const dx = e.touches[0].clientX - startX;
+                    const dy = e.touches[0].clientY - startY;
+                    if (!swiping && Math.abs(dx) < 20) return;
+                    if (!swiping && Math.abs(dy) > Math.abs(dx)) return;
+                    swiping = true;
+                    curX = dx;
+                    row.style.transform = `translateX(${dx}px)`;
+                }, { passive: true });
+
+                row.addEventListener('touchend', () => {
+                    if (!swiping) return;
+                    if (Math.abs(curX) >= 80) {
+                        const snap = curX > 0 ? 80 : -80;
+                        row.style.transition = 'transform 0.2s ease';
+                        row.style.transform  = `translateX(${snap}px)`;
+                        activeSwipeRow = row;
+                    } else {
+                        snapRowBack(row);
+                    }
+                }, { passive: true });
+
+                // Delete on backdrop tap
+                backdrop.addEventListener('click', async () => {
+                    if (!confirm('Delete this expense?')) { snapRowBack(row); return; }
+                    await sb.from('expenses').delete().eq('id', exp.id).eq('user_id', currentUser.id);
+                    expenses = expenses.filter(e => e.id !== exp.id);
+                    activeSwipeRow = null;
+                    renderExpensesView();
+                    renderApp();
+                    showToast('Deleted');
+                });
+
+                wrapper.appendChild(backdrop);
+                wrapper.appendChild(row);
+                container.appendChild(wrapper);
+            } else {
+                // Auto-expense — no swipe
+                const row = document.createElement('div'); row.className = 'exp-row';
+                const nameSpan = document.createElement('span'); nameSpan.className = 'exp-name'; nameSpan.textContent = exp.name;
+                const amtSpan  = document.createElement('span'); amtSpan.className = 'exp-amount'; amtSpan.textContent = getCurrencySymbol() + formatAmount(exp.amount);
+                row.appendChild(nameSpan); row.appendChild(amtSpan);
+                container.appendChild(row);
+            }
         });
         if (gi < groups.length - 1) { const div = document.createElement('div'); div.className = 'exp-divider'; container.appendChild(div); }
     });
@@ -737,7 +1089,7 @@ async function renderApp() {
             left.appendChild(icon); left.appendChild(info);
 
             const right = document.createElement('div'); right.className = 'text-right';
-            const priceEl = document.createElement('div'); priceEl.className = 'list-price'; priceEl.textContent = '₹' + parseFloat(sub.price).toLocaleString('en-IN', { minimumFractionDigits:2 });
+            const priceEl = document.createElement('div'); priceEl.className = 'list-price'; priceEl.textContent = getCurrencySymbol() + formatAmount(sub.price);
             const dateEl  = document.createElement('div'); dateEl.className = 'list-date'; dateEl.textContent = formatDate(sub.dateAdded);
             right.appendChild(priceEl); right.appendChild(dateEl);
 
@@ -779,7 +1131,7 @@ async function renderApp() {
             left.appendChild(icon); left.appendChild(info);
 
             const right    = document.createElement('div'); right.className = 'text-right';
-            const priceEl  = document.createElement('div'); priceEl.className = 'list-price'; priceEl.textContent = '₹' + parseFloat(exp.amount).toLocaleString('en-IN', { minimumFractionDigits:2 });
+            const priceEl  = document.createElement('div'); priceEl.className = 'list-price'; priceEl.textContent = getCurrencySymbol() + formatAmount(exp.amount);
             right.appendChild(priceEl);
 
             item.appendChild(left); item.appendChild(right);
@@ -814,8 +1166,8 @@ async function renderApp() {
     const thisMonthExpenses = expenses
         .filter(e => { const d = new Date(e.date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); })
         .reduce((s,e) => s + parseFloat(e.amount), 0);
-    document.getElementById('total-spend').textContent = (totalMonthly + thisMonthExpenses).toLocaleString('en-IN', { minimumFractionDigits:2, maximumFractionDigits:2 });
-    document.getElementById('ytd-spend').textContent   = totalMonthly.toLocaleString('en-IN', { minimumFractionDigits:2, maximumFractionDigits:2 });
+    document.getElementById('total-spend').textContent = formatAmount(totalMonthly + thisMonthExpenses);
+    document.getElementById('ytd-spend').textContent   = formatAmount(totalMonthly);
 
     renderAnalyticsView();
     renderInsights();
@@ -863,26 +1215,27 @@ function renderInsights() {
     activeSubs.forEach(sub => { const days = Math.floor((now - new Date(sub.dateAdded)) / msDay); if (days > oldestDays) { oldestDays = days; oldestSub = sub; } });
     let nextRenewalDays = Infinity;
     activeSubs.forEach(sub => { const anchor = sub.startDate || sub.dateAdded; const diff = Math.ceil((getNextRenewalDate(anchor, sub.cycle) - todayMidnight) / msDay); if (diff < nextRenewalDays) nextRenewalDays = diff; });
-    const fmt = n => parseFloat(n).toLocaleString('en-IN', { minimumFractionDigits:2, maximumFractionDigits:2 });
+    const sym = getCurrencySymbol();
+    const fmt = n => formatAmount(n);
     const candidates = [];
 
     if (subscriptions.length === 0 && manualExp.length === 0) candidates.push({ score:1000, solo:true, title:'Broke or Just Shy?', text:"No transactions yet. Either you live off the grid or you forgot to add everything. We don't judge. Much." });
     if (manualExp.length > 0 && subscriptions.length === 0) candidates.push({ score:900, solo:true, title:'Spending Without Tracking', text:"You're logging one-time expenses but haven't added recurring subscriptions yet. Add them to see the real damage." });
-    if (renewalsToday.length > 0) { const total = renewalsToday.reduce((s,sub) => s + parseFloat(sub.price), 0); candidates.push({ score: 850 + (renewalsToday.length-1)*50, title:'Money Leaving Right Now', text: renewalsToday.length === 1 ? `${renewalsToday[0].name} renews today. ₹${fmt(renewalsToday[0].price)} is already gone or going. Moment of silence.` : `${renewalsToday[0].name} renews today plus ${renewalsToday.length-1} more totaling ₹${fmt(total)}.` }); }
-    if (renewalsSoon.length > 0) { const s = renewalsSoon.sort((a,b) => a.diffDays - b.diffDays)[0]; candidates.push({ score: 700 + (3-s.diffDays)*50, title:'Renewal Incoming', text:`${s.sub.name} hits your wallet in ${s.diffDays} day${s.diffDays > 1 ? 's' : ''} — ₹${fmt(s.sub.price)}. Start mentally preparing.` }); }
-    if (subCount > 1 && totalMonthly > 0) { let d = null, dp = 0; activeSubs.forEach(sub => { const p = getMonthlyCost(sub)/totalMonthly*100; if (p > dp) { dp = p; d = sub; } }); if (dp > 50) candidates.push({ score: dp*8, title:'One Sub to Rule Them All', text:`${d.name} is ${Math.round(dp)}% of your monthly spend. That's ₹${fmt(getMonthlyCost(d))} out of ₹${fmt(totalMonthly)}. At this point just marry it.` }); }
-    Object.values(catTotals).forEach(cat => { if (cat.count > 2) candidates.push({ score: 400+cat.count*30, title:'Category Obsession', text:`You have ${cat.count} ${cat.name} subscriptions worth ₹${fmt(cat.total)}/month. We get it. You really love ${cat.name}.` }); });
-    if (oldestSub && oldestDays >= 365) { const months = Math.floor(oldestDays/30); candidates.push({ score: 350+(oldestDays/365)*40, title:'Loyalty or Laziness?', text:`You've had ${oldestSub.name} for ${months} months. Either you love it or forgot it exists. Estimated cost so far: ₹${fmt(getMonthlyCost(oldestSub)*months)}.` }); }
-    if (subCount > 4) candidates.push({ score: subCount*45, title:'Subscription Hoarder', text:`You have ${subCount} active subscriptions burning ₹${fmt(totalMonthly)}/mo. The average person uses about 3 actively. Think about that.` });
-    if (totalMonthly > 3000) candidates.push({ score: (totalMonthly/1000)*60, title:'Big Spender Energy', text:`You're spending ₹${fmt(totalMonthly)}/mo. That's ₹${fmt(totalYearly)}/year. That's ${Math.round(totalYearly/250)} plates of biryani. Your call.` });
-    if (totalYearly > 10000) candidates.push({ score: (totalYearly/5000)*40, title:'Annual Reality Check', text:`You're on track for ₹${fmt(totalYearly)} this year. Breaking it down: ₹${fmt(totalMonthly)}/mo, ₹${fmt(totalMonthly*12/52)}/week. Every. Single. Day.` });
+    if (renewalsToday.length > 0) { const total = renewalsToday.reduce((s,sub) => s + parseFloat(sub.price), 0); candidates.push({ score: 850 + (renewalsToday.length-1)*50, title:'Money Leaving Right Now', text: renewalsToday.length === 1 ? `${renewalsToday[0].name} renews today. ${sym}${fmt(renewalsToday[0].price)} is already gone or going. Moment of silence.` : `${renewalsToday[0].name} renews today plus ${renewalsToday.length-1} more totaling ${sym}${fmt(total)}.` }); }
+    if (renewalsSoon.length > 0) { const s = renewalsSoon.sort((a,b) => a.diffDays - b.diffDays)[0]; candidates.push({ score: 700 + (3-s.diffDays)*50, title:'Renewal Incoming', text:`${s.sub.name} hits your wallet in ${s.diffDays} day${s.diffDays > 1 ? 's' : ''} — ${sym}${fmt(s.sub.price)}. Start mentally preparing.` }); }
+    if (subCount > 1 && totalMonthly > 0) { let d = null, dp = 0; activeSubs.forEach(sub => { const p = getMonthlyCost(sub)/totalMonthly*100; if (p > dp) { dp = p; d = sub; } }); if (dp > 50) candidates.push({ score: dp*8, title:'One Sub to Rule Them All', text:`${d.name} is ${Math.round(dp)}% of your monthly spend. That's ${sym}${fmt(getMonthlyCost(d))} out of ${sym}${fmt(totalMonthly)}. At this point just marry it.` }); }
+    Object.values(catTotals).forEach(cat => { if (cat.count > 2) candidates.push({ score: 400+cat.count*30, title:'Category Obsession', text:`You have ${cat.count} ${cat.name} subscriptions worth ${sym}${fmt(cat.total)}/month. We get it. You really love ${cat.name}.` }); });
+    if (oldestSub && oldestDays >= 365) { const months = Math.floor(oldestDays/30); candidates.push({ score: 350+(oldestDays/365)*40, title:'Loyalty or Laziness?', text:`You've had ${oldestSub.name} for ${months} months. Either you love it or forgot it exists. Estimated cost so far: ${sym}${fmt(getMonthlyCost(oldestSub)*months)}.` }); }
+    if (subCount > 4) candidates.push({ score: subCount*45, title:'Subscription Hoarder', text:`You have ${subCount} active subscriptions burning ${sym}${fmt(totalMonthly)}/mo. The average person uses about 3 actively. Think about that.` });
+    if (totalMonthly > 3000) candidates.push({ score: (totalMonthly/1000)*60, title:'Big Spender Energy', text:`You're spending ${sym}${fmt(totalMonthly)}/mo. That's ${sym}${fmt(totalYearly)}/year. That's ${Math.round(totalYearly/250)} plates of biryani. Your call.` });
+    if (totalYearly > 10000) candidates.push({ score: (totalYearly/5000)*40, title:'Annual Reality Check', text:`You're on track for ${sym}${fmt(totalYearly)} this year. Breaking it down: ${sym}${fmt(totalMonthly)}/mo, ${sym}${fmt(totalMonthly*12/52)}/week. Every. Single. Day.` });
     if (subCount === 1) candidates.push({ score:200, title:'Baby Steps', text:"One subscription tracked. Either you're a minimalist legend or this is just the beginning of a very expensive list." });
-    if (subCount > 0) { const nr = nextRenewalDays === Infinity ? 'N/A' : `${nextRenewalDays} day${nextRenewalDays !== 1 ? 's' : ''}`; candidates.push({ score:100, title:'Looking Clean 👀', text:`Spending looks controlled. ${subCount} subscription${subCount !== 1 ? 's' : ''}, ₹${fmt(totalMonthly)}/mo, next renewal in ${nr}. Either you're disciplined or haven't added everything yet.` }); }
-    if (lastWeekTotal > 0 && thisWeekTotal > lastWeekTotal*2) { const ratio = thisWeekTotal/lastWeekTotal; candidates.push({ score:ratio*200, title:'Spending Spike Detected', text:`Your one-time expenses this week are ${ratio.toFixed(1)}x higher than last week. ₹${fmt(thisWeekTotal)} vs ₹${fmt(lastWeekTotal)}. Something happened. We're not asking questions.` }); }
-    if (totalMonthly > 0) { let lc = null, lp = 0; Object.values(catTotals).forEach(cat => { const p = cat.total/totalMonthly*100; if (p > lp) { lp = p; lc = cat; } }); if (lc && lp > 40) candidates.push({ score:450, title:`${lc.name} is Draining You`, text:`Your ${lc.name} subscriptions alone cost ₹${fmt(lc.total)}/mo — ${Math.round(lp)}% of your total. Consider if you need all ${lc.count} of them.` }); }
-    if (thisWeekExps.length > 3) { const da = thisWeekTotal/7; candidates.push({ score:380, title:'Daily Spending Habit', text:`You've logged ${thisWeekExps.length} expenses this week averaging ₹${fmt(da)}/day. At this pace that's ₹${fmt(da*30)} extra this month.` }); }
+    if (subCount > 0) { const nr = nextRenewalDays === Infinity ? 'N/A' : `${nextRenewalDays} day${nextRenewalDays !== 1 ? 's' : ''}`; candidates.push({ score:100, title:'Looking Clean 👀', text:`Spending looks controlled. ${subCount} subscription${subCount !== 1 ? 's' : ''}, ${sym}${fmt(totalMonthly)}/mo, next renewal in ${nr}. Either you're disciplined or haven't added everything yet.` }); }
+    if (lastWeekTotal > 0 && thisWeekTotal > lastWeekTotal*2) { const ratio = thisWeekTotal/lastWeekTotal; candidates.push({ score:ratio*200, title:'Spending Spike Detected', text:`Your one-time expenses this week are ${ratio.toFixed(1)}x higher than last week. ${sym}${fmt(thisWeekTotal)} vs ${sym}${fmt(lastWeekTotal)}. Something happened. We're not asking questions.` }); }
+    if (totalMonthly > 0) { let lc = null, lp = 0; Object.values(catTotals).forEach(cat => { const p = cat.total/totalMonthly*100; if (p > lp) { lp = p; lc = cat; } }); if (lc && lp > 40) candidates.push({ score:450, title:`${lc.name} is Draining You`, text:`Your ${lc.name} subscriptions alone cost ${sym}${fmt(lc.total)}/mo — ${Math.round(lp)}% of your total. Consider if you need all ${lc.count} of them.` }); }
+    if (thisWeekExps.length > 3) { const da = thisWeekTotal/7; candidates.push({ score:380, title:'Daily Spending Habit', text:`You've logged ${thisWeekExps.length} expenses this week averaging ${sym}${fmt(da)}/day. At this pace that's ${sym}${fmt(da*30)} extra this month.` }); }
     const cb = totalMonthly + thisMonthExpTotal;
-    if (cb > 8000) candidates.push({ score:(cb/500)*60, title:'Total Burn Rate', text:`This month: ₹${fmt(thisMonthExpTotal)} one-time + ₹${fmt(totalMonthly)} subscriptions = ₹${fmt(cb)} combined. That's your real monthly spend.` });
+    if (cb > 8000) candidates.push({ score:(cb/500)*60, title:'Total Burn Rate', text:`This month: ${sym}${fmt(thisMonthExpTotal)} one-time + ${sym}${fmt(totalMonthly)} subscriptions = ${sym}${fmt(cb)} combined. That's your real monthly spend.` });
 
     categories.forEach(cat => {
         if (!cat.budget) return;
@@ -892,8 +1245,8 @@ function renderInsights() {
         if (pct >= 90) {
             const over = ct.total - cat.budget;
             candidates.push(pct >= 100
-                ? { score: 750, title: `Budget Blown — ${cat.name}`, text: `${cat.name} has exceeded its ₹${fmt(cat.budget)}/mo limit by ₹${fmt(over)}. Consider pausing something.` }
-                : { score: 500 + pct, title: `Budget Alert — ${cat.name}`, text: `${cat.name} is at ${Math.round(pct)}% of your ₹${fmt(cat.budget)}/mo limit. You have ₹${fmt(cat.budget - ct.total)} left.` }
+                ? { score: 750, title: `Budget Blown — ${cat.name}`, text: `${cat.name} has exceeded its ${sym}${fmt(cat.budget)}/mo limit by ${sym}${fmt(over)}. Consider pausing something.` }
+                : { score: 500 + pct, title: `Budget Alert — ${cat.name}`, text: `${cat.name} is at ${Math.round(pct)}% of your ${sym}${fmt(cat.budget)}/mo limit. You have ${sym}${fmt(cat.budget - ct.total)} left.` }
             );
         }
     });
@@ -904,8 +1257,8 @@ function renderInsights() {
     else if (candidates[0].solo) { shown = [candidates[0]]; }
     else { const m = candidates.filter(c => c.score > 300); shown = (m.length > 0 ? m : candidates).slice(0, 3); }
 
-    if (shown.length === 0) { card.innerHTML = '<h3 style="margin:0 0 6px;">All Quiet</h3><p style="color:rgba(255,255,255,0.8);font-size:0.875rem;margin:0;">Nothing to flag yet. Add subscriptions and expenses to get personalised insights.</p>'; return; }
-    card.innerHTML = shown.map((insight, i) => `<div style="${i > 0 ? 'border-top:1px solid rgba(255,255,255,0.1);padding-top:14px;margin-top:14px;' : ''}"><h3 style="font-size:1.1rem;line-height:1.3;margin-bottom:6px;position:relative;z-index:2;">${escapeHTML(insight.title)}</h3><p style="color:rgba(255,255,255,0.8);font-size:0.875rem;line-height:1.5;margin:0;position:relative;z-index:2;">${escapeHTML(insight.text)}</p></div>`).join('');
+    if (shown.length === 0) { card.innerHTML = '<h3 style="margin:0 0 6px;">All Quiet</h3><p style="color:var(--insights-text);font-size:0.875rem;margin:0;">Nothing to flag yet. Add subscriptions and expenses to get personalised insights.</p>'; return; }
+    card.innerHTML = shown.map((insight, i) => `<div style="${i > 0 ? 'border-top:1px solid var(--insights-divider);padding-top:14px;margin-top:14px;' : ''}"><h3 style="font-size:1.1rem;line-height:1.3;margin-bottom:6px;position:relative;z-index:2;">${escapeHTML(insight.title)}</h3><p style="color:var(--insights-text);font-size:0.875rem;line-height:1.5;margin:0;position:relative;z-index:2;">${escapeHTML(insight.text)}</p></div>`).join('');
 }
 
 // ═══════════════════════════════════════════
@@ -983,7 +1336,7 @@ function renderAnalytics() {
             left.appendChild(icon); left.appendChild(info);
 
             const right   = document.createElement('div'); right.className = 'text-right';
-            const priceEl = document.createElement('div'); priceEl.className = 'list-price'; priceEl.style.fontSize = '1.1rem'; priceEl.textContent = '₹' + parseFloat(sub.price).toLocaleString('en-IN', { minimumFractionDigits:2 });
+            const priceEl = document.createElement('div'); priceEl.className = 'list-price'; priceEl.style.fontSize = '1.1rem'; priceEl.textContent = getCurrencySymbol() + formatAmount(sub.price);
             right.appendChild(priceEl);
 
             item.appendChild(left); item.appendChild(right);
@@ -1040,6 +1393,7 @@ async function addCategoryFn(name) {
     await upsertCategory(cat);
     document.getElementById('add-category-input').value = '';
     renderAnalytics();
+    showToast('Category added');
 }
 
 // ═══════════════════════════════════════════
@@ -1123,7 +1477,8 @@ function renderCalendar() {
 function renderCalendarDetail(dateKey, subs) {
     const detail = document.getElementById('cal-detail');
     const d = new Date(dateKey); const label = d.toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long' });
-    const fmt = n => parseFloat(n).toLocaleString('en-IN', { minimumFractionDigits:2, maximumFractionDigits:2 });
+    const fmt = n => formatAmount(n);
+    const sym = getCurrencySymbol();
     const dayExps = expenses.filter(e => e.date.split('T')[0] === dateKey);
     detail.innerHTML = '';
 
@@ -1141,7 +1496,7 @@ function renderCalendarDetail(dateKey, subs) {
         const cycle = document.createElement('div'); cycle.className = 'cal-detail-cycle'; cycle.textContent = formatCycle(sub.cycle) + ' renewal';
         info.appendChild(name); info.appendChild(cycle);
         left.appendChild(icon); left.appendChild(info);
-        const price = document.createElement('div'); price.className = 'cal-detail-price'; price.textContent = '₹' + fmt(sub.price);
+        const price = document.createElement('div'); price.className = 'cal-detail-price'; price.textContent = sym + fmt(sub.price);
         row.appendChild(left); row.appendChild(price);
         detail.appendChild(row);
     });
@@ -1162,7 +1517,7 @@ function renderCalendarDetail(dateKey, subs) {
             const type = document.createElement('div'); type.className = 'cal-detail-cycle'; type.textContent = 'One-time expense';
             info.appendChild(name); info.appendChild(type);
             left.appendChild(icon); left.appendChild(info);
-            const price = document.createElement('div'); price.className = 'cal-detail-price'; price.textContent = '₹' + fmt(exp.amount);
+            const price = document.createElement('div'); price.className = 'cal-detail-price'; price.textContent = sym + fmt(exp.amount);
             row.appendChild(left); row.appendChild(price);
             detail.appendChild(row);
         });
@@ -1174,7 +1529,7 @@ function renderCalendarDetail(dateKey, subs) {
         const total = document.createElement('div');
         total.style.cssText = 'border-top:1px solid var(--surface);margin-top:8px;padding-top:10px;display:flex;justify-content:space-between;align-items:center;';
         const lbl = document.createElement('div'); lbl.style.cssText = 'font-size:0.75rem;color:var(--on-surface-variant);font-weight:600;'; lbl.textContent = 'Total today';
-        const amt  = document.createElement('div'); amt.style.cssText  = 'font-size:1rem;font-weight:800;color:var(--primary);'; amt.textContent = '₹' + fmt(st+et);
+        const amt  = document.createElement('div'); amt.style.cssText  = 'font-size:1rem;font-weight:800;color:var(--primary);'; amt.textContent = sym + fmt(st+et);
         total.appendChild(lbl); total.appendChild(amt);
         detail.appendChild(total);
     }
@@ -1254,7 +1609,7 @@ function startBootNoise() {
     return () => clearInterval(timer);
 }
 
-async function runBootWithLoader(bootFn, minVisible = 3800) {
+async function runBootWithLoader(bootFn, minVisible = 800) {
     const loading = document.getElementById('app-loading');
     const statusEl = document.getElementById('boot-status');
     const startTime = Date.now();
@@ -1281,10 +1636,7 @@ async function runBootWithLoader(bootFn, minVisible = 3800) {
             }, 1800);
             setTimeout(() => {
                  decodeStatus(statusEl, "OPTIMIZING DASHBOARD...", 600);
-            }, 3800);
-            setTimeout(() => {
-                 decodeStatus(statusEl, "FINALIZING SYSTEM SYNC...", 600);
-            }, 5500);
+            }, 2800);
         }
 
         await Promise.race([bootPromise, timeoutPromise]);
@@ -1329,6 +1681,7 @@ async function runBootWithLoader(bootFn, minVisible = 3800) {
         loadAllData().then(() => {
             renderApp();
             renderProfilePage();
+            scheduleRenewalNotifications();
         });
     });
 })();
@@ -1348,7 +1701,9 @@ sb.auth.onAuthStateChange(async (event, session) => {
             await loadAllData();
             await renderApp();
             renderProfilePage();
-        }, 7000);
+            scheduleRenewalNotifications();
+            showNotificationPrompt();
+        }, 4000);
     }
 
     if (event === 'SIGNED_OUT') {
