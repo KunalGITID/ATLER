@@ -23,6 +23,9 @@ let expenses      = [];
 let activeSubId   = null;
 let analyticsView = 'subscriptions';
 let activeSwipeRow = null;
+let dashSearchQuery = '';
+let dashSearchFilter = 'all'; // 'all' | 'subscriptions' | 'expenses'
+let expSearchQuery   = '';
 
 const presetCategories = ['Entertainment','Productivity','Utilities','Health','Food','Education'];
 const navItems = document.querySelectorAll('.nav-item');
@@ -99,6 +102,16 @@ const themes = {
         error: '#ff6b6b', errorBg: 'rgba(255,107,107,0.1)',
         insightsText: 'rgba(239,239,239,0.82)', insightsDivider: 'rgba(255,106,0,0.3)',
         navBg: 'rgba(10,10,10,0.92)', navShadow: '0 -10px 40px rgba(255,106,0,0.12)',
+    },
+    slate: {
+        primary: '#94a3b8', primaryContainer: '#334155', primaryGlow: 'rgba(148,163,184,0.3)',
+        secondary: '#7dd3fc', secondaryGlow: 'rgba(125,211,252,0.2)',
+        bg: '#0f172a', surfaceLow: '#1e293b', surface: '#263348', surfaceHigh: '#334155',
+        onSurface: '#e2e8f0', onSurfaceVariant: '#94a3b8',
+        glassBg: 'rgba(15,23,42,0.75)', glassBorder: 'rgba(148,163,184,0.1)',
+        error: '#fca5a5', errorBg: 'rgba(252,165,165,0.1)',
+        insightsText: 'rgba(226,232,240,0.8)', insightsDivider: 'rgba(148,163,184,0.2)',
+        navBg: 'rgba(15,23,42,0.92)', navShadow: '0 -10px 40px rgba(0,0,0,0.7)',
     },
 };
 
@@ -935,6 +948,92 @@ function renderAnalyticsView() {
 }
 
 // ═══════════════════════════════════════════
+// SWIPE-TO-DELETE HELPER
+// ═══════════════════════════════════════════
+/**
+ * Wraps any row in a swipeable delete UI.
+ * Swiping left or right reveals an 80px red trash zone.
+ * Tapping the trash zone triggers onDelete().
+ * Tapping on the row while open snaps it back.
+ * Tapping outside the wrapper (global touchstart) also snaps it back.
+ */
+function makeSwipeDeleteRow({ rowClass = '', buildContent, onDelete, onClick = null }) {
+    const SNAP = 80;
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'position:relative;overflow:hidden;border-radius:var(--radius-md);margin-bottom:8px;';
+
+    // Left zone — shown when swiped right
+    const zoneLeft = document.createElement('div');
+    zoneLeft.style.cssText = 'position:absolute;left:0;top:0;bottom:0;width:' + SNAP + 'px;background:#c0392b;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+    zoneLeft.innerHTML = '<span class="material-symbols-outlined" style="color:#fff;font-size:22px;pointer-events:none;">delete</span>';
+
+    // Right zone — shown when swiped left
+    const zoneRight = document.createElement('div');
+    zoneRight.style.cssText = 'position:absolute;right:0;top:0;bottom:0;width:' + SNAP + 'px;background:#c0392b;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+    zoneRight.innerHTML = '<span class="material-symbols-outlined" style="color:#fff;font-size:22px;pointer-events:none;">delete</span>';
+
+    const row = document.createElement('div');
+    if (rowClass) row.className = rowClass;
+    row.style.cssText += 'position:relative;z-index:1;';
+    buildContent(row);
+
+    // Touch tracking
+    let startX = 0, startY = 0, curX = 0, swiping = false;
+
+    row.addEventListener('touchstart', e => {
+        if (activeSwipeRow && activeSwipeRow !== row) snapRowBack(activeSwipeRow);
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        curX = 0; swiping = false;
+        row.style.transition = '';
+    }, { passive: true });
+
+    row.addEventListener('touchmove', e => {
+        const dx = e.touches[0].clientX - startX;
+        const dy = e.touches[0].clientY - startY;
+        if (!swiping && Math.abs(dx) < 10) return;
+        if (!swiping && Math.abs(dy) > Math.abs(dx)) return;
+        swiping = true;
+        curX = dx;
+        row.style.transform = `translateX(${dx}px)`;
+    }, { passive: true });
+
+    row.addEventListener('touchend', () => {
+        if (!swiping) return;
+        if (Math.abs(curX) >= 60) {
+            const snap = curX > 0 ? SNAP : -SNAP;
+            row.style.transition = 'transform 0.2s ease';
+            row.style.transform  = `translateX(${snap}px)`;
+            activeSwipeRow = row;
+        } else {
+            snapRowBack(row);
+        }
+    }, { passive: true });
+
+    // Tap on row while open → snap back; otherwise normal click
+    row.addEventListener('click', e => {
+        if (activeSwipeRow === row) {
+            snapRowBack(row);
+            return;
+        }
+        if (onClick) onClick(e);
+    });
+
+    // Tapping the trash zones
+    const doDelete = () => {
+        activeSwipeRow = null;
+        onDelete();
+    };
+    zoneLeft.addEventListener('click',  doDelete);
+    zoneRight.addEventListener('click', doDelete);
+
+    wrapper.appendChild(zoneLeft);
+    wrapper.appendChild(zoneRight);
+    wrapper.appendChild(row);
+    return wrapper;
+}
+
+// ═══════════════════════════════════════════
 // EXPENSES VIEW
 // ═══════════════════════════════════════════
 function renderExpensesView() {
@@ -943,8 +1042,18 @@ function renderExpensesView() {
     activeSwipeRow = null;
     const total = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
     document.getElementById('expenses-month-total-val').textContent = formatAmount(total);
+    // Search bar visibility
+    const expBar = document.getElementById('exp-search-bar');
+    if (expBar) expBar.style.display = expenses.length >= 7 ? 'block' : 'none';
+    const expInput = document.getElementById('exp-search-input');
+    if (expInput) expInput.value = expSearchQuery;
+
     if (expenses.length === 0) { container.innerHTML = `<div class="expenses-empty">No expenses logged yet.<br>Tap (+) to add one.</div>`; return; }
-    const sorted = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+    let sorted = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+    if (expSearchQuery.trim()) {
+        const q = expSearchQuery.trim().toLowerCase();
+        sorted = sorted.filter(e => e.name.toLowerCase().includes(q));
+    }
     const todayStr = todayISO();
     const yest = (() => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; })();
     const dateLabel = iso => iso === todayStr ? 'Today' : iso === yest ? 'Yesterday' : new Date(iso).toLocaleDateString('en-IN', { day:'numeric', month:'short' });
@@ -960,69 +1069,21 @@ function renderExpensesView() {
         container.appendChild(dayLabel);
         group.items.forEach(exp => {
             if (exp.type === 'manual') {
-                // ── Swipeable wrapper ──────────────────────────────────
-                const wrapper = document.createElement('div');
-                wrapper.style.cssText = 'position:relative;overflow:hidden;border-radius:var(--radius-md);';
-
-                // Delete backdrop (always behind the row)
-                const backdrop = document.createElement('div');
-                backdrop.style.cssText = 'position:absolute;inset:0;background:var(--error-bg);border:1px solid var(--error);color:var(--error);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;cursor:pointer;';
-                backdrop.innerHTML = '<span class="material-symbols-outlined">delete</span>';
-
-                // Swipeable row
-                const row = document.createElement('div');
-                row.className = 'exp-row';
-                row.style.cssText = 'position:relative;z-index:1;';
-                const nameSpan = document.createElement('span'); nameSpan.className = 'exp-name'; nameSpan.textContent = exp.name;
-                const amtSpan  = document.createElement('span'); amtSpan.className = 'exp-amount'; amtSpan.textContent = getCurrencySymbol() + formatAmount(exp.amount);
-                row.appendChild(nameSpan); row.appendChild(amtSpan);
-
-                // Touch state
-                let startX = 0, startY = 0, curX = 0, swiping = false;
-
-                row.addEventListener('touchstart', e => {
-                    if (activeSwipeRow && activeSwipeRow !== row) snapRowBack(activeSwipeRow);
-                    startX = e.touches[0].clientX;
-                    startY = e.touches[0].clientY;
-                    curX = 0; swiping = false;
-                    row.style.transition = '';
-                }, { passive: true });
-
-                row.addEventListener('touchmove', e => {
-                    const dx = e.touches[0].clientX - startX;
-                    const dy = e.touches[0].clientY - startY;
-                    if (!swiping && Math.abs(dx) < 20) return;
-                    if (!swiping && Math.abs(dy) > Math.abs(dx)) return;
-                    swiping = true;
-                    curX = dx;
-                    row.style.transform = `translateX(${dx}px)`;
-                }, { passive: true });
-
-                row.addEventListener('touchend', () => {
-                    if (!swiping) return;
-                    if (Math.abs(curX) >= 80) {
-                        const snap = curX > 0 ? 80 : -80;
-                        row.style.transition = 'transform 0.2s ease';
-                        row.style.transform  = `translateX(${snap}px)`;
-                        activeSwipeRow = row;
-                    } else {
-                        snapRowBack(row);
-                    }
-                }, { passive: true });
-
-                // Delete on backdrop tap
-                backdrop.addEventListener('click', async () => {
-                    if (!confirm('Delete this expense?')) { snapRowBack(row); return; }
-                    await sb.from('expenses').delete().eq('id', exp.id).eq('user_id', currentUser.id);
-                    expenses = expenses.filter(e => e.id !== exp.id);
-                    activeSwipeRow = null;
-                    renderExpensesView();
-                    renderApp();
-                    showToast('Deleted');
+                const wrapper = makeSwipeDeleteRow({
+                    rowClass: 'exp-row',
+                    buildContent: row => {
+                        const nameSpan = document.createElement('span'); nameSpan.className = 'exp-name'; nameSpan.textContent = exp.name;
+                        const amtSpan  = document.createElement('span'); amtSpan.className  = 'exp-amount'; amtSpan.textContent = getCurrencySymbol() + formatAmount(exp.amount);
+                        row.appendChild(nameSpan); row.appendChild(amtSpan);
+                    },
+                    onDelete: async () => {
+                        await sb.from('expenses').delete().eq('id', exp.id).eq('user_id', currentUser.id);
+                        expenses = expenses.filter(e => e.id !== exp.id);
+                        renderExpensesView();
+                        renderApp();
+                        showToast('Deleted');
+                    },
                 });
-
-                wrapper.appendChild(backdrop);
-                wrapper.appendChild(row);
                 container.appendChild(wrapper);
             } else {
                 // Auto-expense — no swipe
@@ -1062,40 +1123,68 @@ async function renderApp() {
     const subItems = subscriptions.map(sub => ({ _type:'sub', _sortDate:new Date(sub.startDate || sub.dateAdded), data:sub }));
     const expItems = expenses.filter(e => e.type === 'manual').map(exp => ({ _type:'exp', _sortDate:new Date(exp.date), data:exp }));
     const mixed    = [...subItems, ...expItems].sort((a,b) => b._sortDate - a._sortDate);
-    const visible  = mixed.slice(0, 5);
+
+    // Search bar visibility
+    const searchBar = document.getElementById('dash-search-bar');
+    if (searchBar) searchBar.style.display = mixed.length >= 7 ? 'block' : 'none';
+
+    // Sync UI inputs to state (in case renderApp was called externally)
+    const dashInput = document.getElementById('dash-search-input');
+    const dashFilter = document.getElementById('dash-filter-select');
+    if (dashInput)  dashInput.value  = dashSearchQuery;
+    if (dashFilter) dashFilter.value = dashSearchFilter;
+
+    // Filter
+    let filtered = mixed;
+    if (dashSearchFilter !== 'all') {
+        filtered = filtered.filter(e => dashSearchFilter === 'subscriptions' ? e._type === 'sub' : e._type === 'exp');
+    }
+    if (dashSearchQuery.trim()) {
+        const q = dashSearchQuery.trim().toLowerCase();
+        filtered = filtered.filter(e => (e._type === 'sub' ? e.data.name : e.data.name).toLowerCase().includes(q));
+    }
+    const isSearching = dashSearchQuery.trim() || dashSearchFilter !== 'all';
+    const visible  = isSearching ? filtered : mixed.slice(0, 5);
 
     visible.forEach(entry => {
         if (entry._type === 'sub') {
             const sub   = entry.data;
             const color = colorFromName(sub.name);
-            const item  = document.createElement('div');
-            item.className = 'list-item';
-            if (sub.paused) item.style.opacity = '0.5';
 
-            const left = document.createElement('div'); left.className = 'list-item-left';
-            const icon = document.createElement('div'); icon.className = 'list-icon-wrapper';
-            icon.style.cssText = `background:${color}20;color:${color};font-size:24px;`;
-            icon.textContent = sub.name.charAt(0).toUpperCase();
-            const info = document.createElement('div');
-            const titleEl = document.createElement('div'); titleEl.className = 'list-title'; titleEl.textContent = sub.name;
-            if (sub.paused) {
-                const badge = document.createElement('span');
-                badge.style.cssText = 'font-size:0.65rem;background:var(--surface-high);color:var(--on-surface-variant);padding:2px 8px;border-radius:99px;font-family:var(--font-body);margin-left:6px;';
-                badge.textContent = 'Paused';
-                titleEl.appendChild(badge);
-            }
-            const subtitleEl = document.createElement('div'); subtitleEl.className = 'list-subtitle'; subtitleEl.textContent = formatCycle(sub.cycle);
-            info.appendChild(titleEl); info.appendChild(subtitleEl);
-            left.appendChild(icon); left.appendChild(info);
-
-            const right = document.createElement('div'); right.className = 'text-right';
-            const priceEl = document.createElement('div'); priceEl.className = 'list-price'; priceEl.textContent = getCurrencySymbol() + formatAmount(sub.price);
-            const dateEl  = document.createElement('div'); dateEl.className = 'list-date'; dateEl.textContent = formatDate(sub.dateAdded);
-            right.appendChild(priceEl); right.appendChild(dateEl);
-
-            item.appendChild(left); item.appendChild(right);
-            item.addEventListener('click', () => viewDetails(sub.id));
-            portfolioList.appendChild(item);
+            const wrapper = makeSwipeDeleteRow({
+                rowClass: 'list-item',
+                buildContent: item => {
+                    if (sub.paused) item.style.opacity = '0.5';
+                    const left = document.createElement('div'); left.className = 'list-item-left';
+                    const icon = document.createElement('div'); icon.className = 'list-icon-wrapper';
+                    icon.style.cssText = `background:${color}20;color:${color};font-size:24px;`;
+                    icon.textContent = sub.name.charAt(0).toUpperCase();
+                    const info = document.createElement('div');
+                    const titleEl = document.createElement('div'); titleEl.className = 'list-title'; titleEl.textContent = sub.name;
+                    if (sub.paused) {
+                        const badge = document.createElement('span');
+                        badge.style.cssText = 'font-size:0.65rem;background:var(--surface-high);color:var(--on-surface-variant);padding:2px 8px;border-radius:99px;font-family:var(--font-body);margin-left:6px;';
+                        badge.textContent = 'Paused';
+                        titleEl.appendChild(badge);
+                    }
+                    const subtitleEl = document.createElement('div'); subtitleEl.className = 'list-subtitle'; subtitleEl.textContent = formatCycle(sub.cycle);
+                    info.appendChild(titleEl); info.appendChild(subtitleEl);
+                    left.appendChild(icon); left.appendChild(info);
+                    const right = document.createElement('div'); right.className = 'text-right';
+                    const priceEl = document.createElement('div'); priceEl.className = 'list-price'; priceEl.textContent = getCurrencySymbol() + formatAmount(sub.price);
+                    const dateEl  = document.createElement('div'); dateEl.className = 'list-date'; dateEl.textContent = formatDate(sub.dateAdded);
+                    right.appendChild(priceEl); right.appendChild(dateEl);
+                    item.appendChild(left); item.appendChild(right);
+                },
+                onClick: () => viewDetails(sub.id),
+                onDelete: async () => {
+                    await deleteSubscription(sub.id);
+                    subscriptions = subscriptions.filter(s => s.id !== sub.id);
+                    renderApp();
+                    showToast('Deleted');
+                },
+            });
+            portfolioList.appendChild(wrapper);
 
             if (!sub.paused) {
                 const today = new Date(); today.setHours(0,0,0,0);
@@ -1116,30 +1205,37 @@ async function renderApp() {
                 upcomingScroll.appendChild(miniCard);
             }
         } else {
-            const exp  = entry.data;
-            const item = document.createElement('div');
-            item.className = 'list-item'; item.style.cursor = 'default';
-
-            const left = document.createElement('div'); left.className = 'list-item-left';
-            const icon = document.createElement('div'); icon.className = 'list-icon-wrapper';
-            icon.style.cssText = 'background:var(--surface-high);color:var(--on-surface-variant);';
-            icon.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">receipt_long</span>';
-            const info = document.createElement('div');
-            const titleEl    = document.createElement('div'); titleEl.className = 'list-title'; titleEl.textContent = exp.name;
-            const subtitleEl = document.createElement('div'); subtitleEl.className = 'list-subtitle'; subtitleEl.textContent = formatDate(exp.date);
-            info.appendChild(titleEl); info.appendChild(subtitleEl);
-            left.appendChild(icon); left.appendChild(info);
-
-            const right    = document.createElement('div'); right.className = 'text-right';
-            const priceEl  = document.createElement('div'); priceEl.className = 'list-price'; priceEl.textContent = getCurrencySymbol() + formatAmount(exp.amount);
-            right.appendChild(priceEl);
-
-            item.appendChild(left); item.appendChild(right);
-            portfolioList.appendChild(item);
+            const exp = entry.data;
+            const wrapper = makeSwipeDeleteRow({
+                rowClass: 'list-item',
+                buildContent: item => {
+                    item.style.cursor = 'default';
+                    const left = document.createElement('div'); left.className = 'list-item-left';
+                    const icon = document.createElement('div'); icon.className = 'list-icon-wrapper';
+                    icon.style.cssText = 'background:var(--surface-high);color:var(--on-surface-variant);';
+                    icon.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">receipt_long</span>';
+                    const info = document.createElement('div');
+                    const titleEl    = document.createElement('div'); titleEl.className = 'list-title'; titleEl.textContent = exp.name;
+                    const subtitleEl = document.createElement('div'); subtitleEl.className = 'list-subtitle'; subtitleEl.textContent = formatDate(exp.date);
+                    info.appendChild(titleEl); info.appendChild(subtitleEl);
+                    left.appendChild(icon); left.appendChild(info);
+                    const right   = document.createElement('div'); right.className = 'text-right';
+                    const priceEl = document.createElement('div'); priceEl.className = 'list-price'; priceEl.textContent = getCurrencySymbol() + formatAmount(exp.amount);
+                    right.appendChild(priceEl);
+                    item.appendChild(left); item.appendChild(right);
+                },
+                onDelete: async () => {
+                    await sb.from('expenses').delete().eq('id', exp.id).eq('user_id', currentUser.id);
+                    expenses = expenses.filter(e => e.id !== exp.id);
+                    renderApp();
+                    showToast('Deleted');
+                },
+            });
+            portfolioList.appendChild(wrapper);
         }
     });
 
-    if (mixed.length > 5) {
+    if (!isSearching && mixed.length > 5) {
         const viewAll = document.createElement('div');
         viewAll.style.cssText = 'text-align:center;padding:12px 0 4px;';
         const link = document.createElement('a');
@@ -1396,28 +1492,6 @@ async function addCategoryFn(name) {
     showToast('Category added');
 }
 
-// ═══════════════════════════════════════════
-// SWIPE NAVIGATION
-// ═══════════════════════════════════════════
-(function () {
-    const swipePageOrder = ['dashboard-page','analytics-page','profile-page'];
-    const container = document.querySelector('.container');
-    let touchStartX = 0, touchStartY = 0, touchStartedInScroll = false;
-    container.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; touchStartedInScroll = !!e.target.closest('.horizontal-scroll'); }, { passive: true });
-    container.addEventListener('touchend', e => {
-        if (touchStartedInScroll) return;
-        const deltaX = e.changedTouches[0].clientX - touchStartX;
-        const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartY);
-        if (Math.abs(deltaX) < 50 || deltaY > 75) return;
-        const currentId = document.querySelector('.page.active')?.id;
-        if (currentId === 'details-page' || currentId === 'calendar-page') return;
-        const idx = swipePageOrder.indexOf(currentId);
-        if (idx === -1) return;
-        const nextIdx = deltaX < 0 ? idx + 1 : idx - 1;
-        if (nextIdx < 0 || nextIdx >= swipePageOrder.length) return;
-        switchPage(swipePageOrder[nextIdx]);
-    }, { passive: true });
-})();
 
 // ═══════════════════════════════════════════
 // CALENDAR
@@ -1538,6 +1612,34 @@ function renderCalendarDetail(dateKey, subs) {
     detail.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
+// ═══════════════════════════════════════════
+// PROFILE COLLAPSIBLE SECTIONS
+// ═══════════════════════════════════════════
+window.toggleProfileSection = function(bodyId, chevronId) {
+    const body    = document.getElementById(bodyId);
+    const chevron = document.getElementById(chevronId);
+    if (!body) return;
+    const open = body.style.display === 'none';
+    body.style.display    = open ? 'block' : 'none';
+    if (chevron) chevron.textContent = open ? 'expand_more' : 'chevron_right';
+};
+
+// ═══════════════════════════════════════════
+// SEARCH & FILTER LISTENERS
+// ═══════════════════════════════════════════
+document.getElementById('dash-search-input').addEventListener('input', e => {
+    dashSearchQuery = e.target.value;
+    renderApp();
+});
+document.getElementById('dash-filter-select').addEventListener('change', e => {
+    dashSearchFilter = e.target.value;
+    renderApp();
+});
+document.getElementById('exp-search-input').addEventListener('input', e => {
+    expSearchQuery = e.target.value;
+    renderExpensesView();
+});
+
 document.getElementById('cal-prev').addEventListener('click', () => { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); });
 document.getElementById('cal-next').addEventListener('click', () => { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCalendar(); });
 document.getElementById('cal-back-btn').addEventListener('click', e => { e.preventDefault(); switchPage('dashboard-page'); });
@@ -1618,31 +1720,15 @@ async function runBootWithLoader(bootFn, minVisible = 800) {
     const stopNoise = startBootNoise();
 
     try {
-        await decodeStatus(statusEl, "INITIALIZING ATŁER...", 600);
+        await decodeStatus(statusEl, "INITIALIZING ATŁER...", 300);
         
         // Run the boot function with a 10s safety timeout to prevent getting "stuck"
         const bootPromise = bootFn();
         const timeoutPromise = new Promise(resolve => setTimeout(() => resolve('timeout'), 10000));
         
-        // While waiting, show some more flavor messages if it's taking a bit
-        const flavorTimer = setTimeout(() => {
-            const msg = minVisible > 3000 ? "PREPARING PREMIUM DASHBOARD..." : "SYNCING SECURE SESSION...";
-            decodeStatus(statusEl, msg, 600);
-        }, 1200);
-
-        if (minVisible > 3000) {
-            setTimeout(() => {
-                 decodeStatus(statusEl, "UPLINKING ACCOUNTS...", 600);
-            }, 1800);
-            setTimeout(() => {
-                 decodeStatus(statusEl, "OPTIMIZING DASHBOARD...", 600);
-            }, 2800);
-        }
-
         await Promise.race([bootPromise, timeoutPromise]);
-        clearTimeout(flavorTimer);
         
-        await decodeStatus(statusEl, "SYSTEM READY.", 400);
+        await decodeStatus(statusEl, "SYSTEM READY.", 200);
 
         // Ensure loader is visible for the requested vibe duration
         const elapsed = Date.now() - startTime;
@@ -1651,8 +1737,8 @@ async function runBootWithLoader(bootFn, minVisible = 800) {
     } finally {
         stopNoise();
         loading.style.opacity = '0';
-        loading.style.transition = 'opacity 0.5s ease';
-        await sleep(500);
+        loading.style.transition = 'opacity 0.3s ease';
+        await sleep(300);
         loading.classList.add('hidden');
         loading.style.opacity = '';
     }
@@ -1693,17 +1779,16 @@ sb.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session?.user) {
         if (currentUser?.id === session.user.id) return;
 
-        // Custom 5-second premium boot after login
         await runBootWithLoader(async () => {
             currentUser = session.user;
             authScreen.classList.add('hidden');
-            
+
             await loadAllData();
             await renderApp();
             renderProfilePage();
             scheduleRenewalNotifications();
             showNotificationPrompt();
-        }, 4000);
+        }, 1000);
     }
 
     if (event === 'SIGNED_OUT') {
