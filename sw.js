@@ -1,99 +1,99 @@
-// Atler Service Worker — Cache-first for static assets, network-first for Supabase API
-const CACHE_NAME = 'atler-v11';
+const CACHE_NAME = 'atler-v12';
 
-// Assets to pre-cache on install (shell of the app)
-const STATIC_ASSETS = [
+const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=11',
   './script.js?v=11',
   './manifest.json',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js',
 ];
 
-
-// ── Install: pre-cache the app shell ──────────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(STATIC_ASSETS);
+    caches.open(CACHE_NAME).then(async cache => {
+      await Promise.all(
+        APP_SHELL.map(async asset => {
+          try {
+            await cache.add(asset);
+          } catch (_) {
+            // Skip failed optional precache entries instead of aborting install.
+          }
+        })
+      );
     })
   );
-  // Take control immediately, don't wait for old SW to die
   self.skipWaiting();
 });
 
-// ── Activate: delete old caches ───────────────────────────────────
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))
     )
   );
-  // Take control of all open pages immediately
   self.clients.claim();
 });
 
-// ── Fetch: strategy depends on request type ───────────────────────
-self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
+function isSameOrigin(requestUrl) {
+  return requestUrl.origin === self.location.origin;
+}
 
-  // Always go to network for:
-  // 1. Supabase API calls
-  // 2. Auth requests
-  // 3. POST/PATCH/DELETE mutations
+function isAppShellAsset(requestUrl) {
+  return (
+    requestUrl.pathname === '/' ||
+    requestUrl.pathname.endsWith('.html') ||
+    requestUrl.pathname.endsWith('.css') ||
+    requestUrl.pathname.endsWith('.js') ||
+    requestUrl.pathname.endsWith('.json')
+  );
+}
+
+self.addEventListener('fetch', event => {
+  const { request } = event;
+
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+
   if (
     url.hostname.includes('supabase.co') ||
-    url.hostname.includes('supabase.io') ||
-    event.request.method !== 'GET'
+    url.hostname.includes('supabase.io')
   ) {
-    return; // Let browser handle it normally
+    return;
   }
 
-  // Google Fonts / CDN: cache-first, long-lived
-  if (
-    url.hostname.includes('fonts.googleapis.com') ||
-    url.hostname.includes('fonts.gstatic.com') ||
-    url.hostname.includes('cdn.jsdelivr.net')
-  ) {
+  if (!isSameOrigin(url)) {
+    return;
+  }
+
+  if (request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html')) {
     event.respondWith(
-      caches.match(event.request).then(cached => {
+      fetch(request)
+        .then(response => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request).then(cached => cached || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  if (isAppShellAsset(url)) {
+    event.respondWith(
+      caches.match(request).then(cached => {
         if (cached) return cached;
-        return fetch(event.request).then(response => {
-          // Only cache valid responses
-          if (!response || response.status !== 200) return response;
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+
+        return fetch(request).then(response => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+          }
           return response;
         });
       })
     );
-    return;
-  }
-
-  // App shell files (HTML, CSS, JS): cache-first, update in background (stale-while-revalidate)
-  if (
-    url.hostname === self.location.hostname &&
-    (url.pathname.endsWith('.html') ||
-     url.pathname.endsWith('.css') ||
-     url.pathname.endsWith('.js') ||
-     url.pathname.endsWith('.json') ||
-     url.pathname === '/')
-  ) {
-    event.respondWith(
-      caches.match(event.request).then(cached => {
-        const networkFetch = fetch(event.request).then(response => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-          }
-          return response;
-        }).catch(() => cached); // If offline, fall back to cache
-
-        // Return cached version immediately, update cache in background
-        return cached || networkFetch;
-      })
-    );
-    return;
   }
 });
