@@ -231,7 +231,7 @@ section {
   scroll-snap-type: x proximity;
   scroll-padding-left: var(--spacing-6);
   overscroll-behavior-x: contain;
-  touch-action: pan-x pinch-zoom;
+  touch-action: pan-x;
 }
 
 .horizontal-scroll::-webkit-scrollbar {
