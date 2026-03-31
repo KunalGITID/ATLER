@@ -21,10 +21,14 @@ let subscriptions = [];
 let categories    = [];
 let expenses      = [];
 let activeSubId   = null;
+let activeExpenseId = null;
 let analyticsView = 'subscriptions';
-let activeSwipeRow    = null;
 let analyticsSubSearch = '';
 let analyticsExpSearch = '';
+let currentPageId = 'dashboard-page';
+let pageHistory = [];
+let isSubmittingSubscription = false;
+let isSubmittingExpense = false;
 
 const presetCategories = ['Entertainment','Productivity','Utilities','Health','Food','Education'];
 const navItems = document.querySelectorAll('.nav-item');
@@ -42,19 +46,6 @@ function showToast(message, duration = 2200) {
         el.style.transform = 'translateX(-50%) translateY(-12px)';
     }, duration);
 }
-
-function snapRowBack(rowEl) {
-    rowEl.style.transition = 'transform 0.3s ease';
-    rowEl.style.transform  = 'translateX(0)';
-    if (activeSwipeRow === rowEl) activeSwipeRow = null;
-}
-
-document.addEventListener('touchstart', e => {
-    if (!activeSwipeRow) return;
-    const wrapper = activeSwipeRow.parentElement;
-    if (wrapper && wrapper.contains(e.target)) return;
-    snapRowBack(activeSwipeRow);
-}, { passive: true });
 
 // ═══════════════════════════════════════════
 // THEMES
@@ -310,6 +301,8 @@ async function upsertSubscription(sub) {
 async function deleteSubscription(id) {
     if (!currentUser) return;
     await sb.from('subscriptions').delete().eq('id', id).eq('user_id', currentUser.id);
+    await sb.from('expenses').delete().eq('user_id', currentUser.id).like('id', `auto_${id}_%`);
+    expenses = expenses.filter(exp => !String(exp.id).startsWith(`auto_${id}_`));
 }
 
 async function upsertCategory(cat) {
@@ -382,10 +375,19 @@ function escapeHTML(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
 }
+function pad2(value) {
+    return String(value).padStart(2, '0');
+}
+function getLocalDateKey(date = new Date()) {
+    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+function getLocalDateTimeString(date = new Date()) {
+    return `${getLocalDateKey(date)}T${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+}
 function formatDate(ds) {
     return new Date(ds).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
 }
-function todayISO() { return new Date().toISOString().split('T')[0]; }
+function todayISO() { return getLocalDateKey(new Date()); }
 
 // ═══════════════════════════════════════════
 // CURRENCY HELPERS
@@ -448,7 +450,7 @@ async function autoLogRenewals() {
         const anchor = sub.startDate || sub.dateAdded;
         const lastRenewal = getLastRenewalDate(anchor, sub.cycle);
         if (lastRenewal > today) continue;
-        const lastRenewalISO = lastRenewal.toISOString().split('T')[0];
+        const lastRenewalISO = getLocalDateKey(lastRenewal);
         if (sub.lastLoggedRenewal === lastRenewalISO) continue;
         const subAddedDate = new Date(sub.dateAdded); subAddedDate.setHours(0,0,0,0);
         if (lastRenewal < subAddedDate) continue;
@@ -467,28 +469,45 @@ async function autoLogRenewals() {
 // ═══════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════
-function switchPage(targetId) {
+const ROOT_PAGES = new Set(['dashboard-page', 'analytics-page', 'profile-page']);
+
+function switchPage(targetId, options = {}) {
+    const { pushHistory: shouldPushHistory = false, preserveHistory = false } = options;
+    if (shouldPushHistory && currentPageId && currentPageId !== targetId) {
+        pageHistory.push(currentPageId);
+    } else if (!preserveHistory && ROOT_PAGES.has(targetId)) {
+        pageHistory = [];
+    }
+
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     navItems.forEach(item => item.classList.toggle('active', item.getAttribute('data-target') === targetId));
     const target = document.getElementById(targetId);
     if (target) {
         target.classList.add('active');
         if (targetId === 'dashboard-page' || targetId === 'analytics-page') renderApp();
-        if (targetId === 'calendar-page') renderCalendar();
         if (targetId === 'profile-page') renderProfilePage();
+        currentPageId = targetId;
     }
     window.scrollTo(0, 0);
+}
+
+function goBack() {
+    const previous = pageHistory.pop() || 'dashboard-page';
+    switchPage(previous, { preserveHistory: true });
 }
 
 navItems.forEach(item => {
     item.addEventListener('click', e => {
         e.preventDefault();
         const t = item.getAttribute('data-target');
-        if (t) switchPage(t);
+        if (t) switchPage(t, { preserveHistory: false });
     });
 });
 
 document.getElementById('user-avatar-img').addEventListener('click', () => switchPage('profile-page'));
+document.querySelectorAll('[data-back-button]').forEach(button => {
+    button.addEventListener('click', goBack);
+});
 
 // ═══════════════════════════════════════════
 // DETAILS PAGE
@@ -516,7 +535,21 @@ function viewDetails(id) {
     document.getElementById('pause-icon').textContent  = sub.paused ? 'play_arrow' : 'pause';
     document.getElementById('pause-label').textContent = sub.paused ? 'Resume Subscription' : 'Pause Subscription';
 
-    switchPage('details-page');
+    switchPage('details-page', { pushHistory: true });
+}
+
+function viewExpenseDetails(id) {
+    activeExpenseId = id;
+    const exp = expenses.find(entry => entry.id === id);
+    if (!exp) return;
+
+    document.getElementById('expense-detail-name').textContent = exp.name;
+    document.getElementById('expense-detail-date').textContent = formatDate(exp.date);
+    document.getElementById('expense-detail-date-full').textContent = formatDate(exp.date);
+    document.getElementById('expense-detail-amount').textContent = formatAmount(exp.amount);
+    document.getElementById('expense-detail-type').textContent = exp.type === 'auto' ? 'Auto renewal' : 'Manual expense';
+
+    switchPage('expense-details-page', { pushHistory: true });
 }
 
 // Edit form cycle toggle
@@ -571,7 +604,21 @@ document.getElementById('delete-sub-btn').addEventListener('click', async () => 
     if (!confirm('Are you sure you want to delete this subscription?')) return;
     await deleteSubscription(activeSubId);
     subscriptions = subscriptions.filter(s => s.id !== activeSubId);
-    switchPage('dashboard-page');
+    showToast('Subscription deleted');
+    goBack();
+    await renderApp();
+});
+
+document.getElementById('delete-expense-btn').addEventListener('click', async () => {
+    if (!activeExpenseId) return;
+    if (!confirm('Delete this expense?')) return;
+
+    await sb.from('expenses').delete().eq('id', activeExpenseId).eq('user_id', currentUser.id);
+    expenses = expenses.filter(exp => exp.id !== activeExpenseId);
+    activeExpenseId = null;
+    showToast('Expense deleted');
+    goBack();
+    await renderApp();
 });
 
 // ═══════════════════════════════════════════
@@ -834,6 +881,9 @@ cycleSelect.addEventListener('change', e => {
 
 addForm.addEventListener('submit', async e => {
     e.preventDefault();
+    if (isSubmittingSubscription) return;
+
+    const submitBtn  = addForm.querySelector('button[type="submit"]');
     const name       = document.getElementById('add-name').value.trim();
     let cycle        = document.getElementById('add-cycle').value;
     const price      = document.getElementById('add-price').value;
@@ -850,22 +900,37 @@ addForm.addEventListener('submit', async e => {
         const existingCycle = formatCycle(existing.cycle);
         if (!confirm(`You already have ${existing.name} at ${existingPrice}/${existingCycle}. Add another anyway?`)) return;
     }
-    const newSub = {
-        id:        Date.now().toString(),
-        name, cycle,
-        price:     parseFloat(price).toFixed(2),
-        dateAdded: new Date().toISOString(),
-        startDate: startDate || todayISO(),
-        category:  'unlisted',
-        paused:    false,
-    };
-    subscriptions.push(newSub);
-    await upsertSubscription(newSub);
-    addForm.reset();
-    document.getElementById('add-start-date').value = todayISO();
-    customDaysGroup.style.display = 'none';
-    closeAddSheet();
-    await renderApp();
+
+    isSubmittingSubscription = true;
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+    }
+
+    try {
+        const newSub = {
+            id:        Date.now().toString(),
+            name, cycle,
+            price:     parseFloat(price).toFixed(2),
+            dateAdded: getLocalDateTimeString(),
+            startDate: startDate || todayISO(),
+            category:  'unlisted',
+            paused:    false,
+        };
+        subscriptions.push(newSub);
+        await upsertSubscription(newSub);
+        addForm.reset();
+        document.getElementById('add-start-date').value = todayISO();
+        customDaysGroup.style.display = 'none';
+        closeAddSheet();
+        await renderApp();
+    } finally {
+        isSubmittingSubscription = false;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Subscription';
+        }
+    }
 });
 
 // ═══════════════════════════════════════════
@@ -876,17 +941,35 @@ document.getElementById('exp-date').value = todayISO();
 
 addExpenseForm.addEventListener('submit', async e => {
     e.preventDefault();
+    if (isSubmittingExpense) return;
+
+    const submitBtn = addExpenseForm.querySelector('button[type="submit"]');
     const name   = document.getElementById('exp-name').value.trim();
     const amount = document.getElementById('exp-amount').value;
     const date   = document.getElementById('exp-date').value || todayISO();
     if (!name || !amount) return;
-    const newExp = { id: Date.now().toString(), name, amount: parseFloat(amount), date, type: 'manual' };
-    expenses.push(newExp);
-    await insertExpense(newExp);
-    addExpenseForm.reset();
-    document.getElementById('exp-date').value = todayISO();
-    closeAddSheet();
-    await renderApp();
+
+    isSubmittingExpense = true;
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+    }
+
+    try {
+        const newExp = { id: Date.now().toString(), name, amount: parseFloat(amount), date, type: 'manual' };
+        expenses.push(newExp);
+        await insertExpense(newExp);
+        addExpenseForm.reset();
+        document.getElementById('exp-date').value = todayISO();
+        closeAddSheet();
+        await renderApp();
+    } finally {
+        isSubmittingExpense = false;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Expense';
+        }
+    }
 });
 
 // ═══════════════════════════════════════════
@@ -968,7 +1051,6 @@ function renderAnalyticsView() {
 function renderExpensesView() {
     const container = document.getElementById('expenses-list-container');
     container.innerHTML = '';
-    activeSwipeRow = null;
     const total = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
     document.getElementById('expenses-month-total-val').textContent = formatAmount(total);
 
@@ -992,7 +1074,7 @@ function renderExpensesView() {
     const q = analyticsExpSearch.trim().toLowerCase();
     const sorted = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
     const todayStr = todayISO();
-    const yest = (() => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; })();
+    const yest = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return getLocalDateKey(d); })();
     const dateLabel = iso => iso === todayStr ? 'Today' : iso === yest ? 'Yesterday' : new Date(iso).toLocaleDateString('en-IN', { day:'numeric', month:'short' });
 
     // Build day groups
@@ -1015,69 +1097,31 @@ function renderExpensesView() {
         container.appendChild(dayLabel);
 
         visible.forEach(exp => {
-            if (exp.type === 'manual') {
-                // ── Swipeable wrapper (backdrop style) ──
-                const wrapper = document.createElement('div');
-                wrapper.style.cssText = 'position:relative;overflow:hidden;border-radius:var(--radius-md);margin-bottom:4px;';
+            const row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'exp-row exp-row-button';
 
-                const backdrop = document.createElement('div');
-                backdrop.style.cssText = 'position:absolute;inset:0;background:var(--error-bg);border:1px solid var(--error);color:var(--error);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;cursor:pointer;';
-                backdrop.innerHTML = '<span class="material-symbols-outlined">delete</span>';
+            const left = document.createElement('div');
+            left.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;gap:2px;';
+            const nameSpan = document.createElement('span'); nameSpan.className = 'exp-name'; nameSpan.textContent = exp.name;
+            const metaSpan = document.createElement('span'); metaSpan.className = 'list-subtitle'; metaSpan.textContent = exp.type === 'auto' ? 'Auto renewal' : 'Manual expense';
+            left.appendChild(nameSpan);
+            left.appendChild(metaSpan);
 
-                const row = document.createElement('div');
-                row.className = 'exp-row';
-                row.style.cssText = 'position:relative;z-index:1;';
-                const nameSpan = document.createElement('span'); nameSpan.className = 'exp-name'; nameSpan.textContent = exp.name;
-                const amtSpan  = document.createElement('span'); amtSpan.className  = 'exp-amount'; amtSpan.textContent = getCurrencySymbol() + formatAmount(exp.amount);
-                row.appendChild(nameSpan); row.appendChild(amtSpan);
+            const right = document.createElement('div');
+            right.style.cssText = 'display:flex;align-items:center;gap:10px;';
+            const amtSpan  = document.createElement('span'); amtSpan.className  = 'exp-amount'; amtSpan.textContent = getCurrencySymbol() + formatAmount(exp.amount);
+            const chevron = document.createElement('span');
+            chevron.className = 'material-symbols-outlined';
+            chevron.style.cssText = 'font-size:18px;color:var(--on-surface-variant);';
+            chevron.textContent = 'chevron_right';
+            right.appendChild(amtSpan);
+            right.appendChild(chevron);
 
-                let startX = 0, startY = 0, curX = 0, swiping = false;
-
-                row.addEventListener('touchstart', e => {
-                    if (activeSwipeRow && activeSwipeRow !== row) snapRowBack(activeSwipeRow);
-                    startX = e.touches[0].clientX; startY = e.touches[0].clientY;
-                    curX = 0; swiping = false; row.style.transition = '';
-                }, { passive: true });
-
-                row.addEventListener('touchmove', e => {
-                    const dx = e.touches[0].clientX - startX;
-                    const dy = e.touches[0].clientY - startY;
-                    if (!swiping && Math.abs(dx) < 20) return;
-                    if (!swiping && Math.abs(dy) > Math.abs(dx)) return;
-                    swiping = true; curX = dx;
-                    row.style.transform = `translateX(${dx}px)`;
-                }, { passive: true });
-
-                row.addEventListener('touchend', () => {
-                    if (!swiping) return;
-                    if (Math.abs(curX) >= 80) {
-                        const snap = curX > 0 ? 80 : -80;
-                        row.style.transition = 'transform 0.2s ease';
-                        row.style.transform  = `translateX(${snap}px)`;
-                        activeSwipeRow = row;
-                    } else { snapRowBack(row); }
-                }, { passive: true });
-
-                backdrop.addEventListener('click', async () => {
-                    if (!confirm('Delete this expense?')) { snapRowBack(row); return; }
-                    await sb.from('expenses').delete().eq('id', exp.id).eq('user_id', currentUser.id);
-                    expenses = expenses.filter(e => e.id !== exp.id);
-                    activeSwipeRow = null;
-                    renderExpensesView();
-                    renderApp();
-                    showToast('Deleted');
-                });
-
-                wrapper.appendChild(backdrop);
-                wrapper.appendChild(row);
-                container.appendChild(wrapper);
-            } else {
-                const row = document.createElement('div'); row.className = 'exp-row';
-                const nameSpan = document.createElement('span'); nameSpan.className = 'exp-name'; nameSpan.textContent = exp.name;
-                const amtSpan  = document.createElement('span'); amtSpan.className = 'exp-amount'; amtSpan.textContent = getCurrencySymbol() + formatAmount(exp.amount);
-                row.appendChild(nameSpan); row.appendChild(amtSpan);
-                container.appendChild(row);
-            }
+            row.appendChild(left);
+            row.appendChild(right);
+            row.addEventListener('click', () => viewExpenseDetails(exp.id));
+            container.appendChild(row);
         });
 
         if (gi < groups.length - 1) {
@@ -1126,6 +1170,7 @@ async function renderApp() {
             const color = colorFromName(sub.name);
             const item  = document.createElement('div');
             item.className = 'list-item';
+            item.style.cursor = 'default';
             if (sub.paused) item.style.opacity = '0.5';
 
             const left = document.createElement('div'); left.className = 'list-item-left';
@@ -1150,7 +1195,6 @@ async function renderApp() {
             right.appendChild(priceEl); right.appendChild(dateEl);
 
             item.appendChild(left); item.appendChild(right);
-            item.addEventListener('click', () => viewDetails(sub.id));
             portfolioList.appendChild(item);
 
             if (!sub.paused) {
@@ -1162,13 +1206,13 @@ async function renderApp() {
                 const textColor   = diffDays <= 3 ? 'var(--error)' : 'var(--primary)';
                 const miniCard = document.createElement('div');
                 miniCard.className = 'card-mini';
+                miniCard.style.cursor = 'default';
                 const cardIcon = document.createElement('div'); cardIcon.className = 'card-icon';
                 cardIcon.style.cssText = `background:${color}20;color:${color};`;
                 cardIcon.innerHTML = '<span class="material-symbols-outlined">payments</span>';
                 const cardName = document.createElement('h3'); cardName.textContent = sub.name;
                 const cardDate = document.createElement('p'); cardDate.style.cssText = `font-size:0.85rem;color:${textColor};font-weight:600;`; cardDate.textContent = renewalText;
                 miniCard.appendChild(cardIcon); miniCard.appendChild(cardName); miniCard.appendChild(cardDate);
-                miniCard.addEventListener('click', () => viewDetails(sub.id));
                 upcomingScroll.appendChild(miniCard);
             }
         } else {
@@ -1418,6 +1462,7 @@ function renderAnalytics() {
 
             item.appendChild(left); item.appendChild(right);
             item.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', sub.id));
+            item.addEventListener('click', () => viewDetails(sub.id));
             listEl.appendChild(item);
         });
         groupEl.appendChild(listEl);
@@ -1480,127 +1525,6 @@ async function addCategoryFn(name) {
     renderAnalytics();
     showToast('Category added');
 }
-
-
-// ═══════════════════════════════════════════
-// CALENDAR
-// ═══════════════════════════════════════════
-let calYear  = new Date().getFullYear();
-let calMonth = new Date().getMonth();
-let calSelectedDate = null;
-
-function buildRenewalMap(year, month) {
-    const map = {}; const monthStart = new Date(year, month, 1); const monthEnd = new Date(year, month+1, 0);
-    subscriptions.filter(s => !s.paused).forEach(sub => {
-        const anchor = sub.startDate || sub.dateAdded; const start = new Date(anchor); start.setHours(0,0,0,0);
-        let cursor = new Date(start);
-        if (sub.cycle === 'Yearly') { while (cursor < monthStart) cursor.setFullYear(cursor.getFullYear()+1); }
-        else { const inc = sub.cycle === 'Monthly' ? 30 : parseInt(sub.cycle); while (cursor < monthStart) cursor.setDate(cursor.getDate()+inc); }
-        while (cursor <= monthEnd) {
-            const key = cursor.toISOString().split('T')[0];
-            if (!map[key]) map[key] = []; map[key].push(sub);
-            cursor = new Date(cursor);
-            if (sub.cycle === 'Yearly') cursor.setFullYear(cursor.getFullYear()+1);
-            else { const inc = sub.cycle === 'Monthly' ? 30 : parseInt(sub.cycle); cursor.setDate(cursor.getDate()+inc); }
-        }
-    });
-    return map;
-}
-
-function renderCalendar() {
-    const monthLabel = document.getElementById('cal-month-label'); const grid = document.getElementById('cal-grid'); const detail = document.getElementById('cal-detail');
-    if (!monthLabel || !grid || !detail) return;
-    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    monthLabel.textContent = `${monthNames[calMonth]} ${calYear}`;
-    grid.innerHTML = ''; detail.style.display = 'none'; calSelectedDate = null;
-    const renewalMap = buildRenewalMap(calYear, calMonth);
-    const firstDay = new Date(calYear, calMonth, 1).getDay(); const daysInMonth = new Date(calYear, calMonth+1, 0).getDate(); const prevDays = new Date(calYear, calMonth, 0).getDate();
-    const today = new Date(); today.setHours(0,0,0,0);
-    const expenseMap = {};
-    expenses.forEach(exp => { const d = new Date(exp.date); if (d.getMonth() === calMonth && d.getFullYear() === calYear) { const key = exp.date.split('T')[0]; expenseMap[key] = (expenseMap[key] || 0) + parseFloat(exp.amount); } });
-    const heatBg = spend => { if (spend <= 0) return null; const t = Math.min(spend/1000, 1); return `rgba(105,106,219,${(0.08+t*0.67).toFixed(2)})`; };
-    for (let i = 0; i < firstDay; i++) { const cell = document.createElement('div'); cell.className = 'cal-cell other-month'; const d = document.createElement('div'); d.className = 'cal-date'; d.textContent = prevDays - firstDay + 1 + i; cell.appendChild(d); grid.appendChild(cell); }
-    for (let d = 1; d <= daysInMonth; d++) {
-        const dateObj = new Date(calYear, calMonth, d); const key = dateObj.toISOString().split('T')[0];
-        const subs = renewalMap[key] || []; const dayExpAmt = expenseMap[key] || 0;
-        const totalSpend = subs.reduce((s,sub) => s + parseFloat(sub.price), 0) + dayExpAmt;
-        const isToday = dateObj.getTime() === today.getTime(); const hasAny = subs.length > 0 || dayExpAmt > 0;
-        const cell = document.createElement('div');
-        cell.className = 'cal-cell' + (hasAny ? ' has-events' : '') + (isToday ? ' today' : '');
-        const heat = heatBg(totalSpend); if (heat) cell.style.background = heat;
-        const dateEl = document.createElement('div'); dateEl.className = 'cal-date'; dateEl.textContent = d; cell.appendChild(dateEl);
-        if (subs.length) { const dotsEl = document.createElement('div'); dotsEl.className = 'cal-dots'; subs.slice(0,3).forEach(sub => { const dot = document.createElement('div'); dot.className = 'cal-dot'; dot.style.background = colorFromName(sub.name); dotsEl.appendChild(dot); }); cell.appendChild(dotsEl); }
-        if (hasAny) { cell.addEventListener('click', () => { if (calSelectedDate === key) { calSelectedDate = null; grid.querySelectorAll('.cal-cell').forEach(c => c.classList.remove('selected')); detail.style.display = 'none'; return; } calSelectedDate = key; grid.querySelectorAll('.cal-cell').forEach(c => c.classList.remove('selected')); cell.classList.add('selected'); renderCalendarDetail(key, subs); }); }
-        grid.appendChild(cell);
-    }
-    const trailing = (firstDay + daysInMonth) % 7;
-    if (trailing > 0) { for (let i = 1; i <= 7 - trailing; i++) { const cell = document.createElement('div'); cell.className = 'cal-cell other-month'; const dn = document.createElement('div'); dn.className = 'cal-date'; dn.textContent = i; cell.appendChild(dn); grid.appendChild(cell); } }
-}
-
-function renderCalendarDetail(dateKey, subs) {
-    const detail = document.getElementById('cal-detail');
-    const d = new Date(dateKey); const label = d.toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long' });
-    const fmt = n => formatAmount(n);
-    const sym = getCurrencySymbol();
-    const dayExps = expenses.filter(e => e.date.split('T')[0] === dateKey);
-    detail.innerHTML = '';
-
-    const dateDiv = document.createElement('div'); dateDiv.className = 'cal-detail-date'; dateDiv.textContent = label;
-    detail.appendChild(dateDiv);
-
-    subs.forEach(sub => {
-        const color = colorFromName(sub.name);
-        const row = document.createElement('div'); row.className = 'cal-detail-item';
-        const left = document.createElement('div'); left.className = 'cal-detail-left';
-        const icon = document.createElement('div'); icon.className = 'cal-detail-icon';
-        icon.style.cssText = `background:${color}20;color:${color};`; icon.textContent = sub.name.charAt(0).toUpperCase();
-        const info = document.createElement('div');
-        const name = document.createElement('div'); name.className = 'cal-detail-name'; name.textContent = sub.name;
-        const cycle = document.createElement('div'); cycle.className = 'cal-detail-cycle'; cycle.textContent = formatCycle(sub.cycle) + ' renewal';
-        info.appendChild(name); info.appendChild(cycle);
-        left.appendChild(icon); left.appendChild(info);
-        const price = document.createElement('div'); price.className = 'cal-detail-price'; price.textContent = sym + fmt(sub.price);
-        row.appendChild(left); row.appendChild(price);
-        detail.appendChild(row);
-    });
-
-    if (dayExps.length) {
-        if (subs.length) {
-            const sep = document.createElement('div'); sep.style.cssText = 'border-top:1px solid var(--surface);margin:8px 0 6px;'; detail.appendChild(sep);
-            const lbl = document.createElement('div'); lbl.style.cssText = 'font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--on-surface-variant);margin-bottom:6px;'; lbl.textContent = 'One-time expenses'; detail.appendChild(lbl);
-        }
-        dayExps.forEach(exp => {
-            const row = document.createElement('div'); row.className = 'cal-detail-item';
-            const left = document.createElement('div'); left.className = 'cal-detail-left';
-            const icon = document.createElement('div'); icon.className = 'cal-detail-icon';
-            icon.style.cssText = 'background:var(--surface-high);color:var(--on-surface-variant);';
-            icon.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">receipt_long</span>';
-            const info = document.createElement('div');
-            const name = document.createElement('div'); name.className = 'cal-detail-name'; name.textContent = exp.name;
-            const type = document.createElement('div'); type.className = 'cal-detail-cycle'; type.textContent = 'One-time expense';
-            info.appendChild(name); info.appendChild(type);
-            left.appendChild(icon); left.appendChild(info);
-            const price = document.createElement('div'); price.className = 'cal-detail-price'; price.textContent = sym + fmt(exp.amount);
-            row.appendChild(left); row.appendChild(price);
-            detail.appendChild(row);
-        });
-    }
-
-    if (subs.length && dayExps.length) {
-        const st = subs.reduce((s,sub) => s+parseFloat(sub.price),0);
-        const et = dayExps.reduce((s,e) => s+parseFloat(e.amount),0);
-        const total = document.createElement('div');
-        total.style.cssText = 'border-top:1px solid var(--surface);margin-top:8px;padding-top:10px;display:flex;justify-content:space-between;align-items:center;';
-        const lbl = document.createElement('div'); lbl.style.cssText = 'font-size:0.75rem;color:var(--on-surface-variant);font-weight:600;'; lbl.textContent = 'Total today';
-        const amt  = document.createElement('div'); amt.style.cssText  = 'font-size:1rem;font-weight:800;color:var(--primary);'; amt.textContent = sym + fmt(st+et);
-        total.appendChild(lbl); total.appendChild(amt);
-        detail.appendChild(total);
-    }
-
-    detail.style.display = 'block';
-    detail.scrollIntoView({ behavior:'smooth', block:'nearest' });
-}
-
 // ═══════════════════════════════════════════
 // NETWORK STATUS
 // ═══════════════════════════════════════════
@@ -1620,15 +1544,12 @@ window.toggleProfileSection = function(bodyId, chevronId) {
     const body    = document.getElementById(bodyId);
     const chevron = document.getElementById(chevronId);
     if (!body) return;
-    const open = body.style.display === 'none';
-    body.style.display    = open ? 'block' : 'none';
+    const open = !body.classList.contains('is-open');
+    body.classList.toggle('is-open', open);
+    const trigger = chevron?.closest('.profile-collapse-header');
+    if (trigger) trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
     if (chevron) chevron.textContent = open ? 'expand_more' : 'chevron_right';
 };
-
-document.getElementById('cal-prev').addEventListener('click', () => { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); });
-document.getElementById('cal-next').addEventListener('click', () => { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCalendar(); });
-document.getElementById('cal-back-btn').addEventListener('click', e => { e.preventDefault(); switchPage('dashboard-page'); });
-document.getElementById('calendar-link').addEventListener('click', e => { e.preventDefault(); switchPage('calendar-page'); });
 
 // ═══════════════════════════════════════════
 // BOOT LOADER & INITIALIZATION
