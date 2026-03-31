@@ -22,10 +22,9 @@ let categories    = [];
 let expenses      = [];
 let activeSubId   = null;
 let analyticsView = 'subscriptions';
-let activeSwipeRow = null;
-let dashSearchQuery = '';
-let dashSearchFilter = 'all'; // 'all' | 'subscriptions' | 'expenses'
-let expSearchQuery   = '';
+let activeSwipeRow    = null;
+let analyticsSubSearch = '';
+let analyticsExpSearch = '';
 
 const presetCategories = ['Entertainment','Productivity','Utilities','Health','Food','Education'];
 const navItems = document.querySelectorAll('.nav-item');
@@ -274,30 +273,38 @@ async function loadAllData() {
 
 async function saveProfile() {
     if (!currentUser) return;
-    await sb.from('profiles').upsert({
-        user_id:       currentUser.id,
-        name:          profile.name,
-        avatar:        profile.avatar,
-        theme:         profile.theme,
-        last_notified: profile.lastNotified || null,
-        currency:      profile.currency || 'INR',
-    });
+    try {
+        await sb.from('profiles').upsert({
+            user_id:       currentUser.id,
+            name:          profile.name,
+            avatar:        profile.avatar,
+            theme:         profile.theme,
+            last_notified: profile.lastNotified || null,
+            currency:      profile.currency || 'INR',
+        });
+    } catch {
+        if (!navigator.onLine) showToast('Saved locally — will sync when online');
+    }
 }
 
 async function upsertSubscription(sub) {
     if (!currentUser) return;
-    await sb.from('subscriptions').upsert({
-        id:                  sub.id,
-        user_id:             currentUser.id,
-        name:                sub.name,
-        cycle:               String(sub.cycle),
-        price:               sub.price,
-        date_added:          sub.dateAdded,
-        start_date:          sub.startDate,
-        category:            sub.category || 'unlisted',
-        last_logged_renewal: sub.lastLoggedRenewal || null,
-        paused:              sub.paused || false,
-    });
+    try {
+        await sb.from('subscriptions').upsert({
+            id:                  sub.id,
+            user_id:             currentUser.id,
+            name:                sub.name,
+            cycle:               String(sub.cycle),
+            price:               sub.price,
+            date_added:          sub.dateAdded,
+            start_date:          sub.startDate,
+            category:            sub.category || 'unlisted',
+            last_logged_renewal: sub.lastLoggedRenewal || null,
+            paused:              sub.paused || false,
+        });
+    } catch {
+        if (!navigator.onLine) showToast('Saved locally — will sync when online');
+    }
 }
 
 async function deleteSubscription(id) {
@@ -307,12 +314,16 @@ async function deleteSubscription(id) {
 
 async function upsertCategory(cat) {
     if (!currentUser) return;
-    await sb.from('categories').upsert({
-        id:      cat.id,
-        user_id: currentUser.id,
-        name:    cat.name,
-        budget:  cat.budget || null,
-    });
+    try {
+        await sb.from('categories').upsert({
+            id:      cat.id,
+            user_id: currentUser.id,
+            name:    cat.name,
+            budget:  cat.budget || null,
+        });
+    } catch {
+        if (!navigator.onLine) showToast('Saved locally — will sync when online');
+    }
 }
 
 async function deleteCategoryFromDB(id) {
@@ -334,14 +345,18 @@ window.deleteCategory = async function(id) {
 
 async function insertExpense(exp) {
     if (!currentUser) return;
-    await sb.from('expenses').insert({
-        id:      exp.id,
-        user_id: currentUser.id,
-        name:    exp.name,
-        amount:  exp.amount,
-        date:    exp.date,
-        type:    exp.type || 'manual',
-    });
+    try {
+        await sb.from('expenses').insert({
+            id:      exp.id,
+            user_id: currentUser.id,
+            name:    exp.name,
+            amount:  exp.amount,
+            date:    exp.date,
+            type:    exp.type || 'manual',
+        });
+    } catch {
+        if (!navigator.onLine) showToast('Saved locally — will sync when online');
+    }
 }
 
 async function clearAllData() {
@@ -948,92 +963,6 @@ function renderAnalyticsView() {
 }
 
 // ═══════════════════════════════════════════
-// SWIPE-TO-DELETE HELPER
-// ═══════════════════════════════════════════
-/**
- * Wraps any row in a swipeable delete UI.
- * Swiping left or right reveals an 80px red trash zone.
- * Tapping the trash zone triggers onDelete().
- * Tapping on the row while open snaps it back.
- * Tapping outside the wrapper (global touchstart) also snaps it back.
- */
-function makeSwipeDeleteRow({ rowClass = '', buildContent, onDelete, onClick = null }) {
-    const SNAP = 80;
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'position:relative;overflow:hidden;border-radius:var(--radius-md);margin-bottom:8px;';
-
-    // Left zone — shown when swiped right
-    const zoneLeft = document.createElement('div');
-    zoneLeft.style.cssText = 'position:absolute;left:0;top:0;bottom:0;width:' + SNAP + 'px;background:#c0392b;display:flex;align-items:center;justify-content:center;cursor:pointer;';
-    zoneLeft.innerHTML = '<span class="material-symbols-outlined" style="color:#fff;font-size:22px;pointer-events:none;">delete</span>';
-
-    // Right zone — shown when swiped left
-    const zoneRight = document.createElement('div');
-    zoneRight.style.cssText = 'position:absolute;right:0;top:0;bottom:0;width:' + SNAP + 'px;background:#c0392b;display:flex;align-items:center;justify-content:center;cursor:pointer;';
-    zoneRight.innerHTML = '<span class="material-symbols-outlined" style="color:#fff;font-size:22px;pointer-events:none;">delete</span>';
-
-    const row = document.createElement('div');
-    if (rowClass) row.className = rowClass;
-    row.style.cssText += 'position:relative;z-index:1;';
-    buildContent(row);
-
-    // Touch tracking
-    let startX = 0, startY = 0, curX = 0, swiping = false;
-
-    row.addEventListener('touchstart', e => {
-        if (activeSwipeRow && activeSwipeRow !== row) snapRowBack(activeSwipeRow);
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-        curX = 0; swiping = false;
-        row.style.transition = '';
-    }, { passive: true });
-
-    row.addEventListener('touchmove', e => {
-        const dx = e.touches[0].clientX - startX;
-        const dy = e.touches[0].clientY - startY;
-        if (!swiping && Math.abs(dx) < 10) return;
-        if (!swiping && Math.abs(dy) > Math.abs(dx)) return;
-        swiping = true;
-        curX = dx;
-        row.style.transform = `translateX(${dx}px)`;
-    }, { passive: true });
-
-    row.addEventListener('touchend', () => {
-        if (!swiping) return;
-        if (Math.abs(curX) >= 60) {
-            const snap = curX > 0 ? SNAP : -SNAP;
-            row.style.transition = 'transform 0.2s ease';
-            row.style.transform  = `translateX(${snap}px)`;
-            activeSwipeRow = row;
-        } else {
-            snapRowBack(row);
-        }
-    }, { passive: true });
-
-    // Tap on row while open → snap back; otherwise normal click
-    row.addEventListener('click', e => {
-        if (activeSwipeRow === row) {
-            snapRowBack(row);
-            return;
-        }
-        if (onClick) onClick(e);
-    });
-
-    // Tapping the trash zones
-    const doDelete = () => {
-        activeSwipeRow = null;
-        onDelete();
-    };
-    zoneLeft.addEventListener('click',  doDelete);
-    zoneRight.addEventListener('click', doDelete);
-
-    wrapper.appendChild(zoneLeft);
-    wrapper.appendChild(zoneRight);
-    wrapper.appendChild(row);
-    return wrapper;
-}
-
-// ═══════════════════════════════════════════
 // EXPENSES VIEW
 // ═══════════════════════════════════════════
 function renderExpensesView() {
@@ -1042,51 +971,107 @@ function renderExpensesView() {
     activeSwipeRow = null;
     const total = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
     document.getElementById('expenses-month-total-val').textContent = formatAmount(total);
-    // Search bar visibility
-    const expBar = document.getElementById('exp-search-bar');
-    if (expBar) expBar.style.display = expenses.length >= 7 ? 'block' : 'none';
-    const expInput = document.getElementById('exp-search-input');
-    if (expInput) expInput.value = expSearchQuery;
+
+    // ── JS-injected search input (only when expenses.length > 7) ──
+    const expSearchWrap = container.parentElement.querySelector('.analytics-search-input[data-scope="expenses"]');
+    if (expSearchWrap) expSearchWrap.remove(); // remove stale before re-injecting
+    if (expenses.length > 7) {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.placeholder = 'Search expenses…';
+        inp.autocomplete = 'off';
+        inp.className = 'analytics-search-input';
+        inp.dataset.scope = 'expenses';
+        inp.value = analyticsExpSearch;
+        inp.addEventListener('input', e => { analyticsExpSearch = e.target.value; renderExpensesView(); });
+        container.parentElement.insertBefore(inp, container);
+    }
 
     if (expenses.length === 0) { container.innerHTML = `<div class="expenses-empty">No expenses logged yet.<br>Tap (+) to add one.</div>`; return; }
-    let sorted = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
-    if (expSearchQuery.trim()) {
-        const q = expSearchQuery.trim().toLowerCase();
-        sorted = sorted.filter(e => e.name.toLowerCase().includes(q));
-    }
+
+    const q = analyticsExpSearch.trim().toLowerCase();
+    const sorted = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
     const todayStr = todayISO();
     const yest = (() => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; })();
     const dateLabel = iso => iso === todayStr ? 'Today' : iso === yest ? 'Yesterday' : new Date(iso).toLocaleDateString('en-IN', { day:'numeric', month:'short' });
+
+    // Build day groups
     const groups = []; const seen = new Map();
     sorted.forEach(exp => {
         const label = dateLabel(exp.date);
         if (!seen.has(exp.date)) { seen.set(exp.date, groups.length); groups.push({ label, date: exp.date, items: [] }); }
         groups[seen.get(exp.date)].items.push(exp);
     });
+
+    let anyVisible = false;
     groups.forEach((group, gi) => {
+        // Filter items in this group
+        const visible = q ? group.items.filter(e => e.name.toLowerCase().includes(q)) : group.items;
+        if (visible.length === 0) return; // hide whole day group when nothing matches
+        anyVisible = true;
+
         const dayLabel = document.createElement('div');
         dayLabel.className = 'exp-day-label'; dayLabel.textContent = group.label;
         container.appendChild(dayLabel);
-        group.items.forEach(exp => {
+
+        visible.forEach(exp => {
             if (exp.type === 'manual') {
-                const wrapper = makeSwipeDeleteRow({
-                    rowClass: 'exp-row',
-                    buildContent: row => {
-                        const nameSpan = document.createElement('span'); nameSpan.className = 'exp-name'; nameSpan.textContent = exp.name;
-                        const amtSpan  = document.createElement('span'); amtSpan.className  = 'exp-amount'; amtSpan.textContent = getCurrencySymbol() + formatAmount(exp.amount);
-                        row.appendChild(nameSpan); row.appendChild(amtSpan);
-                    },
-                    onDelete: async () => {
-                        await sb.from('expenses').delete().eq('id', exp.id).eq('user_id', currentUser.id);
-                        expenses = expenses.filter(e => e.id !== exp.id);
-                        renderExpensesView();
-                        renderApp();
-                        showToast('Deleted');
-                    },
+                // ── Swipeable wrapper (backdrop style) ──
+                const wrapper = document.createElement('div');
+                wrapper.style.cssText = 'position:relative;overflow:hidden;border-radius:var(--radius-md);margin-bottom:4px;';
+
+                const backdrop = document.createElement('div');
+                backdrop.style.cssText = 'position:absolute;inset:0;background:var(--error-bg);border:1px solid var(--error);color:var(--error);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;cursor:pointer;';
+                backdrop.innerHTML = '<span class="material-symbols-outlined">delete</span>';
+
+                const row = document.createElement('div');
+                row.className = 'exp-row';
+                row.style.cssText = 'position:relative;z-index:1;';
+                const nameSpan = document.createElement('span'); nameSpan.className = 'exp-name'; nameSpan.textContent = exp.name;
+                const amtSpan  = document.createElement('span'); amtSpan.className  = 'exp-amount'; amtSpan.textContent = getCurrencySymbol() + formatAmount(exp.amount);
+                row.appendChild(nameSpan); row.appendChild(amtSpan);
+
+                let startX = 0, startY = 0, curX = 0, swiping = false;
+
+                row.addEventListener('touchstart', e => {
+                    if (activeSwipeRow && activeSwipeRow !== row) snapRowBack(activeSwipeRow);
+                    startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+                    curX = 0; swiping = false; row.style.transition = '';
+                }, { passive: true });
+
+                row.addEventListener('touchmove', e => {
+                    const dx = e.touches[0].clientX - startX;
+                    const dy = e.touches[0].clientY - startY;
+                    if (!swiping && Math.abs(dx) < 20) return;
+                    if (!swiping && Math.abs(dy) > Math.abs(dx)) return;
+                    swiping = true; curX = dx;
+                    row.style.transform = `translateX(${dx}px)`;
+                }, { passive: true });
+
+                row.addEventListener('touchend', () => {
+                    if (!swiping) return;
+                    if (Math.abs(curX) >= 80) {
+                        const snap = curX > 0 ? 80 : -80;
+                        row.style.transition = 'transform 0.2s ease';
+                        row.style.transform  = `translateX(${snap}px)`;
+                        activeSwipeRow = row;
+                    } else { snapRowBack(row); }
+                }, { passive: true });
+
+                backdrop.addEventListener('click', async () => {
+                    if (!confirm('Delete this expense?')) { snapRowBack(row); return; }
+                    await sb.from('expenses').delete().eq('id', exp.id).eq('user_id', currentUser.id);
+                    expenses = expenses.filter(e => e.id !== exp.id);
+                    activeSwipeRow = null;
+                    renderExpensesView();
+                    renderApp();
+                    showToast('Deleted');
                 });
+
+                wrapper.appendChild(backdrop);
+                wrapper.appendChild(row);
                 container.appendChild(wrapper);
             } else {
-                // Auto-expense — no swipe
                 const row = document.createElement('div'); row.className = 'exp-row';
                 const nameSpan = document.createElement('span'); nameSpan.className = 'exp-name'; nameSpan.textContent = exp.name;
                 const amtSpan  = document.createElement('span'); amtSpan.className = 'exp-amount'; amtSpan.textContent = getCurrencySymbol() + formatAmount(exp.amount);
@@ -1094,8 +1079,18 @@ function renderExpensesView() {
                 container.appendChild(row);
             }
         });
-        if (gi < groups.length - 1) { const div = document.createElement('div'); div.className = 'exp-divider'; container.appendChild(div); }
+
+        if (gi < groups.length - 1) {
+            const div = document.createElement('div'); div.className = 'exp-divider'; container.appendChild(div);
+        }
     });
+
+    if (!anyVisible && q) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'text-align:center;padding:24px 0;color:var(--on-surface-variant);font-size:0.85rem;';
+        empty.textContent = 'No results';
+        container.appendChild(empty);
+    }
 }
 
 // ═══════════════════════════════════════════
@@ -1123,68 +1118,40 @@ async function renderApp() {
     const subItems = subscriptions.map(sub => ({ _type:'sub', _sortDate:new Date(sub.startDate || sub.dateAdded), data:sub }));
     const expItems = expenses.filter(e => e.type === 'manual').map(exp => ({ _type:'exp', _sortDate:new Date(exp.date), data:exp }));
     const mixed    = [...subItems, ...expItems].sort((a,b) => b._sortDate - a._sortDate);
-
-    // Search bar visibility
-    const searchBar = document.getElementById('dash-search-bar');
-    if (searchBar) searchBar.style.display = mixed.length >= 7 ? 'block' : 'none';
-
-    // Sync UI inputs to state (in case renderApp was called externally)
-    const dashInput = document.getElementById('dash-search-input');
-    const dashFilter = document.getElementById('dash-filter-select');
-    if (dashInput)  dashInput.value  = dashSearchQuery;
-    if (dashFilter) dashFilter.value = dashSearchFilter;
-
-    // Filter
-    let filtered = mixed;
-    if (dashSearchFilter !== 'all') {
-        filtered = filtered.filter(e => dashSearchFilter === 'subscriptions' ? e._type === 'sub' : e._type === 'exp');
-    }
-    if (dashSearchQuery.trim()) {
-        const q = dashSearchQuery.trim().toLowerCase();
-        filtered = filtered.filter(e => (e._type === 'sub' ? e.data.name : e.data.name).toLowerCase().includes(q));
-    }
-    const isSearching = dashSearchQuery.trim() || dashSearchFilter !== 'all';
-    const visible  = isSearching ? filtered : mixed.slice(0, 5);
+    const visible  = mixed.slice(0, 5);
 
     visible.forEach(entry => {
         if (entry._type === 'sub') {
             const sub   = entry.data;
             const color = colorFromName(sub.name);
+            const item  = document.createElement('div');
+            item.className = 'list-item';
+            if (sub.paused) item.style.opacity = '0.5';
 
-            const wrapper = makeSwipeDeleteRow({
-                rowClass: 'list-item',
-                buildContent: item => {
-                    if (sub.paused) item.style.opacity = '0.5';
-                    const left = document.createElement('div'); left.className = 'list-item-left';
-                    const icon = document.createElement('div'); icon.className = 'list-icon-wrapper';
-                    icon.style.cssText = `background:${color}20;color:${color};font-size:24px;`;
-                    icon.textContent = sub.name.charAt(0).toUpperCase();
-                    const info = document.createElement('div');
-                    const titleEl = document.createElement('div'); titleEl.className = 'list-title'; titleEl.textContent = sub.name;
-                    if (sub.paused) {
-                        const badge = document.createElement('span');
-                        badge.style.cssText = 'font-size:0.65rem;background:var(--surface-high);color:var(--on-surface-variant);padding:2px 8px;border-radius:99px;font-family:var(--font-body);margin-left:6px;';
-                        badge.textContent = 'Paused';
-                        titleEl.appendChild(badge);
-                    }
-                    const subtitleEl = document.createElement('div'); subtitleEl.className = 'list-subtitle'; subtitleEl.textContent = formatCycle(sub.cycle);
-                    info.appendChild(titleEl); info.appendChild(subtitleEl);
-                    left.appendChild(icon); left.appendChild(info);
-                    const right = document.createElement('div'); right.className = 'text-right';
-                    const priceEl = document.createElement('div'); priceEl.className = 'list-price'; priceEl.textContent = getCurrencySymbol() + formatAmount(sub.price);
-                    const dateEl  = document.createElement('div'); dateEl.className = 'list-date'; dateEl.textContent = formatDate(sub.dateAdded);
-                    right.appendChild(priceEl); right.appendChild(dateEl);
-                    item.appendChild(left); item.appendChild(right);
-                },
-                onClick: () => viewDetails(sub.id),
-                onDelete: async () => {
-                    await deleteSubscription(sub.id);
-                    subscriptions = subscriptions.filter(s => s.id !== sub.id);
-                    renderApp();
-                    showToast('Deleted');
-                },
-            });
-            portfolioList.appendChild(wrapper);
+            const left = document.createElement('div'); left.className = 'list-item-left';
+            const icon = document.createElement('div'); icon.className = 'list-icon-wrapper';
+            icon.style.cssText = `background:${color}20;color:${color};font-size:24px;`;
+            icon.textContent = sub.name.charAt(0).toUpperCase();
+            const info = document.createElement('div');
+            const titleEl = document.createElement('div'); titleEl.className = 'list-title'; titleEl.textContent = sub.name;
+            if (sub.paused) {
+                const badge = document.createElement('span');
+                badge.style.cssText = 'font-size:0.65rem;background:var(--surface-high);color:var(--on-surface-variant);padding:2px 8px;border-radius:99px;font-family:var(--font-body);margin-left:6px;';
+                badge.textContent = 'Paused';
+                titleEl.appendChild(badge);
+            }
+            const subtitleEl = document.createElement('div'); subtitleEl.className = 'list-subtitle'; subtitleEl.textContent = formatCycle(sub.cycle);
+            info.appendChild(titleEl); info.appendChild(subtitleEl);
+            left.appendChild(icon); left.appendChild(info);
+
+            const right = document.createElement('div'); right.className = 'text-right';
+            const priceEl = document.createElement('div'); priceEl.className = 'list-price'; priceEl.textContent = getCurrencySymbol() + formatAmount(sub.price);
+            const dateEl  = document.createElement('div'); dateEl.className = 'list-date'; dateEl.textContent = formatDate(sub.dateAdded);
+            right.appendChild(priceEl); right.appendChild(dateEl);
+
+            item.appendChild(left); item.appendChild(right);
+            item.addEventListener('click', () => viewDetails(sub.id));
+            portfolioList.appendChild(item);
 
             if (!sub.paused) {
                 const today = new Date(); today.setHours(0,0,0,0);
@@ -1205,37 +1172,30 @@ async function renderApp() {
                 upcomingScroll.appendChild(miniCard);
             }
         } else {
-            const exp = entry.data;
-            const wrapper = makeSwipeDeleteRow({
-                rowClass: 'list-item',
-                buildContent: item => {
-                    item.style.cursor = 'default';
-                    const left = document.createElement('div'); left.className = 'list-item-left';
-                    const icon = document.createElement('div'); icon.className = 'list-icon-wrapper';
-                    icon.style.cssText = 'background:var(--surface-high);color:var(--on-surface-variant);';
-                    icon.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">receipt_long</span>';
-                    const info = document.createElement('div');
-                    const titleEl    = document.createElement('div'); titleEl.className = 'list-title'; titleEl.textContent = exp.name;
-                    const subtitleEl = document.createElement('div'); subtitleEl.className = 'list-subtitle'; subtitleEl.textContent = formatDate(exp.date);
-                    info.appendChild(titleEl); info.appendChild(subtitleEl);
-                    left.appendChild(icon); left.appendChild(info);
-                    const right   = document.createElement('div'); right.className = 'text-right';
-                    const priceEl = document.createElement('div'); priceEl.className = 'list-price'; priceEl.textContent = getCurrencySymbol() + formatAmount(exp.amount);
-                    right.appendChild(priceEl);
-                    item.appendChild(left); item.appendChild(right);
-                },
-                onDelete: async () => {
-                    await sb.from('expenses').delete().eq('id', exp.id).eq('user_id', currentUser.id);
-                    expenses = expenses.filter(e => e.id !== exp.id);
-                    renderApp();
-                    showToast('Deleted');
-                },
-            });
-            portfolioList.appendChild(wrapper);
+            const exp  = entry.data;
+            const item = document.createElement('div');
+            item.className = 'list-item'; item.style.cursor = 'default';
+
+            const left = document.createElement('div'); left.className = 'list-item-left';
+            const icon = document.createElement('div'); icon.className = 'list-icon-wrapper';
+            icon.style.cssText = 'background:var(--surface-high);color:var(--on-surface-variant);';
+            icon.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">receipt_long</span>';
+            const info = document.createElement('div');
+            const titleEl    = document.createElement('div'); titleEl.className = 'list-title'; titleEl.textContent = exp.name;
+            const subtitleEl = document.createElement('div'); subtitleEl.className = 'list-subtitle'; subtitleEl.textContent = formatDate(exp.date);
+            info.appendChild(titleEl); info.appendChild(subtitleEl);
+            left.appendChild(icon); left.appendChild(info);
+
+            const right   = document.createElement('div'); right.className = 'text-right';
+            const priceEl = document.createElement('div'); priceEl.className = 'list-price'; priceEl.textContent = getCurrencySymbol() + formatAmount(exp.amount);
+            right.appendChild(priceEl);
+
+            item.appendChild(left); item.appendChild(right);
+            portfolioList.appendChild(item);
         }
     });
 
-    if (!isSearching && mixed.length > 5) {
+    if (mixed.length > 5) {
         const viewAll = document.createElement('div');
         viewAll.style.cssText = 'text-align:center;padding:12px 0 4px;';
         const link = document.createElement('a');
@@ -1369,12 +1329,33 @@ document.getElementById('toggle-manage-categories-btn')?.addEventListener('click
 function renderAnalytics() {
     const container = document.getElementById('category-groups-container');
     container.innerHTML = '';
+
+    // ── JS-injected search input (only when subscriptions.length > 7) ──
+    const subsSearchWrap = container.parentElement.querySelector('.analytics-search-input[data-scope="subscriptions"]');
+    if (subsSearchWrap) subsSearchWrap.remove();
+    if (subscriptions.length > 7) {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.placeholder = 'Search subscriptions…';
+        inp.autocomplete = 'off';
+        inp.className = 'analytics-search-input';
+        inp.dataset.scope = 'subscriptions';
+        inp.value = analyticsSubSearch;
+        inp.addEventListener('input', e => { analyticsSubSearch = e.target.value; renderAnalytics(); });
+        container.parentElement.insertBefore(inp, container);
+    }
+
+    const q = analyticsSubSearch.trim().toLowerCase();
     const groups = { unlisted: { name: 'Unlisted', subs: [] } };
     categories.forEach(c => groups[c.id] = { name: c.name, subs: [] });
     subscriptions.forEach(sub => { const cat = sub.category || 'unlisted'; (groups[cat] || groups['unlisted']).subs.push(sub); });
     const hasCategories = categories.length > 0;
 
     const createGroup = (id, name, subs, showHeading) => {
+        // Filter subs by search query
+        const visibleSubs = q ? subs.filter(s => s.name.toLowerCase().includes(q)) : subs;
+        // Hide entire group if nothing matches (only when searching)
+        if (q && visibleSubs.length === 0) return;
         const groupEl = document.createElement('div'); groupEl.style.marginBottom = '20px';
         if (showHeading) {
             const header = document.createElement('h2');
@@ -1402,13 +1383,13 @@ function renderAnalytics() {
             const sub = subscriptions.find(s => s.id === draggedId);
             if (sub && sub.category !== id) { sub.category = id; await upsertSubscription(sub); renderAnalytics(); }
         });
-        if (subs.length === 0 && showHeading) {
+        if (subs.length === 0 && showHeading && !q) {
             const empty = document.createElement('p');
             empty.style.cssText = 'color:var(--on-surface-variant);font-size:0.8rem;text-align:center;padding:10px;';
             empty.textContent = 'Drag subscriptions here';
             listEl.appendChild(empty);
         }
-        subs.forEach(sub => {
+        visibleSubs.forEach(sub => {
             const color    = colorFromName(sub.name);
             const today    = new Date(); today.setHours(0,0,0,0);
             const anchor   = sub.startDate || sub.dateAdded;
@@ -1445,6 +1426,14 @@ function renderAnalytics() {
 
     if (!hasCategories) { createGroup('unlisted', 'Unlisted', groups['unlisted'].subs, false); }
     else { for (const [id, grp] of Object.entries(groups)) { if (id !== 'unlisted') createGroup(id, grp.name, grp.subs, true); } createGroup('unlisted', 'Unlisted', groups['unlisted'].subs, true); }
+
+    if (q && container.children.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'text-align:center;padding:24px 0;color:var(--on-surface-variant);font-size:0.85rem;';
+        empty.textContent = 'No results';
+        container.appendChild(empty);
+    }
+
     renderCategoryManager();
 }
 
@@ -1613,6 +1602,18 @@ function renderCalendarDetail(dateKey, subs) {
 }
 
 // ═══════════════════════════════════════════
+// NETWORK STATUS
+// ═══════════════════════════════════════════
+(function () {
+    const banner = document.getElementById('offline-banner');
+    if (!banner) return;
+    const update = () => { banner.style.display = navigator.onLine ? 'none' : 'block'; };
+    window.addEventListener('online',  update);
+    window.addEventListener('offline', update);
+    update(); // initialise on load
+})();
+
+// ═══════════════════════════════════════════
 // PROFILE COLLAPSIBLE SECTIONS
 // ═══════════════════════════════════════════
 window.toggleProfileSection = function(bodyId, chevronId) {
@@ -1623,22 +1624,6 @@ window.toggleProfileSection = function(bodyId, chevronId) {
     body.style.display    = open ? 'block' : 'none';
     if (chevron) chevron.textContent = open ? 'expand_more' : 'chevron_right';
 };
-
-// ═══════════════════════════════════════════
-// SEARCH & FILTER LISTENERS
-// ═══════════════════════════════════════════
-document.getElementById('dash-search-input').addEventListener('input', e => {
-    dashSearchQuery = e.target.value;
-    renderApp();
-});
-document.getElementById('dash-filter-select').addEventListener('change', e => {
-    dashSearchFilter = e.target.value;
-    renderApp();
-});
-document.getElementById('exp-search-input').addEventListener('input', e => {
-    expSearchQuery = e.target.value;
-    renderExpensesView();
-});
 
 document.getElementById('cal-prev').addEventListener('click', () => { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); });
 document.getElementById('cal-next').addEventListener('click', () => { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCalendar(); });
