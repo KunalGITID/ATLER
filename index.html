@@ -13,6 +13,17 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Atler">
 
+    <script>
+        (function () {
+            const isGithubPages = location.hostname === 'kunalgitid.github.io';
+            const wrongRootPath = location.pathname === '/' || location.pathname === '/index.html';
+            if (isGithubPages && wrongRootPath) {
+                const next = '/ATLER/' + (location.search || '') + (location.hash || '');
+                location.replace(next);
+            }
+        })();
+    </script>
+
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
