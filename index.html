@@ -28,7 +28,8 @@
         midnight: { primary:'#4fc3f7', primaryContainer:'#0d47a1', primaryGlow:'rgba(79,195,247,0.4)',  secondary:'#80deea', secondaryGlow:'rgba(128,222,234,0.2)' },
         rose:     { primary:'#f48fb1', primaryContainer:'#880e4f', primaryGlow:'rgba(244,143,177,0.4)', secondary:'#f06292', secondaryGlow:'rgba(240,98,146,0.2)' },
         forest:   { primary:'#81c784', primaryContainer:'#1b5e20', primaryGlow:'rgba(129,199,132,0.4)', secondary:'#aed581', secondaryGlow:'rgba(174,213,129,0.2)' },
-        amber:    { primary:'#ffcc02', primaryContainer:'#e65100', primaryGlow:'rgba(255,204,2,0.4)',   secondary:'#ffb300', secondaryGlow:'rgba(255,179,0,0.2)' }
+        amber:    { primary:'#ffcc02', primaryContainer:'#e65100', primaryGlow:'rgba(255,204,2,0.4)',   secondary:'#ffb300', secondaryGlow:'rgba(255,179,0,0.2)' },
+        slate:    { primary:'#94a3b8', primaryContainer:'#334155', primaryGlow:'rgba(148,163,184,0.3)', secondary:'#7dd3fc', secondaryGlow:'rgba(125,211,252,0.2)' }
       };
       const t = themes[saved] || themes.default;
       const r = document.documentElement.style;
@@ -112,7 +113,24 @@
                 </div>
             </section>
             <section>
-                <h2>The Money Pit</h2>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                    <h2 style="margin-bottom:0;">The Money Pit</h2>
+                </div>
+                <div id="dash-search-bar" style="display:none;margin-bottom:12px;">
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <div style="position:relative;flex:1;">
+                            <span class="material-symbols-outlined" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--on-surface-variant);pointer-events:none;">search</span>
+                            <input type="text" id="dash-search-input" placeholder="Search..." autocomplete="off"
+                                style="width:100%;background:var(--surface-low);border:1px solid var(--glass-border);color:var(--on-surface);padding:10px 12px 10px 36px;border-radius:var(--radius-md);font-size:0.9rem;font-family:var(--font-body);outline:none;">
+                        </div>
+                        <select id="dash-filter-select"
+                            style="background:var(--surface-low);border:1px solid var(--glass-border);color:var(--on-surface);padding:10px 12px;border-radius:var(--radius-md);font-size:0.85rem;font-family:var(--font-body);outline:none;cursor:pointer;flex-shrink:0;">
+                            <option value="all">All</option>
+                            <option value="subscriptions">Subs</option>
+                            <option value="expenses">Expenses</option>
+                        </select>
+                    </div>
+                </div>
                 <div id="portfolio-list"></div>
             </section>
             <section class="insights-card" id="insights-card">
@@ -242,6 +260,13 @@
                             style="font-size:2.6rem;font-family:var(--font-headline);font-weight:800;letter-spacing:-0.04em;">0.00</span>
                     </div>
                 </div>
+                <div id="exp-search-bar" style="display:none;margin-bottom:12px;">
+                    <div style="position:relative;">
+                        <span class="material-symbols-outlined" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--on-surface-variant);pointer-events:none;">search</span>
+                        <input type="text" id="exp-search-input" placeholder="Search expenses..." autocomplete="off"
+                            style="width:100%;background:var(--surface-low);border:1px solid var(--glass-border);color:var(--on-surface);padding:10px 12px 10px 36px;border-radius:var(--radius-md);font-size:0.9rem;font-family:var(--font-body);outline:none;">
+                    </div>
+                </div>
                 <div id="expenses-list-container"></div>
             </div>
         </main>
@@ -301,67 +326,85 @@
                         style="background:var(--primary-container);color:var(--primary);border:none;padding:12px 20px;border-radius:var(--radius-md);font-weight:700;font-size:0.85rem;cursor:pointer;white-space:nowrap;">Save</button>
                 </div>
             </section>
+            <!-- Currency — collapsible -->
             <section>
-                <div class="label" style="margin-bottom:16px;">Currency</div>
-                <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                    <button class="currency-pill" data-currency="INR" style="background:var(--surface-low);border:2px solid var(--primary);color:var(--primary);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">₹ INR</button>
-                    <button class="currency-pill" data-currency="USD" style="background:var(--surface-low);border:2px solid var(--glass-border);color:var(--on-surface-variant);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">$ USD</button>
-                    <button class="currency-pill" data-currency="EUR" style="background:var(--surface-low);border:2px solid var(--glass-border);color:var(--on-surface-variant);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">€ EUR</button>
-                    <button class="currency-pill" data-currency="GBP" style="background:var(--surface-low);border:2px solid var(--glass-border);color:var(--on-surface-variant);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">£ GBP</button>
-                </div>
-            </section>
-            <section>
-                <div class="label" style="margin-bottom:16px;">Theme</div>
-                <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
-                    <div class="theme-chip" data-theme="default" style="text-align:center;cursor:pointer;">
-                        <div
-                            style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#4b4dd8,#c0c1ff);margin:0 auto 6px;border:2px solid var(--primary);">
-                        </div><span style="font-size:0.7rem;color:var(--on-surface-variant);">Default</span>
-                    </div>
-                    <div class="theme-chip" data-theme="midnight" style="text-align:center;cursor:pointer;">
-                        <div
-                            style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0d47a1,#4fc3f7);margin:0 auto 6px;border:2px solid transparent;">
-                        </div><span style="font-size:0.7rem;color:var(--on-surface-variant);">Midnight</span>
-                    </div>
-                    <div class="theme-chip" data-theme="forest" style="text-align:center;cursor:pointer;">
-                        <div
-                            style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1b5e20,#81c784);margin:0 auto 6px;border:2px solid transparent;">
-                        </div><span style="font-size:0.7rem;color:var(--on-surface-variant);">Forest</span>
-                    </div>
-                    <div class="theme-chip" data-theme="paper" style="text-align:center;cursor:pointer;">
-                        <div
-                            style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#E0E0E0,#F5F5F5);margin:0 auto 6px;border:2px solid transparent;">
-                        </div><span style="font-size:0.7rem;color:var(--on-surface-variant);">Paper</span>
-                    </div>
-                    <div class="theme-chip" data-theme="void" style="text-align:center;cursor:pointer;">
-                        <div
-                            style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0D0D0D,#E05A4E);margin:0 auto 6px;border:2px solid transparent;">
-                        </div><span style="font-size:0.7rem;color:var(--on-surface-variant);">Void</span>
-                    </div>
-                    <div class="theme-chip" data-theme="inferno" style="text-align:center;cursor:pointer;">
-                        <div
-                            style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#FF6A00,#00FFB2);margin:0 auto 6px;border:2px solid transparent;">
-                        </div><span style="font-size:0.7rem;color:var(--on-surface-variant);">Inferno</span>
+                <button class="profile-collapse-header" id="currency-toggle" aria-expanded="false" onclick="toggleProfileSection('currency-body','currency-chevron')">
+                    <span class="label" style="margin:0;">Currency</span>
+                    <span class="material-symbols-outlined profile-collapse-chevron" id="currency-chevron">chevron_right</span>
+                </button>
+                <div id="currency-body" style="display:none;padding-top:14px;">
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                        <button class="currency-pill" data-currency="INR" style="background:var(--surface-low);border:2px solid var(--primary);color:var(--primary);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">₹ INR</button>
+                        <button class="currency-pill" data-currency="USD" style="background:var(--surface-low);border:2px solid var(--glass-border);color:var(--on-surface-variant);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">$ USD</button>
+                        <button class="currency-pill" data-currency="EUR" style="background:var(--surface-low);border:2px solid var(--glass-border);color:var(--on-surface-variant);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">€ EUR</button>
+                        <button class="currency-pill" data-currency="GBP" style="background:var(--surface-low);border:2px solid var(--glass-border);color:var(--on-surface-variant);padding:10px 20px;border-radius:var(--radius-full);font-size:0.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);transition:border-color 0.2s,color 0.2s;">£ GBP</button>
                     </div>
                 </div>
             </section>
+
+            <!-- Theme — collapsible -->
             <section>
-                <div class="label" style="margin-bottom:16px;">Notifications</div>
-                <div style="background:var(--surface-low);border:1px solid var(--glass-border);border-radius:var(--radius-md);overflow:hidden;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;">
-                        <div style="display:flex;align-items:center;gap:14px;">
-                            <div id="notif-icon-wrap" style="width:40px;height:40px;border-radius:var(--radius-md);background:var(--primary-container);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                                <span class="material-symbols-outlined" style="font-size:20px;color:var(--primary);">notifications</span>
-                            </div>
-                            <div>
-                                <div style="font-size:0.95rem;color:var(--on-surface);font-weight:600;">Renewal Reminders</div>
-                                <div id="notif-status" style="font-size:0.75rem;color:var(--on-surface-variant);margin-top:3px;">Not enabled</div>
-                            </div>
+                <button class="profile-collapse-header" id="theme-toggle" aria-expanded="false" onclick="toggleProfileSection('theme-body','theme-chevron')">
+                    <span class="label" style="margin:0;">Theme</span>
+                    <span class="material-symbols-outlined profile-collapse-chevron" id="theme-chevron">chevron_right</span>
+                </button>
+                <div id="theme-body" style="display:none;padding-top:14px;">
+                    <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+                        <div class="theme-chip" data-theme="default" style="text-align:center;cursor:pointer;">
+                            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#4b4dd8,#c0c1ff);margin:0 auto 6px;border:2px solid var(--primary);"></div>
+                            <span style="font-size:0.7rem;color:var(--on-surface-variant);">Default</span>
                         </div>
-                        <button id="notif-toggle-btn" style="background:var(--primary-container);color:var(--primary);border:none;padding:10px 18px;border-radius:var(--radius-md);font-weight:700;font-size:0.82rem;cursor:pointer;white-space:nowrap;font-family:var(--font-body);">Enable</button>
+                        <div class="theme-chip" data-theme="midnight" style="text-align:center;cursor:pointer;">
+                            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0d47a1,#4fc3f7);margin:0 auto 6px;border:2px solid transparent;"></div>
+                            <span style="font-size:0.7rem;color:var(--on-surface-variant);">Midnight</span>
+                        </div>
+                        <div class="theme-chip" data-theme="forest" style="text-align:center;cursor:pointer;">
+                            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1b5e20,#81c784);margin:0 auto 6px;border:2px solid transparent;"></div>
+                            <span style="font-size:0.7rem;color:var(--on-surface-variant);">Forest</span>
+                        </div>
+                        <div class="theme-chip" data-theme="paper" style="text-align:center;cursor:pointer;">
+                            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#E0E0E0,#F5F5F5);margin:0 auto 6px;border:2px solid transparent;"></div>
+                            <span style="font-size:0.7rem;color:var(--on-surface-variant);">Paper</span>
+                        </div>
+                        <div class="theme-chip" data-theme="void" style="text-align:center;cursor:pointer;">
+                            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0D0D0D,#E05A4E);margin:0 auto 6px;border:2px solid transparent;"></div>
+                            <span style="font-size:0.7rem;color:var(--on-surface-variant);">Void</span>
+                        </div>
+                        <div class="theme-chip" data-theme="inferno" style="text-align:center;cursor:pointer;">
+                            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#FF6A00,#00FFB2);margin:0 auto 6px;border:2px solid transparent;"></div>
+                            <span style="font-size:0.7rem;color:var(--on-surface-variant);">Inferno</span>
+                        </div>
+                        <div class="theme-chip" data-theme="slate" style="text-align:center;cursor:pointer;">
+                            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0f172a,#94a3b8);margin:0 auto 6px;border:2px solid transparent;"></div>
+                            <span style="font-size:0.7rem;color:var(--on-surface-variant);">Slate</span>
+                        </div>
                     </div>
-                    <div style="padding:0 16px 14px;font-size:0.78rem;color:var(--on-surface-variant);line-height:1.5;border-top:1px solid var(--glass-border);padding-top:12px;">
-                        Get reminded <strong style="color:var(--on-surface);">3 days</strong> and <strong style="color:var(--on-surface);">1 day</strong> before any subscription renews so you're never caught off guard.
+                </div>
+            </section>
+
+            <!-- Notifications — collapsible -->
+            <section>
+                <button class="profile-collapse-header" id="notif-section-toggle" aria-expanded="false" onclick="toggleProfileSection('notif-body','notif-section-chevron')">
+                    <span class="label" style="margin:0;">Notifications</span>
+                    <span class="material-symbols-outlined profile-collapse-chevron" id="notif-section-chevron">chevron_right</span>
+                </button>
+                <div id="notif-body" style="display:none;padding-top:14px;">
+                    <div style="background:var(--surface-low);border:1px solid var(--glass-border);border-radius:var(--radius-md);overflow:hidden;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;">
+                            <div style="display:flex;align-items:center;gap:14px;">
+                                <div id="notif-icon-wrap" style="width:40px;height:40px;border-radius:var(--radius-md);background:var(--primary-container);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <span class="material-symbols-outlined" style="font-size:20px;color:var(--primary);">notifications</span>
+                                </div>
+                                <div>
+                                    <div style="font-size:0.95rem;color:var(--on-surface);font-weight:600;">Renewal Reminders</div>
+                                    <div id="notif-status" style="font-size:0.75rem;color:var(--on-surface-variant);margin-top:3px;">Not enabled</div>
+                                </div>
+                            </div>
+                            <button id="notif-toggle-btn" style="background:var(--primary-container);color:var(--primary);border:none;padding:10px 18px;border-radius:var(--radius-md);font-weight:700;font-size:0.82rem;cursor:pointer;white-space:nowrap;font-family:var(--font-body);">Enable</button>
+                        </div>
+                        <div style="padding:12px 16px 14px;font-size:0.78rem;color:var(--on-surface-variant);line-height:1.5;border-top:1px solid var(--glass-border);">
+                            Get reminded <strong style="color:var(--on-surface);">3 days</strong> and <strong style="color:var(--on-surface);">1 day</strong> before any subscription renews so you're never caught off guard.
+                        </div>
                     </div>
                 </div>
             </section>
