@@ -199,7 +199,7 @@
         })();
     </script>
 
-    <link rel="stylesheet" href="./style.css?v=22">
+    <link rel="stylesheet" href="./style.css?v=24">
   <style>
     #ls-star-container {
       position: absolute;
@@ -1248,15 +1248,6 @@
                 } catch (_) { }
             });
         }
-    </script>
-    <!-- iOS / PWA: discourage pinch and double-tap zoom (native-app feel) -->
-    <script>
-        (function () {
-            function blockGesture(e) { e.preventDefault(); }
-            document.addEventListener('gesturestart', blockGesture, { passive: false });
-            document.addEventListener('gesturechange', blockGesture, { passive: false });
-            document.addEventListener('gestureend', blockGesture, { passive: false });
-        })();
     </script>
 </body>
 
