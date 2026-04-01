@@ -3207,77 +3207,45 @@ window.toggleProfileSection = function(bodyId, chevronId) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function runBootWithLoader(bootFn, minVisible = 250) {
+function dismissLoaderAfterPaint() {
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            if (typeof window.dismissLoader === 'function') window.dismissLoader();
+        });
+    });
+}
+
+async function runBootWithLoader(bootFn, minVisible = 0) {
     const startTime = Date.now();
     let forcedDismissTimer = null;
-    console.log('[boot] runBootWithLoader start');
 
     try {
         forcedDismissTimer = setTimeout(() => {
-            console.log('[boot] forced 12s dismiss fired');
             if (typeof window.dismissLoader === 'function') window.dismissLoader();
         }, 12000);
 
-        const bootPromise = bootFn();
-        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve('timeout'), 2500));
-
-        const bootResult = await Promise.race([bootPromise, timeoutPromise]);
-        console.log('[boot] race resolved:', bootResult, 'elapsed:', Date.now() - startTime);
-
-        if (bootResult === 'timeout') {
-            const authScreen = document.getElementById('auth-screen');
-            if (authScreen && !currentUser) authScreen.classList.remove('hidden');
-            if (typeof window.dismissLoader === 'function') window.dismissLoader();
-            return;
-        }
+        await bootFn();
 
         const elapsed = Date.now() - startTime;
-        if (elapsed < minVisible) await sleep(minVisible - elapsed);
+        if (minVisible > 0 && elapsed < minVisible) await sleep(minVisible - elapsed);
 
     } catch (error) {
         console.error('[boot] Boot failed:', error);
         const authScreen = document.getElementById('auth-screen');
         if (authScreen && !currentUser) authScreen.classList.remove('hidden');
     } finally {
-        console.log('[boot] finally — calling dismissLoader, type:', typeof window.dismissLoader);
         clearTimeout(forcedDismissTimer);
-        if (typeof window.dismissLoader === 'function') window.dismissLoader();
+        dismissLoaderAfterPaint();
     }
 }
 
 async function renderInitialSessionView() {
-    let dataLoadedInTime = false;
-    const loadPromise = loadAllData()
-        .then(() => {
-            dataLoadedInTime = true;
-        })
-        .catch(() => {});
-
-    await Promise.race([
-        loadPromise,
-        sleep(1200)
-    ]);
-
+    await loadAllData().catch(() => {});
     renderApp();
     renderProfilePage();
-
-    if (dataLoadedInTime) {
-        scheduleRenewalNotifications();
-        handleLaunchShortcut();
-        if (lastLoadError) showToast(lastLoadError, 3200);
-        return;
-    }
-
-    loadPromise.then(() => {
-        renderApp();
-        renderProfilePage();
-        scheduleRenewalNotifications();
-        handleLaunchShortcut();
-        if (lastLoadError) showToast(lastLoadError, 3200);
-    }).catch(() => {
-        handleLaunchShortcut();
-        if (lastLoadError) showToast(lastLoadError, 3200);
-    });
+    scheduleRenewalNotifications();
+    handleLaunchShortcut();
+    if (lastLoadError) showToast(lastLoadError, 3200);
 }
 
 // Global App Initialization
@@ -3339,7 +3307,7 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
             showNotificationPrompt();
             handleLaunchShortcut();
             if (lastLoadError) showToast(lastLoadError, 3200);
-        }, 1000);
+        }, 0);
     }
 
     if (event === 'SIGNED_OUT') {
