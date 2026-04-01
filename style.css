@@ -75,9 +75,7 @@ body {
   color: var(--on-surface);
   font-family: var(--font-body);
   line-height: 1.5;
-  /* Keep horizontal page shift minimal without killing vertical momentum (iOS) */
   overscroll-behavior-x: none;
-  touch-action: manipulation;
   overflow-x: hidden;
   max-width: 100vw;
 }
@@ -102,7 +100,7 @@ body {
   padding-top: 0;
   padding-left: max(var(--spacing-6), env(safe-area-inset-left, 0px));
   padding-right: max(var(--spacing-6), env(safe-area-inset-right, 0px));
-  padding-bottom: 140px;
+  /* Bottom spacing comes from .page padding-bottom (nav clearance) */
   max-width: min(600px, 100%);
 }
 
@@ -845,14 +843,15 @@ button.list-item {
 
 .view-all:hover { text-decoration: underline; }
 
-/* Page Transitions */
+/* Page Transitions — in-flow (not position:absolute) so the document scroll height matches
+   content on iOS; absolute stacking caused scroll trapping / “stuck” scrolling. */
 .page {
   display: none;
-  position: absolute;
-  top: 0; left: 0; right: 0;
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
   padding-top: var(--page-pad-top);
   padding-bottom: 140px;
-  will-change: transform, opacity;
 }
 
 .page.active {
