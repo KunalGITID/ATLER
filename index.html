@@ -333,8 +333,8 @@
       var lsDotsEl      = document.getElementById('ls-dots');
 
       var SYMBOLS    = '*$&@(%)@!+#?&%@?$!@#%^&*';
-      var CHAR_DELAY = 75;
-      var DOT_DELAY  = 320;
+      var CHAR_DELAY = 35;
+      var DOT_DELAY  = 150;
       var running    = true;
       var animDone   = false;
       var dismissReq = false;
@@ -386,7 +386,7 @@
       }
 
       async function run() {
-        await new Promise(function(r) { setTimeout(r, 350); });
+        await new Promise(function(r) { setTimeout(r, 150); });
         await decodeRow(lsRowTop);
         await decodeRow(lsRowBottom);
         lsCenter.classList.add('pulse');
