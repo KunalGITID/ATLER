@@ -176,6 +176,18 @@ const themes = {
     },
 };
 
+function syncThemeChipStyles(activeThemeName) {
+    document.querySelectorAll('.theme-chip').forEach(chip => {
+        const dot = chip.querySelector('div');
+        const label = chip.querySelector('span');
+        const key = chip.dataset.theme;
+        const ct = themes[key] || themes.default;
+        const selected = key === activeThemeName;
+        if (dot) dot.style.border = selected ? `2px solid ${ct.primary}` : '2px solid transparent';
+        if (label) label.style.color = selected ? ct.primary : 'var(--on-surface-variant)';
+    });
+}
+
 function applyTheme(name) {
     const t = themes[name] || themes.default;
     const r = document.documentElement.style;
@@ -201,12 +213,7 @@ function applyTheme(name) {
     r.setProperty('--nav-bg',            t.navBg);
     r.setProperty('--nav-shadow',        t.navShadow);
 
-    document.querySelectorAll('.theme-chip').forEach(chip => {
-        const dot = chip.querySelector('div');
-        const label = chip.querySelector('span');
-        if (dot) dot.style.border = '2px solid transparent';
-        if (label) label.style.color = chip.dataset.theme === name ? '#ffffff' : '';
-    });
+    syncThemeChipStyles(name);
 
     profile.theme = name;
     localStorage.setItem('atler_theme', name);
@@ -1648,7 +1655,9 @@ function viewExpenseDetails(id) {
     document.getElementById('edit-expense-date').value = exp.date;
     document.getElementById('expense-edit-card').style.display = 'none';
     document.getElementById('edit-expense-btn').style.display = exp.type === 'manual' ? 'block' : 'none';
-    document.getElementById('delete-expense-btn').style.display = exp.type === 'manual' ? 'block' : 'none';
+    const delBtn = document.getElementById('delete-expense-btn');
+    delBtn.style.display = 'block';
+    delBtn.textContent = exp.type === 'auto' ? 'Remove renewal log' : 'Delete Expense';
 
     switchPage('expense-details-page', { pushHistory: true });
 }
@@ -1747,12 +1756,17 @@ document.getElementById('delete-sub-btn').addEventListener('click', async () => 
 
 document.getElementById('delete-expense-btn').addEventListener('click', async () => {
     if (!activeExpenseId) return;
-    showConfirm('Delete this expense? This will remove the manual expense from your history.', async () => {
+    const entry = expenses.find(e => e.id === activeExpenseId);
+    const isAuto = entry?.type === 'auto';
+    const msg = isAuto
+        ? 'Remove this renewal log? Your subscription is kept — only this history line goes away.'
+        : 'Delete this expense? This will remove the manual expense from your history.';
+    showConfirm(msg, async () => {
         haptic('error');
         await sbWrite(() => sb.from('expenses').delete().eq('id', activeExpenseId).eq('user_id', currentUser.id));
         expenses = expenses.filter(exp => exp.id !== activeExpenseId);
         activeExpenseId = null;
-        showToast('Expense deleted');
+        showToast(isAuto ? 'Renewal log removed' : 'Expense deleted');
         goBack();
         await renderApp();
     });
@@ -2345,7 +2359,7 @@ addExpenseForm.addEventListener('submit', async e => {
     }
 
     try {
-        const newExp = { id: Date.now().toString(), name, amount: parseFloat(amount), date, type: 'manual' };
+        const newExp = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, name, amount: parseFloat(amount), date, type: 'manual' };
         expenses.push(newExp);
         await insertExpense(newExp);
         haptic('success');
@@ -2613,10 +2627,9 @@ function renderExpensesView() {
         container.appendChild(dayLabel);
 
         visible.forEach(exp => {
-            const isManual = exp.type === 'manual';
-            const row = document.createElement(isManual ? 'button' : 'div');
-            if (isManual) row.type = 'button';
-            row.className = `exp-row${isManual ? ' exp-row-button' : ''}`;
+            const row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'exp-row exp-row-button';
 
             const left = document.createElement('div');
             left.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;gap:2px;';
@@ -2629,17 +2642,18 @@ function renderExpensesView() {
             right.style.cssText = 'display:flex;align-items:center;gap:10px;';
             const amtSpan  = document.createElement('span'); amtSpan.className  = 'exp-amount'; amtSpan.textContent = getCurrencySymbol() + formatAmount(exp.amount);
             right.appendChild(amtSpan);
-            if (isManual) {
-                const chevron = document.createElement('span');
-                chevron.className = 'material-symbols-outlined';
-                chevron.style.cssText = 'font-size:18px;color:var(--on-surface-variant);';
-                chevron.textContent = 'chevron_right';
-                right.appendChild(chevron);
-            }
+            const chevron = document.createElement('span');
+            chevron.className = 'material-symbols-outlined';
+            chevron.style.cssText = 'font-size:18px;color:var(--on-surface-variant);';
+            chevron.textContent = 'chevron_right';
+            right.appendChild(chevron);
 
             row.appendChild(left);
             row.appendChild(right);
-            if (isManual) row.addEventListener('click', () => openEditExpenseSheet(exp.id));
+            row.addEventListener('click', () => {
+                if (exp.type === 'manual') openEditExpenseSheet(exp.id);
+                else viewExpenseDetails(exp.id);
+            });
             container.appendChild(row);
         });
 
@@ -2746,8 +2760,12 @@ async function renderApp() {
             }
         } else {
             const exp  = entry.data;
-            const item = document.createElement('div');
-            item.className = 'list-item'; item.style.cursor = 'default';
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'list-item list-item-stagger';
+            item.style.animationDelay = (idx * 40) + 'ms';
+            item.style.cursor = 'pointer';
+            item.addEventListener('click', () => openEditExpenseSheet(exp.id));
 
             const left = document.createElement('div'); left.className = 'list-item-left';
             const _iconWrap2 = document.createElement('div'); _iconWrap2.innerHTML = buildIconCircle(exp.name, null, 'var(--on-surface-variant)', '48px');
