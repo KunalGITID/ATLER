@@ -6,52 +6,13 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 
 // IndexedDB-backed storage adapter — survives PWA force-quit on iOS/Android
 // unlike localStorage which can be evicted by the OS on process kill.
-const idbStorage = (() => {
-    const DB_NAME = 'atler_auth';
-    const STORE   = 'kv';
-    function open() {
-        return new Promise((res, rej) => {
-            const req = indexedDB.open(DB_NAME, 1);
-            req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
-            req.onsuccess = e => res(e.target.result);
-            req.onerror   = () => rej(req.error);
-        });
-    }
-    return {
-        async getItem(key) {
-            const db = await open();
-            return new Promise((res, rej) => {
-                const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(key);
-                req.onsuccess = () => res(req.result ?? null);
-                req.onerror   = () => rej(req.error);
-            });
-        },
-        async setItem(key, value) {
-            const db = await open();
-            return new Promise((res, rej) => {
-                const req = db.transaction(STORE, 'readwrite').objectStore(STORE).put(value, key);
-                req.onsuccess = () => res();
-                req.onerror   = () => rej(req.error);
-            });
-        },
-        async removeItem(key) {
-            const db = await open();
-            return new Promise((res, rej) => {
-                const req = db.transaction(STORE, 'readwrite').objectStore(STORE).delete(key);
-                req.onsuccess = () => res();
-                req.onerror   = () => rej(req.error);
-            });
-        },
-    };
-})();
-
 const sb = window.supabase?.createClient
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
         auth: {
             persistSession: true,
             autoRefreshToken: true,
             detectSessionInUrl: true,
-            storage: idbStorage,
+            storage: localStorage,
         }
     })
     : null;
@@ -518,6 +479,9 @@ async function loadAllData() {
 
     await cleanupLegacyAutoDuplicates();
     applyTheme(profile.theme);
+    
+    // Run in background without blocking UI render
+    autoLogRenewals().catch(console.error);
 }
 
 async function saveProfile() {
@@ -2726,8 +2690,6 @@ function renderExpensesView() {
 // RENDER APP
 // ═══════════════════════════════════════════
 async function renderApp() {
-    await autoLogRenewals();
-
     document.getElementById('user-display-name').textContent = profile.name;
     document.getElementById('user-avatar-img').src           = profile.avatar;
 
@@ -3292,49 +3254,94 @@ async function runBootWithLoader(bootFn, minVisible = 0) {
 
 async function renderInitialSessionView() {
     await loadAllData().catch(() => {});
-    renderApp();
+    await renderApp();
     renderProfilePage();
     scheduleRenewalNotifications();
     handleLaunchShortcut();
     if (lastLoadError) showToast(lastLoadError, 3200);
 }
 
-// Global App Initialization
-(async () => {
+// Local Cache logic for SWR (Stale-While-Revalidate)
+function loadLocalCache(uid) {
+    try {
+       const cached = localStorage.getItem(`atler_cache_${uid}`);
+       if (cached) {
+           const data = JSON.parse(cached);
+           profile = data.profile || profile;
+           subscriptions = data.subscriptions || [];
+           categories = data.categories || [];
+           expenses = data.expenses || [];
+           applyTheme(profile.theme);
+           return true;
+       }
+    } catch(e) {}
+    return false;
+}
+
+function saveLocalCache(uid) {
+    if (!uid) return;
+    localStorage.setItem(`atler_cache_${uid}`, JSON.stringify({
+        profile, subscriptions, categories, expenses
+    }));
+}
+
+// Global Boot Flag
+let appBooted = false;
+
+// We explicitly fetch the session to guarantee IDB async storage has resolved.
+async function bootstrapApp() {
+    if (appBooted) return;
+    
+    // If a Google OAuth redirect hash is present, defer to SIGNED_IN listener
+    const hash = window.location.hash || window.location.href || '';
+    if (hash.includes('access_token=') || hash.includes('provider_token=')) return;
+
+    const { data: { session } } = await sb.auth.getSession();
+    const authScreen = document.getElementById('auth-screen');
+
+    if (!session?.user) {
+        if (authScreen) authScreen.classList.remove('hidden');
+        return;
+    }
+
+    appBooted = true;
     await runBootWithLoader(async () => {
-        const authScreen = document.getElementById('auth-screen');
-        const authError = document.getElementById('auth-error');
-        const hash = window.location.hash || '';
-
-        if (!sb) {
-            if (authScreen) authScreen.classList.remove('hidden');
-            if (authError) authError.textContent = 'Unable to load app services. Refresh and try again.';
-            return;
-        }
-
-        if (hash.includes('type=recovery')) {
-            if (authScreen) authScreen.classList.remove('hidden');
-            setRecoveryMode(true);
-            return;
-        }
-
-        const { data: { session } } = await sb.auth.getSession();
-
-        if (!session?.user) {
-            authScreen.classList.remove('hidden');
-            return;
-        }
-
         currentUser = session.user;
-        await ensureUserProfile(session.user);
-        authScreen.classList.add('hidden');
-        await renderInitialSessionView();
-    });
-})();
+        const hasCache = loadLocalCache(currentUser.id);
+
+        if (hasCache) {
+            if (authScreen) authScreen.classList.add('hidden');
+            renderApp();
+            renderProfilePage();
+            scheduleRenewalNotifications();
+            handleLaunchShortcut();
+            
+            // SWR: Fetch in background
+            loadAllData().then(() => {
+                saveLocalCache(currentUser.id);
+                renderApp();
+                renderProfilePage();
+            }).catch(console.error);
+
+        } else {
+            await ensureUserProfile(session.user);
+            if (authScreen) authScreen.classList.add('hidden');
+            await renderInitialSessionView();
+            saveLocalCache(currentUser.id);
+        }
+        updateAppBadge();
+        showNotificationPrompt();
+    }, 0);
+}
+
+if (sb) {
+    bootstrapApp();
+}
 
 // AUTH STATE CHANGES
 if (sb) sb.auth.onAuthStateChange(async (event, session) => {
     const authScreen = document.getElementById('auth-screen');
+    const hash = window.location.hash || window.location.href || '';
 
     if (event === 'PASSWORD_RECOVERY') {
         if (authScreen) authScreen.classList.remove('hidden');
@@ -3342,26 +3349,42 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
         return;
     }
 
+    // SIGNED_IN catches OAuth callbacks and regular logins after the listener binds
     if (event === 'SIGNED_IN' && session?.user) {
-        if (currentUser?.id === session.user.id) return;
+        if (appBooted && currentUser?.id === session.user.id) return;
+        appBooted = true;
 
         await runBootWithLoader(async () => {
             currentUser = session.user;
-            await ensureUserProfile(session.user);
-            authScreen.classList.add('hidden');
+            const hasCache = loadLocalCache(currentUser.id);
 
-            await loadAllData();
-            await renderApp();
+            if (hasCache) {
+                if (authScreen) authScreen.classList.add('hidden');
+                renderApp();
+                renderProfilePage();
+                scheduleRenewalNotifications();
+                handleLaunchShortcut();
+                
+                loadAllData().then(() => {
+                    saveLocalCache(currentUser.id);
+                    renderApp();
+                    renderProfilePage();
+                }).catch(console.error);
+            } else {
+                await ensureUserProfile(session.user);
+                if (authScreen) authScreen.classList.add('hidden');
+                await renderInitialSessionView();
+                saveLocalCache(currentUser.id);
+            }
             updateAppBadge();
-            renderProfilePage();
-            scheduleRenewalNotifications();
             showNotificationPrompt();
-            handleLaunchShortcut();
-            if (lastLoadError) showToast(lastLoadError, 3200);
         }, 0);
     }
 
     if (event === 'SIGNED_OUT') {
+        if (currentUser) {
+            localStorage.removeItem(`atler_cache_${currentUser.id}`);
+        }
         currentUser = null;
         subscriptions = [];
         categories = [];
