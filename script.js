@@ -73,9 +73,9 @@ function haptic(style='light') {
 // One-time cleanup: remove stale SWR cache keys left from a previous experiment
 // that was bloating localStorage and could cause quota issues
 try {
-    if (!localStorage.getItem('ghost_nuked_b39')) {
+    if (!localStorage.getItem('ghost_nuked_b40')) {
         localStorage.clear();
-        localStorage.setItem('ghost_nuked_b39', 'true');
+        localStorage.setItem('ghost_nuked_b40', 'true');
     }
     
     Object.keys(localStorage)
