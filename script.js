@@ -11,6 +11,55 @@ try {
     }
 } catch (e) { }
 
+const IdbStorage = {
+    db: null,
+    async getDb() {
+        if (this.db) return this.db;
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open('atler-v4-auth-db', 1);
+            req.onupgradeneeded = e => {
+                if (!e.target.result.objectStoreNames.contains('auth')) {
+                    e.target.result.createObjectStore('auth');
+                }
+            };
+            req.onsuccess = e => { this.db = e.target.result; resolve(this.db); };
+            req.onerror = e => reject(e.target.error);
+        });
+    },
+    async getItem(key) {
+        try {
+            const db = await this.getDb();
+            return new Promise(resolve => {
+                const req = db.transaction('auth', 'readonly').objectStore('auth').get(key);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => resolve(null);
+            });
+        } catch(e){ return null; }
+    },
+    async setItem(key, value) {
+        try {
+            const db = await this.getDb();
+            return new Promise(resolve => {
+                const tx = db.transaction('auth', 'readwrite');
+                tx.objectStore('auth').put(value, key);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+            });
+        } catch(e){}
+    },
+    async removeItem(key) {
+        try {
+            const db = await this.getDb();
+            return new Promise(resolve => {
+                const tx = db.transaction('auth', 'readwrite');
+                tx.objectStore('auth').delete(key);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+            });
+        } catch(e){}
+    }
+};
+
 // IndexedDB-backed storage adapter — survives PWA force-quit on iOS/Android
 // unlike localStorage which can be evicted by the OS on process kill.
 const sb = window.supabase?.createClient
@@ -19,7 +68,7 @@ const sb = window.supabase?.createClient
             persistSession: true,
             autoRefreshToken: true,
             detectSessionInUrl: true,
-            storage: localStorage,
+            storage: IdbStorage,
         }
     })
     : null;
