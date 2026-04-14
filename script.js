@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════
 // SUPABASE CONFIG
 // ═══════════════════════════════════════════
-const SUPABASE_URL  = 'https://cnxurdingdhhdcjgujkz.supabase.co';
+const SUPABASE_URL = 'https://cnxurdingdhhdcjgujkz.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNueHVyZGluZ2RoaGRjamd1amt6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzQ1OTIsImV4cCI6MjA5MDQ1MDU5Mn0.nX0-MR9C1fmKRA9lHw0FBp_r0LYYlntbz9B7BW7HKd8';
 
 try {
@@ -9,7 +9,7 @@ try {
         localStorage.clear();
         localStorage.setItem('ghost_nuked_b41', 'true');
     }
-} catch(e) {}
+} catch (e) { }
 
 // IndexedDB-backed storage adapter — survives PWA force-quit on iOS/Android
 // unlike localStorage which can be evicted by the OS on process kill.
@@ -20,15 +20,15 @@ const sb = window.supabase?.createClient
             autoRefreshToken: true,
             detectSessionInUrl: true,
             storage: localStorage,
-        } 
+        }
     })
     : null;
 
 // ═══════════════════════════════════════════
 // GLOBAL STATE
 // ═══════════════════════════════════════════
-let currentUser   = null;
-let profile       = {
+let currentUser = null;
+let profile = {
     name: 'Atler',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
     theme: localStorage.getItem('atler_theme') || 'default',
@@ -36,9 +36,9 @@ let profile       = {
     currency: 'INR'
 };
 let subscriptions = [];
-let categories    = [];
-let expenses      = [];
-let activeSubId   = null;
+let categories = [];
+let expenses = [];
+let activeSubId = null;
 let activeExpenseId = null;
 let analyticsView = 'subscriptions';
 let analyticsRange = 'month';
@@ -54,7 +54,7 @@ let lastLoadError = '';
 let reminderPreferences = JSON.parse(localStorage.getItem('atler_reminder_prefs') || '{}');
 let activeSheetExpenseId = null;
 
-const presetCategories = ['Entertainment','Productivity','Utilities','Health','Food','Education'];
+const presetCategories = ['Entertainment', 'Productivity', 'Utilities', 'Health', 'Food', 'Education'];
 const navItems = document.querySelectorAll('.nav-item');
 
 async function sbWrite(fn) {
@@ -71,9 +71,9 @@ async function sbWrite(fn) {
     }
 }
 
-function haptic(style='light') {
+function haptic(style = 'light') {
     if (!navigator.vibrate) return;
-    const patterns = { light:15, medium:30, heavy:50, success:[15,50,15], error:[30,50,30,50,30] };
+    const patterns = { light: 15, medium: 30, heavy: 50, success: [15, 50, 15], error: [30, 50, 30, 50, 30] };
     navigator.vibrate(patterns[style] || 15);
 }
 
@@ -84,14 +84,14 @@ try {
         localStorage.clear();
         localStorage.setItem('ghost_nuked_b40', 'true');
     }
-    
+
     Object.keys(localStorage)
         .filter(k => k.startsWith('atler_cache_'))
         .forEach(k => localStorage.removeItem(k));
-} catch(e) {}
+} catch (e) { }
 
 
-function debounce(fn, delay=600) {
+function debounce(fn, delay = 600) {
     let t;
     return (...args) => {
         clearTimeout(t);
@@ -105,10 +105,10 @@ function showToast(message, duration = 2200) {
     if (!el) return;
     clearTimeout(_toastTimer);
     el.textContent = message;
-    el.style.opacity   = '1';
+    el.style.opacity = '1';
     el.style.transform = 'translateX(-50%) translateY(0)';
     _toastTimer = setTimeout(() => {
-        el.style.opacity   = '0';
+        el.style.opacity = '0';
         el.style.transform = 'translateX(-50%) translateY(-12px)';
     }, duration);
 }
@@ -161,9 +161,9 @@ const DARK_SURFACES = {
 };
 
 const themes = {
-    default:  { ...DARK_SURFACES, primary:'#c0c1ff', primaryContainer:'#4b4dd8', primaryGlow:'rgba(192,193,255,0.4)', secondary:'#4edea3', secondaryGlow:'rgba(78,222,163,0.2)' },
-    midnight: { ...DARK_SURFACES, primary:'#4fc3f7', primaryContainer:'#0d47a1', primaryGlow:'rgba(79,195,247,0.4)',  secondary:'#80deea', secondaryGlow:'rgba(128,222,234,0.2)' },
-    forest:   { ...DARK_SURFACES, primary:'#81c784', primaryContainer:'#1b5e20', primaryGlow:'rgba(129,199,132,0.4)', secondary:'#aed581', secondaryGlow:'rgba(174,213,129,0.2)' },
+    default: { ...DARK_SURFACES, primary: '#c0c1ff', primaryContainer: '#4b4dd8', primaryGlow: 'rgba(192,193,255,0.4)', secondary: '#4edea3', secondaryGlow: 'rgba(78,222,163,0.2)' },
+    midnight: { ...DARK_SURFACES, primary: '#4fc3f7', primaryContainer: '#0d47a1', primaryGlow: 'rgba(79,195,247,0.4)', secondary: '#80deea', secondaryGlow: 'rgba(128,222,234,0.2)' },
+    forest: { ...DARK_SURFACES, primary: '#81c784', primaryContainer: '#1b5e20', primaryGlow: 'rgba(129,199,132,0.4)', secondary: '#aed581', secondaryGlow: 'rgba(174,213,129,0.2)' },
     paper: {
         primary: '#1A1A1A', primaryContainer: '#E0E0E0', primaryGlow: 'rgba(26,26,26,0.08)',
         secondary: '#555555', secondaryGlow: 'rgba(85,85,85,0.08)',
@@ -222,26 +222,26 @@ function applyTheme(name) {
     const t = themes[name] || themes.default;
     const r = document.documentElement.style;
 
-    r.setProperty('--primary',           t.primary);
+    r.setProperty('--primary', t.primary);
     r.setProperty('--primary-container', t.primaryContainer);
-    r.setProperty('--primary-glow',      t.primaryGlow);
-    r.setProperty('--secondary',         t.secondary);
-    r.setProperty('--secondary-glow',    t.secondaryGlow);
+    r.setProperty('--primary-glow', t.primaryGlow);
+    r.setProperty('--secondary', t.secondary);
+    r.setProperty('--secondary-glow', t.secondaryGlow);
 
-    r.setProperty('--bg-color',          t.bg);
-    r.setProperty('--surface-low',       t.surfaceLow);
-    r.setProperty('--surface',           t.surface);
-    r.setProperty('--surface-high',      t.surfaceHigh);
-    r.setProperty('--on-surface',        t.onSurface);
-    r.setProperty('--on-surface-variant',t.onSurfaceVariant);
-    r.setProperty('--glass-bg',          t.glassBg);
-    r.setProperty('--glass-border',      t.glassBorder);
-    r.setProperty('--error',             t.error);
-    r.setProperty('--error-bg',          t.errorBg);
-    r.setProperty('--insights-text',     t.insightsText);
-    r.setProperty('--insights-divider',  t.insightsDivider);
-    r.setProperty('--nav-bg',            t.navBg);
-    r.setProperty('--nav-shadow',        t.navShadow);
+    r.setProperty('--bg-color', t.bg);
+    r.setProperty('--surface-low', t.surfaceLow);
+    r.setProperty('--surface', t.surface);
+    r.setProperty('--surface-high', t.surfaceHigh);
+    r.setProperty('--on-surface', t.onSurface);
+    r.setProperty('--on-surface-variant', t.onSurfaceVariant);
+    r.setProperty('--glass-bg', t.glassBg);
+    r.setProperty('--glass-border', t.glassBorder);
+    r.setProperty('--error', t.error);
+    r.setProperty('--error-bg', t.errorBg);
+    r.setProperty('--insights-text', t.insightsText);
+    r.setProperty('--insights-divider', t.insightsDivider);
+    r.setProperty('--nav-bg', t.navBg);
+    r.setProperty('--nav-shadow', t.navShadow);
 
     syncThemeChipStyles(name);
 
@@ -328,11 +328,11 @@ document.getElementById('tab-signup').addEventListener('click', () => {
 });
 
 document.getElementById('auth-submit-btn').addEventListener('click', async () => {
-    const email    = document.getElementById('auth-email').value.trim();
+    const email = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
-    const name     = document.getElementById('auth-name').value.trim();
-    const btn      = document.getElementById('auth-submit-btn');
-    const errEl    = document.getElementById('auth-error');
+    const name = document.getElementById('auth-name').value.trim();
+    const btn = document.getElementById('auth-submit-btn');
+    const errEl = document.getElementById('auth-error');
 
     if (!sb) { errEl.textContent = 'Unable to load app services. Refresh and try again.'; return; }
     if (!email || !password) { errEl.textContent = 'Please enter email and password.'; return; }
@@ -360,7 +360,7 @@ document.getElementById('auth-submit-btn').addEventListener('click', async () =>
     }
 });
 
-['auth-email','auth-password','auth-name'].forEach(id => {
+['auth-email', 'auth-password', 'auth-name'].forEach(id => {
     document.getElementById(id)?.addEventListener('keydown', e => {
         if (e.key === 'Enter') document.getElementById('auth-submit-btn').click();
     });
@@ -440,16 +440,16 @@ document.getElementById('reset-password-btn').addEventListener('click', async ()
 
 document.getElementById('signout-btn').addEventListener('click', async () => {
     isExplicitSignOut = true;
-    
+
     // Fallback: forcefully wipe local storage in case the token is corrupted and the API rejects it
     localStorage.clear();
-    
+
     try {
         await sb.auth.signOut();
     } catch (err) {
         console.error('[Atler] signOut API error, forcing local reload:', err);
     }
-    
+
     // Guarantee they are evicted
     window.location.reload();
 });
@@ -459,14 +459,19 @@ document.getElementById('signout-btn').addEventListener('click', async () => {
 // ═══════════════════════════════════════════
 async function loadAllData() {
     if (!currentUser) return;
-    
+
     // FORCE Supabase to validate and synchronize the token into the PostgREST client 
     // before making database calls, otherwise it sends an empty or stale token on refresh!
     const { data: authData, error: authErr } = await sb.auth.getUser();
     if (authErr || !authData?.user) {
+        console.error('[Atler] Token validation failed:', authErr);
+        if (window.location.hash.includes('access_token=') || window.location.hash.includes('type=')) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        await sb.auth.signOut();
         throw new Error('Supabase token failed validation: ' + (authErr?.message || 'Unknown network error'));
     }
-    
+
     const uid = authData.user.id;
     currentUser = authData.user;
     lastLoadError = '';
@@ -490,44 +495,44 @@ async function loadAllData() {
 
     if (profRes.data) {
         profile = {
-            name:         profRes.data.name   || 'Atler',
-            avatar:       profRes.data.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
-            theme:        profRes.data.theme  || 'default',
+            name: profRes.data.name || 'Atler',
+            avatar: profRes.data.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
+            theme: profRes.data.theme || 'default',
             lastNotified: profRes.data.last_notified || null,
-            currency:     'INR',
+            currency: 'INR',
         };
     }
 
     subscriptions = (subsRes.data || []).map(s => ({
-        id:                s.id,
-        name:              s.name,
-        cycle:             s.cycle,
-        price:             s.price,
-        dateAdded:         s.date_added,
-        startDate:         s.start_date,
-        reminder:          s.reminder || 'none',
-        category:          s.category || 'unlisted',
+        id: s.id,
+        name: s.name,
+        cycle: s.cycle,
+        price: s.price,
+        dateAdded: s.date_added,
+        startDate: s.start_date,
+        reminder: s.reminder || 'none',
+        category: s.category || 'unlisted',
         lastLoggedRenewal: s.last_logged_renewal,
-        paused:            s.paused || false,
+        paused: s.paused || false,
     }));
 
     categories = (catsRes.data || []).map(c => ({
-        id:     c.id,
-        name:   c.name,
+        id: c.id,
+        name: c.name,
         budget: c.budget,
     }));
 
     expenses = (expsRes.data || []).map(e => ({
-        id:     e.id,
-        name:   e.name,
+        id: e.id,
+        name: e.name,
         amount: e.amount,
-        date:   e.date,
-        type:   e.type || 'manual',
+        date: e.date,
+        type: e.type || 'manual',
     }));
 
     await cleanupLegacyAutoDuplicates();
     applyTheme(profile.theme);
-    
+
     // Run in background without blocking UI render
     autoLogRenewals().catch(console.error);
 }
@@ -535,13 +540,13 @@ async function loadAllData() {
 async function saveProfile() {
     if (!currentUser) return;
     await sbWrite(() => sb.from('profiles').upsert({
-            user_id:       currentUser.id,
-            name:          profile.name,
-            avatar:        profile.avatar,
-            theme:         profile.theme,
-            last_notified: profile.lastNotified || null,
-            currency:      'INR',
-        }));
+        user_id: currentUser.id,
+        name: profile.name,
+        avatar: profile.avatar,
+        theme: profile.theme,
+        last_notified: profile.lastNotified || null,
+        currency: 'INR',
+    }));
 }
 
 async function ensureUserProfile(user = currentUser) {
@@ -619,17 +624,17 @@ async function upsertSubscription(sub) {
     if (!currentUser) return;
     console.log('[Atler] upsertSubscription — saving:', sub.name, 'user:', currentUser.id);
     const { error } = await sbWrite(() => sb.from('subscriptions').upsert({
-            id:                  sub.id,
-            user_id:             currentUser.id,
-            name:                sub.name,
-            cycle:               String(sub.cycle),
-            price:               sub.price,
-            date_added:          sub.dateAdded,
-            start_date:          sub.startDate,
-            category:            sub.category || 'unlisted',
-            last_logged_renewal: sub.lastLoggedRenewal || null,
-            paused:              sub.paused || false,
-        }));
+        id: sub.id,
+        user_id: currentUser.id,
+        name: sub.name,
+        cycle: String(sub.cycle),
+        price: sub.price,
+        date_added: sub.dateAdded,
+        start_date: sub.startDate,
+        category: sub.category || 'unlisted',
+        last_logged_renewal: sub.lastLoggedRenewal || null,
+        paused: sub.paused || false,
+    }));
     if (error) console.error('[Atler] upsertSubscription FAILED:', error);
     else console.log('[Atler] upsertSubscription SUCCESS:', sub.name);
 }
@@ -646,11 +651,11 @@ async function deleteSubscription(id) {
 async function upsertCategory(cat) {
     if (!currentUser) return;
     await sbWrite(() => sb.from('categories').upsert({
-            id:      cat.id,
-            user_id: currentUser.id,
-            name:    cat.name,
-            budget:  cat.budget || null,
-        }));
+        id: cat.id,
+        user_id: currentUser.id,
+        name: cat.name,
+        budget: cat.budget || null,
+    }));
 }
 
 async function deleteCategoryFromDB(id) {
@@ -663,7 +668,7 @@ async function deleteCategoryFromDB(id) {
     }
 }
 
-window.deleteCategory = async function(id) {
+window.deleteCategory = async function (id) {
     showConfirm('Delete this category? Subscriptions inside it will be moved to Unlisted so nothing gets lost.', async () => {
         categories = categories.filter(c => c.id !== id);
         await deleteCategoryFromDB(id);
@@ -674,13 +679,13 @@ window.deleteCategory = async function(id) {
 async function insertExpense(exp) {
     if (!currentUser) return;
     await sbWrite(() => sb.from('expenses').insert({
-            id:      exp.id,
-            user_id: currentUser.id,
-            name:    exp.name,
-            amount:  exp.amount,
-            date:    exp.date,
-            type:    exp.type || 'manual',
-        }));
+        id: exp.id,
+        user_id: currentUser.id,
+        name: exp.name,
+        amount: exp.amount,
+        date: exp.date,
+        type: exp.type || 'manual',
+    }));
 }
 
 async function updateExpense(exp) {
@@ -705,8 +710,8 @@ async function clearAllData() {
         sb.from('expenses').delete().eq('user_id', uid),
     ]));
     subscriptions = [];
-    categories    = [];
-    expenses      = [];
+    categories = [];
+    expenses = [];
 }
 
 const debouncedUpsertSub = debounce(upsertSubscription, 600);
@@ -777,7 +782,7 @@ function getLocalDateTimeString(date = new Date()) {
     return `${getLocalDateKey(date)}T${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
 }
 function formatDate(ds) {
-    return parseDateValue(ds).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+    return parseDateValue(ds).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 function todayISO() { return getLocalDateKey(new Date()); }
 
@@ -881,10 +886,10 @@ function animateCounter(elementId, targetValue, duration = 400) {
     }
     const startTime = performance.now();
     function tick(now) {
-        const elapsed  = now - startTime;
+        const elapsed = now - startTime;
         const progress = Math.min(elapsed / duration, 1);
-        const ease     = 1 - Math.pow(1 - progress, 3);
-        const current  = startValue + (targetValue - startValue) * ease;
+        const ease = 1 - Math.pow(1 - progress, 3);
+        const current = startValue + (targetValue - startValue) * ease;
         el.textContent = current.toLocaleString('en-IN', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
@@ -895,14 +900,14 @@ function animateCounter(elementId, targetValue, duration = 400) {
 }
 
 function getSubAge(dateAdded) {
-    const start  = new Date(dateAdded);
-    const now    = new Date();
-    let years    = now.getFullYear() - start.getFullYear();
-    let months   = now.getMonth()    - start.getMonth();
+    const start = new Date(dateAdded);
+    const now = new Date();
+    let years = now.getFullYear() - start.getFullYear();
+    let months = now.getMonth() - start.getMonth();
     if (months < 0) { years--; months += 12; }
     if (years === 0 && months === 0) return 'Less than a month';
     const parts = [];
-    if (years  > 0) parts.push(`${years} year${years   > 1 ? 's' : ''}`);
+    if (years > 0) parts.push(`${years} year${years > 1 ? 's' : ''}`);
     if (months > 0) parts.push(`${months} month${months > 1 ? 's' : ''}`);
     return `You've had this for ${parts.join(' ')}`;
 }
@@ -950,7 +955,7 @@ function addBillingCycle(dateLike, cycle, step = 1) {
 
 function getMonthlyCost(sub) {
     const price = parseFloat(sub.price);
-    if (sub.cycle === 'Yearly')  return price / 12;
+    if (sub.cycle === 'Yearly') return price / 12;
     if (sub.cycle === 'Monthly') return price;
     const days = parseInt(sub.cycle);
     if (!days || days <= 0) return price;
@@ -999,7 +1004,7 @@ function formatCycle(cycle) {
     return `Every ${cycle} days`;
 }
 function colorFromName(name) {
-    const palette = ['#1db954','#e50914','#c0c1ff','#4edea3','#ffb4ab','#4b4dd8','#f59e0b','#06b6d4'];
+    const palette = ['#1db954', '#e50914', '#c0c1ff', '#4edea3', '#ffb4ab', '#4b4dd8', '#f59e0b', '#06b6d4'];
     let hash = 0;
     for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
     return palette[Math.abs(hash) % palette.length];
@@ -1014,148 +1019,148 @@ function normalizeForIconMatch(name) {
 }
 
 const EXPENSE_ICON_MAP = [
-    { keywords: ['redbull','redbul'],                        icon: 'bolt',                     color: '#FFD700' },
-    { keywords: ['monster'],                                  icon: 'bolt',                     color: '#6ED800' },
-    { keywords: ['rockstar'],                                 icon: 'bolt',                     color: '#F5C400' },
-    { keywords: ['coke','cocacola','coca'],                   icon: 'local_bar',                color: '#E61C24' },
-    { keywords: ['pepsi'],                                    icon: 'local_bar',                color: '#004B93' },
-    { keywords: ['sprite'],                                   icon: 'local_bar',                color: '#00A550' },
-    { keywords: ['7up','sevenup'],                            icon: 'local_bar',                color: '#007A33' },
-    { keywords: ['fanta'],                                    icon: 'local_bar',                color: '#FF6600' },
-    { keywords: ['thumbsup','thumsup'],                       icon: 'local_bar',                color: '#C8102E' },
-    { keywords: ['limca'],                                    icon: 'local_bar',                color: '#00A878' },
-    { keywords: ['frooti','maaza','slice','appyfizz'],        icon: 'local_bar',                color: '#FF8C00' },
-    { keywords: ['coffee','cafe','espresso','latte','cappuccino','barista'], icon: 'coffee',    color: '#6F4E37' },
-    { keywords: ['starbucks'],                                icon: 'coffee',                   color: '#00704A' },
-    { keywords: ['chaayos','chai','tea','adrak'],              icon: 'emoji_food_beverage',      color: '#C8A951' },
-    { keywords: ['bluetokai'],                                icon: 'coffee',                   color: '#1A1A1A' },
-    { keywords: ['zomato'],                                   icon: 'delivery_dining',          color: '#E23744' },
-    { keywords: ['swiggy'],                                   icon: 'delivery_dining',          color: '#FC8019' },
-    { keywords: ['blinkit','grofers'],                        icon: 'delivery_dining',          color: '#F8E71C' },
-    { keywords: ['zepto'],                                    icon: 'delivery_dining',          color: '#8B2FC9' },
-    { keywords: ['dunzo'],                                    icon: 'delivery_dining',          color: '#00C4B4' },
-    { keywords: ['mcdonalds','mcdonald','mcd'],               icon: 'fastfood',                 color: '#FFC72C' },
-    { keywords: ['dominos','domino'],                         icon: 'local_pizza',              color: '#006491' },
-    { keywords: ['pizzahut'],                                 icon: 'local_pizza',              color: '#EE3124' },
-    { keywords: ['kfc'],                                      icon: 'fastfood',                 color: '#F40027' },
-    { keywords: ['subway'],                                   icon: 'lunch_dining',             color: '#009541' },
-    { keywords: ['burgerking'],                               icon: 'fastfood',                 color: '#FF8C00' },
-    { keywords: ['haldirams','haldiram'],                     icon: 'set_meal',                 color: '#FF6F00' },
-    { keywords: ['bikanervala','bikano'],                     icon: 'set_meal',                 color: '#FF8F00' },
-    { keywords: ['vadapav','vadapao','vada'],                 icon: 'fastfood',                 color: '#FF7043' },
-    { keywords: ['dabeli'],                                   icon: 'fastfood',                 color: '#FF5722' },
-    { keywords: ['pavbhaji','pav'],                           icon: 'fastfood',                 color: '#FF6D00' },
-    { keywords: ['samosa'],                                   icon: 'fastfood',                 color: '#FFA000' },
-    { keywords: ['momos','momo'],                             icon: 'fastfood',                 color: '#BDBDBD' },
-    { keywords: ['biryani'],                                  icon: 'rice_bowl',                color: '#FFA726' },
-    { keywords: ['roll','kathi','frankie'],                   icon: 'lunch_dining',             color: '#FF7043' },
-    { keywords: ['dosa','idli','uttapam'],                    icon: 'breakfast_dining',         color: '#FFCC02' },
-    { keywords: ['pizza'],                                    icon: 'local_pizza',              color: '#FF6B35' },
-    { keywords: ['burger'],                                   icon: 'fastfood',                 color: '#FF6B35' },
-    { keywords: ['maggi','noodles'],                          icon: 'ramen_dining',             color: '#FF5722' },
-    { keywords: ['paneer'],                                   icon: 'set_meal',                 color: '#FFF9C4' },
-    { keywords: ['thali','daal','dal','rice','chawal'],       icon: 'rice_bowl',                color: '#A5D6A7' },
-    { keywords: ['paratha','roti','chapati'],                 icon: 'breakfast_dining',         color: '#FFE082' },
-    { keywords: ['canteen','mess','tiffin','dabba'],          icon: 'restaurant',               color: '#795548' },
-    { keywords: ['dhaba'],                                    icon: 'restaurant',               color: '#8D6E63' },
-    { keywords: ['dmart','bigbazaar','reliance','spencer','more'], icon: 'shopping_basket',     color: '#1976D2' },
-    { keywords: ['kirana'],                                   icon: 'shopping_basket',          color: '#4CAF50' },
-    { keywords: ['milk','amul','dairy'],                      icon: 'water_drop',               color: '#90CAF9' },
-    { keywords: ['eggs','anda'],                              icon: 'egg',                      color: '#FFF9C4' },
-    { keywords: ['bread','loaf'],                             icon: 'breakfast_dining',         color: '#FFCC80' },
-    { keywords: ['grocery','groceries','sabzi','vegetable'],  icon: 'shopping_basket',          color: '#66BB6A' },
-    { keywords: ['xerox','photocopy'],                        icon: 'print',                    color: '#607D8B' },
-    { keywords: ['printout','printing'],                      icon: 'print',                    color: '#546E7A' },
-    { keywords: ['binding','spiral'],                         icon: 'book',                     color: '#5C6BC0' },
-    { keywords: ['stationery','pen','pencil','marker','highlighter'], icon: 'edit',             color: '#7E57C2' },
-    { keywords: ['notebook','register'],                      icon: 'menu_book',                color: '#42A5F5' },
-    { keywords: ['textbook','book','notes'],                  icon: 'menu_book',                color: '#3F51B5' },
-    { keywords: ['calculator','casio'],                       icon: 'calculate',                color: '#78909C' },
-    { keywords: ['labcoat','apron','labmanual'],              icon: 'science',                  color: '#ECEFF1' },
-    { keywords: ['soap','dettol','lifebuoy','dove','lux'],    icon: 'sanitizer',                color: '#80DEEA' },
-    { keywords: ['shampoo','conditioner','pantene','headshoulders'], icon: 'shower',            color: '#B39DDB' },
-    { keywords: ['toothpaste','colgate','pepsodent','sensodyne'], icon: 'dentistry',            color: '#E1F5FE' },
-    { keywords: ['facewash','cleanser','cetaphil'],           icon: 'face',                     color: '#F8BBD0' },
-    { keywords: ['moisturizer','lotion','vaseline','nivea'],  icon: 'spa',                      color: '#FCE4EC' },
-    { keywords: ['deodorant','deo','axe','oldspice'],         icon: 'air_freshener',            color: '#B3E5FC' },
-    { keywords: ['razor','shaving','gillette'],               icon: 'content_cut',              color: '#CFD8DC' },
-    { keywords: ['sanitarypad','sanitary','whisper','stayfree'], icon: 'favorite',              color: '#F48FB1' },
-    { keywords: ['hairoil','coconutoil','parachute','dabur'], icon: 'spa',                      color: '#FFF9C4' },
-    { keywords: ['sunscreen','sunblock','spf'],               icon: 'wb_sunny',                 color: '#FFD54F' },
-    { keywords: ['laundry','dhobi','wash'],                   icon: 'local_laundry_service',    color: '#4FC3F7' },
-    { keywords: ['detergent','surfexcel','ariel','tide','rin'], icon: 'local_laundry_service',  color: '#29B6F6' },
-    { keywords: ['dryclean'],                                 icon: 'dry_cleaning',             color: '#81D4FA' },
-    { keywords: ['medicine','dawa','pharmacy','chemist','apollopharmacy'], icon: 'medication',  color: '#EF5350' },
-    { keywords: ['crocin','paracetamol','dolo','combiflam'],  icon: 'medication',               color: '#EF9A9A' },
-    { keywords: ['doctor','consultation','clinic','hospital'], icon: 'local_hospital',          color: '#F44336' },
-    { keywords: ['vitamins','multivitamin','supplement'],      icon: 'medication',               color: '#66BB6A' },
-    { keywords: ['bloodtest','pathology','diagnostic','labtest'], icon: 'biotech',              color: '#CE93D8' },
-    { keywords: ['metro','metrocard'],                        icon: 'directions_subway',        color: '#1565C0' },
-    { keywords: ['bus','buspass','busticket'],                 icon: 'directions_bus',           color: '#FF8F00' },
-    { keywords: ['localtrain','seasonpass','railwaypass'],     icon: 'train',                    color: '#283593' },
-    { keywords: ['auto','autorickshaw','erickshaw'],           icon: 'local_taxi',               color: '#FFC107' },
-    { keywords: ['uber'],                                     icon: 'local_taxi',               color: '#000000' },
-    { keywords: ['ola'],                                      icon: 'local_taxi',               color: '#3DBE29' },
-    { keywords: ['rapido'],                                   icon: 'two_wheeler',              color: '#FFCB05' },
-    { keywords: ['petrol','fuel','cng','pump'],               icon: 'local_gas_station',        color: '#FF5722' },
-    { keywords: ['parking'],                                  icon: 'local_parking',            color: '#455A64' },
-    { keywords: ['toll'],                                     icon: 'toll',                     color: '#607D8B' },
-    { keywords: ['pg','payingguest'],                         icon: 'home',                     color: '#26A69A' },
-    { keywords: ['hostel','hostelrent'],                      icon: 'home',                     color: '#42A5F5' },
-    { keywords: ['rent','roomrent','flatrent'],               icon: 'home',                     color: '#7E57C2' },
-    { keywords: ['deposit','securitydeposit'],                icon: 'account_balance',          color: '#78909C' },
-    { keywords: ['maintenance','societymaintenance'],          icon: 'home_repair_service',      color: '#8D6E63' },
-    { keywords: ['pillow','bedsheet','blanket','quilt','razai'], icon: 'bed',                   color: '#B0BEC5' },
-    { keywords: ['bucket','mug'],                             icon: 'water',                    color: '#4DD0E1' },
-    { keywords: ['mosquitorepellent','goodknight','allout','mortein'], icon: 'pest_control',    color: '#A5D6A7' },
-    { keywords: ['extensionboard','powerstrip','adapter'],    icon: 'power',                    color: '#FFD54F' },
-    { keywords: ['waterbottle','sipper','thermos','flask'],   icon: 'water_full',               color: '#80DEEA' },
-    { keywords: ['lock','padlock'],                           icon: 'lock',                     color: '#90A4AE' },
-    { keywords: ['clothes','shirt','tshirt','jeans','trouser'], icon: 'checkroom',              color: '#EC407A' },
-    { keywords: ['shoes','sneakers','chappal','sandal','slipper'], icon: 'footprint',           color: '#8D6E63' },
-    { keywords: ['jacket','hoodie','sweatshirt','sweater'],   icon: 'checkroom',                color: '#5C6BC0' },
-    { keywords: ['raincoat','umbrella'],                      icon: 'umbrella',                 color: '#1E88E5' },
-    { keywords: ['bag','backpack','slingbag'],                icon: 'backpack',                 color: '#FF7043' },
-    { keywords: ['spectacles','glasses','contactlens'],       icon: 'visibility',               color: '#29B6F6' },
-    { keywords: ['earphone','headphone','earbuds'],           icon: 'headphones',               color: '#7E57C2' },
-    { keywords: ['movie','cinema','pvr','inox','cinepolis'],  icon: 'movie',                    color: '#9C27B0' },
-    { keywords: ['concert','gig','event','fest'],             icon: 'event',                    color: '#E91E63' },
-    { keywords: ['beer','alcohol','whiskey','vodka','rum','wine','kingfisher'], icon: 'sports_bar', color: '#FF8F00' },
-    { keywords: ['hookah','cigarette','cigar'],               icon: 'smoking_rooms',            color: '#78909C' },
-    { keywords: ['gaming','steam'],                           icon: 'sports_esports',           color: '#5C6BC0' },
-    { keywords: ['trek','hiking','picnic','outing'],          icon: 'hiking',                   color: '#66BB6A' },
-    { keywords: ['tattoo','piercing'],                        icon: 'brush',                    color: '#212121' },
-    { keywords: ['netflix'],                                  icon: 'tv',                       color: '#E50914' },
-    { keywords: ['spotify'],                                  icon: 'music_note',               color: '#1DB954' },
-    { keywords: ['youtube'],                                  icon: 'play_circle',              color: '#FF0000' },
-    { keywords: ['hotstar','disneyplus','disney'],            icon: 'live_tv',                  color: '#0063E5' },
-    { keywords: ['prime','amazonprime'],                      icon: 'tv',                       color: '#00A8E1' },
-    { keywords: ['coursera','udemy','unacademy'],             icon: 'school',                   color: '#F7C948' },
-    { keywords: ['chatgpt','claude','copilot','openai'],      icon: 'smart_toy',                color: '#74AA9C' },
-    { keywords: ['vpn','nordvpn','expressvpn'],               icon: 'vpn_lock',                 color: '#4CAF50' },
-    { keywords: ['icloud','googleone','onedrive','dropbox'],  icon: 'cloud',                    color: '#42A5F5' },
-    { keywords: ['tinder','bumble','hinge'],                  icon: 'favorite',                 color: '#FF4458' },
-    { keywords: ['jio','jiorecharge'],                        icon: 'smartphone',               color: '#0B3D91' },
-    { keywords: ['airtel'],                                   icon: 'smartphone',               color: '#ED1C24' },
-    { keywords: ['vi','vodafone','idea'],                     icon: 'smartphone',               color: '#E60000' },
-    { keywords: ['wifi','broadband','internet','act','hathway'], icon: 'wifi',                  color: '#2196F3' },
-    { keywords: ['recharge','mobilecharge'],                  icon: 'smartphone',               color: '#4CAF50' },
-    { keywords: ['electricity','lightbill','bijli'],          icon: 'bolt',                     color: '#FFC107' },
-    { keywords: ['gas','cylinder','lpg','indane','hpgas','bharatgas'], icon: 'local_fire_department', color: '#FF7043' },
-    { keywords: ['haircut','salon','barber','parlour'],       icon: 'content_cut',              color: '#EC407A' },
-    { keywords: ['gym','fitness','cultfit','curefit'],        icon: 'fitness_center',           color: '#FF5722' },
-    { keywords: ['swimming','pool'],                          icon: 'pool',                     color: '#29B6F6' },
-    { keywords: ['coaching','tuition','privatetuition'],      icon: 'school',                   color: '#7E57C2' },
-    { keywords: ['phonepay','phonepe','gpay','googlepay','paytm','bhim','upi'], icon: 'payments', color: '#5C6BC0' },
-    { keywords: ['atmwithdrawal','cashwithdrawal','atm'],     icon: 'local_atm',                color: '#455A64' },
-    { keywords: ['emi','loan','educationloan'],               icon: 'account_balance',          color: '#607D8B' },
-    { keywords: ['insurance'],                                icon: 'security',                 color: '#3F51B5' },
-    { keywords: ['fine','challan','penalty'],                 icon: 'gavel',                    color: '#EF5350' },
-    { keywords: ['gift','birthday'],                          icon: 'card_giftcard',            color: '#EC407A' },
-    { keywords: ['courier','delivery','dtdc','bluedart'],     icon: 'local_shipping',           color: '#FF8F00' },
-    { keywords: ['temple','church','mosque','gurudwara','donation'], icon: 'place',             color: '#FF8A65' },
-    { keywords: ['passport','visa'],                          icon: 'badge',                    color: '#42A5F5' },
-    { keywords: ['photostudio','photoshoot'],                 icon: 'photo_camera',             color: '#7E57C2' },
+    { keywords: ['redbull', 'redbul'], icon: 'bolt', color: '#FFD700' },
+    { keywords: ['monster'], icon: 'bolt', color: '#6ED800' },
+    { keywords: ['rockstar'], icon: 'bolt', color: '#F5C400' },
+    { keywords: ['coke', 'cocacola', 'coca'], icon: 'local_bar', color: '#E61C24' },
+    { keywords: ['pepsi'], icon: 'local_bar', color: '#004B93' },
+    { keywords: ['sprite'], icon: 'local_bar', color: '#00A550' },
+    { keywords: ['7up', 'sevenup'], icon: 'local_bar', color: '#007A33' },
+    { keywords: ['fanta'], icon: 'local_bar', color: '#FF6600' },
+    { keywords: ['thumbsup', 'thumsup'], icon: 'local_bar', color: '#C8102E' },
+    { keywords: ['limca'], icon: 'local_bar', color: '#00A878' },
+    { keywords: ['frooti', 'maaza', 'slice', 'appyfizz'], icon: 'local_bar', color: '#FF8C00' },
+    { keywords: ['coffee', 'cafe', 'espresso', 'latte', 'cappuccino', 'barista'], icon: 'coffee', color: '#6F4E37' },
+    { keywords: ['starbucks'], icon: 'coffee', color: '#00704A' },
+    { keywords: ['chaayos', 'chai', 'tea', 'adrak'], icon: 'emoji_food_beverage', color: '#C8A951' },
+    { keywords: ['bluetokai'], icon: 'coffee', color: '#1A1A1A' },
+    { keywords: ['zomato'], icon: 'delivery_dining', color: '#E23744' },
+    { keywords: ['swiggy'], icon: 'delivery_dining', color: '#FC8019' },
+    { keywords: ['blinkit', 'grofers'], icon: 'delivery_dining', color: '#F8E71C' },
+    { keywords: ['zepto'], icon: 'delivery_dining', color: '#8B2FC9' },
+    { keywords: ['dunzo'], icon: 'delivery_dining', color: '#00C4B4' },
+    { keywords: ['mcdonalds', 'mcdonald', 'mcd'], icon: 'fastfood', color: '#FFC72C' },
+    { keywords: ['dominos', 'domino'], icon: 'local_pizza', color: '#006491' },
+    { keywords: ['pizzahut'], icon: 'local_pizza', color: '#EE3124' },
+    { keywords: ['kfc'], icon: 'fastfood', color: '#F40027' },
+    { keywords: ['subway'], icon: 'lunch_dining', color: '#009541' },
+    { keywords: ['burgerking'], icon: 'fastfood', color: '#FF8C00' },
+    { keywords: ['haldirams', 'haldiram'], icon: 'set_meal', color: '#FF6F00' },
+    { keywords: ['bikanervala', 'bikano'], icon: 'set_meal', color: '#FF8F00' },
+    { keywords: ['vadapav', 'vadapao', 'vada'], icon: 'fastfood', color: '#FF7043' },
+    { keywords: ['dabeli'], icon: 'fastfood', color: '#FF5722' },
+    { keywords: ['pavbhaji', 'pav'], icon: 'fastfood', color: '#FF6D00' },
+    { keywords: ['samosa'], icon: 'fastfood', color: '#FFA000' },
+    { keywords: ['momos', 'momo'], icon: 'fastfood', color: '#BDBDBD' },
+    { keywords: ['biryani'], icon: 'rice_bowl', color: '#FFA726' },
+    { keywords: ['roll', 'kathi', 'frankie'], icon: 'lunch_dining', color: '#FF7043' },
+    { keywords: ['dosa', 'idli', 'uttapam'], icon: 'breakfast_dining', color: '#FFCC02' },
+    { keywords: ['pizza'], icon: 'local_pizza', color: '#FF6B35' },
+    { keywords: ['burger'], icon: 'fastfood', color: '#FF6B35' },
+    { keywords: ['maggi', 'noodles'], icon: 'ramen_dining', color: '#FF5722' },
+    { keywords: ['paneer'], icon: 'set_meal', color: '#FFF9C4' },
+    { keywords: ['thali', 'daal', 'dal', 'rice', 'chawal'], icon: 'rice_bowl', color: '#A5D6A7' },
+    { keywords: ['paratha', 'roti', 'chapati'], icon: 'breakfast_dining', color: '#FFE082' },
+    { keywords: ['canteen', 'mess', 'tiffin', 'dabba'], icon: 'restaurant', color: '#795548' },
+    { keywords: ['dhaba'], icon: 'restaurant', color: '#8D6E63' },
+    { keywords: ['dmart', 'bigbazaar', 'reliance', 'spencer', 'more'], icon: 'shopping_basket', color: '#1976D2' },
+    { keywords: ['kirana'], icon: 'shopping_basket', color: '#4CAF50' },
+    { keywords: ['milk', 'amul', 'dairy'], icon: 'water_drop', color: '#90CAF9' },
+    { keywords: ['eggs', 'anda'], icon: 'egg', color: '#FFF9C4' },
+    { keywords: ['bread', 'loaf'], icon: 'breakfast_dining', color: '#FFCC80' },
+    { keywords: ['grocery', 'groceries', 'sabzi', 'vegetable'], icon: 'shopping_basket', color: '#66BB6A' },
+    { keywords: ['xerox', 'photocopy'], icon: 'print', color: '#607D8B' },
+    { keywords: ['printout', 'printing'], icon: 'print', color: '#546E7A' },
+    { keywords: ['binding', 'spiral'], icon: 'book', color: '#5C6BC0' },
+    { keywords: ['stationery', 'pen', 'pencil', 'marker', 'highlighter'], icon: 'edit', color: '#7E57C2' },
+    { keywords: ['notebook', 'register'], icon: 'menu_book', color: '#42A5F5' },
+    { keywords: ['textbook', 'book', 'notes'], icon: 'menu_book', color: '#3F51B5' },
+    { keywords: ['calculator', 'casio'], icon: 'calculate', color: '#78909C' },
+    { keywords: ['labcoat', 'apron', 'labmanual'], icon: 'science', color: '#ECEFF1' },
+    { keywords: ['soap', 'dettol', 'lifebuoy', 'dove', 'lux'], icon: 'sanitizer', color: '#80DEEA' },
+    { keywords: ['shampoo', 'conditioner', 'pantene', 'headshoulders'], icon: 'shower', color: '#B39DDB' },
+    { keywords: ['toothpaste', 'colgate', 'pepsodent', 'sensodyne'], icon: 'dentistry', color: '#E1F5FE' },
+    { keywords: ['facewash', 'cleanser', 'cetaphil'], icon: 'face', color: '#F8BBD0' },
+    { keywords: ['moisturizer', 'lotion', 'vaseline', 'nivea'], icon: 'spa', color: '#FCE4EC' },
+    { keywords: ['deodorant', 'deo', 'axe', 'oldspice'], icon: 'air_freshener', color: '#B3E5FC' },
+    { keywords: ['razor', 'shaving', 'gillette'], icon: 'content_cut', color: '#CFD8DC' },
+    { keywords: ['sanitarypad', 'sanitary', 'whisper', 'stayfree'], icon: 'favorite', color: '#F48FB1' },
+    { keywords: ['hairoil', 'coconutoil', 'parachute', 'dabur'], icon: 'spa', color: '#FFF9C4' },
+    { keywords: ['sunscreen', 'sunblock', 'spf'], icon: 'wb_sunny', color: '#FFD54F' },
+    { keywords: ['laundry', 'dhobi', 'wash'], icon: 'local_laundry_service', color: '#4FC3F7' },
+    { keywords: ['detergent', 'surfexcel', 'ariel', 'tide', 'rin'], icon: 'local_laundry_service', color: '#29B6F6' },
+    { keywords: ['dryclean'], icon: 'dry_cleaning', color: '#81D4FA' },
+    { keywords: ['medicine', 'dawa', 'pharmacy', 'chemist', 'apollopharmacy'], icon: 'medication', color: '#EF5350' },
+    { keywords: ['crocin', 'paracetamol', 'dolo', 'combiflam'], icon: 'medication', color: '#EF9A9A' },
+    { keywords: ['doctor', 'consultation', 'clinic', 'hospital'], icon: 'local_hospital', color: '#F44336' },
+    { keywords: ['vitamins', 'multivitamin', 'supplement'], icon: 'medication', color: '#66BB6A' },
+    { keywords: ['bloodtest', 'pathology', 'diagnostic', 'labtest'], icon: 'biotech', color: '#CE93D8' },
+    { keywords: ['metro', 'metrocard'], icon: 'directions_subway', color: '#1565C0' },
+    { keywords: ['bus', 'buspass', 'busticket'], icon: 'directions_bus', color: '#FF8F00' },
+    { keywords: ['localtrain', 'seasonpass', 'railwaypass'], icon: 'train', color: '#283593' },
+    { keywords: ['auto', 'autorickshaw', 'erickshaw'], icon: 'local_taxi', color: '#FFC107' },
+    { keywords: ['uber'], icon: 'local_taxi', color: '#000000' },
+    { keywords: ['ola'], icon: 'local_taxi', color: '#3DBE29' },
+    { keywords: ['rapido'], icon: 'two_wheeler', color: '#FFCB05' },
+    { keywords: ['petrol', 'fuel', 'cng', 'pump'], icon: 'local_gas_station', color: '#FF5722' },
+    { keywords: ['parking'], icon: 'local_parking', color: '#455A64' },
+    { keywords: ['toll'], icon: 'toll', color: '#607D8B' },
+    { keywords: ['pg', 'payingguest'], icon: 'home', color: '#26A69A' },
+    { keywords: ['hostel', 'hostelrent'], icon: 'home', color: '#42A5F5' },
+    { keywords: ['rent', 'roomrent', 'flatrent'], icon: 'home', color: '#7E57C2' },
+    { keywords: ['deposit', 'securitydeposit'], icon: 'account_balance', color: '#78909C' },
+    { keywords: ['maintenance', 'societymaintenance'], icon: 'home_repair_service', color: '#8D6E63' },
+    { keywords: ['pillow', 'bedsheet', 'blanket', 'quilt', 'razai'], icon: 'bed', color: '#B0BEC5' },
+    { keywords: ['bucket', 'mug'], icon: 'water', color: '#4DD0E1' },
+    { keywords: ['mosquitorepellent', 'goodknight', 'allout', 'mortein'], icon: 'pest_control', color: '#A5D6A7' },
+    { keywords: ['extensionboard', 'powerstrip', 'adapter'], icon: 'power', color: '#FFD54F' },
+    { keywords: ['waterbottle', 'sipper', 'thermos', 'flask'], icon: 'water_full', color: '#80DEEA' },
+    { keywords: ['lock', 'padlock'], icon: 'lock', color: '#90A4AE' },
+    { keywords: ['clothes', 'shirt', 'tshirt', 'jeans', 'trouser'], icon: 'checkroom', color: '#EC407A' },
+    { keywords: ['shoes', 'sneakers', 'chappal', 'sandal', 'slipper'], icon: 'footprint', color: '#8D6E63' },
+    { keywords: ['jacket', 'hoodie', 'sweatshirt', 'sweater'], icon: 'checkroom', color: '#5C6BC0' },
+    { keywords: ['raincoat', 'umbrella'], icon: 'umbrella', color: '#1E88E5' },
+    { keywords: ['bag', 'backpack', 'slingbag'], icon: 'backpack', color: '#FF7043' },
+    { keywords: ['spectacles', 'glasses', 'contactlens'], icon: 'visibility', color: '#29B6F6' },
+    { keywords: ['earphone', 'headphone', 'earbuds'], icon: 'headphones', color: '#7E57C2' },
+    { keywords: ['movie', 'cinema', 'pvr', 'inox', 'cinepolis'], icon: 'movie', color: '#9C27B0' },
+    { keywords: ['concert', 'gig', 'event', 'fest'], icon: 'event', color: '#E91E63' },
+    { keywords: ['beer', 'alcohol', 'whiskey', 'vodka', 'rum', 'wine', 'kingfisher'], icon: 'sports_bar', color: '#FF8F00' },
+    { keywords: ['hookah', 'cigarette', 'cigar'], icon: 'smoking_rooms', color: '#78909C' },
+    { keywords: ['gaming', 'steam'], icon: 'sports_esports', color: '#5C6BC0' },
+    { keywords: ['trek', 'hiking', 'picnic', 'outing'], icon: 'hiking', color: '#66BB6A' },
+    { keywords: ['tattoo', 'piercing'], icon: 'brush', color: '#212121' },
+    { keywords: ['netflix'], icon: 'tv', color: '#E50914' },
+    { keywords: ['spotify'], icon: 'music_note', color: '#1DB954' },
+    { keywords: ['youtube'], icon: 'play_circle', color: '#FF0000' },
+    { keywords: ['hotstar', 'disneyplus', 'disney'], icon: 'live_tv', color: '#0063E5' },
+    { keywords: ['prime', 'amazonprime'], icon: 'tv', color: '#00A8E1' },
+    { keywords: ['coursera', 'udemy', 'unacademy'], icon: 'school', color: '#F7C948' },
+    { keywords: ['chatgpt', 'claude', 'copilot', 'openai'], icon: 'smart_toy', color: '#74AA9C' },
+    { keywords: ['vpn', 'nordvpn', 'expressvpn'], icon: 'vpn_lock', color: '#4CAF50' },
+    { keywords: ['icloud', 'googleone', 'onedrive', 'dropbox'], icon: 'cloud', color: '#42A5F5' },
+    { keywords: ['tinder', 'bumble', 'hinge'], icon: 'favorite', color: '#FF4458' },
+    { keywords: ['jio', 'jiorecharge'], icon: 'smartphone', color: '#0B3D91' },
+    { keywords: ['airtel'], icon: 'smartphone', color: '#ED1C24' },
+    { keywords: ['vi', 'vodafone', 'idea'], icon: 'smartphone', color: '#E60000' },
+    { keywords: ['wifi', 'broadband', 'internet', 'act', 'hathway'], icon: 'wifi', color: '#2196F3' },
+    { keywords: ['recharge', 'mobilecharge'], icon: 'smartphone', color: '#4CAF50' },
+    { keywords: ['electricity', 'lightbill', 'bijli'], icon: 'bolt', color: '#FFC107' },
+    { keywords: ['gas', 'cylinder', 'lpg', 'indane', 'hpgas', 'bharatgas'], icon: 'local_fire_department', color: '#FF7043' },
+    { keywords: ['haircut', 'salon', 'barber', 'parlour'], icon: 'content_cut', color: '#EC407A' },
+    { keywords: ['gym', 'fitness', 'cultfit', 'curefit'], icon: 'fitness_center', color: '#FF5722' },
+    { keywords: ['swimming', 'pool'], icon: 'pool', color: '#29B6F6' },
+    { keywords: ['coaching', 'tuition', 'privatetuition'], icon: 'school', color: '#7E57C2' },
+    { keywords: ['phonepay', 'phonepe', 'gpay', 'googlepay', 'paytm', 'bhim', 'upi'], icon: 'payments', color: '#5C6BC0' },
+    { keywords: ['atmwithdrawal', 'cashwithdrawal', 'atm'], icon: 'local_atm', color: '#455A64' },
+    { keywords: ['emi', 'loan', 'educationloan'], icon: 'account_balance', color: '#607D8B' },
+    { keywords: ['insurance'], icon: 'security', color: '#3F51B5' },
+    { keywords: ['fine', 'challan', 'penalty'], icon: 'gavel', color: '#EF5350' },
+    { keywords: ['gift', 'birthday'], icon: 'card_giftcard', color: '#EC407A' },
+    { keywords: ['courier', 'delivery', 'dtdc', 'bluedart'], icon: 'local_shipping', color: '#FF8F00' },
+    { keywords: ['temple', 'church', 'mosque', 'gurudwara', 'donation'], icon: 'place', color: '#FF8A65' },
+    { keywords: ['passport', 'visa'], icon: 'badge', color: '#42A5F5' },
+    { keywords: ['photostudio', 'photoshoot'], icon: 'photo_camera', color: '#7E57C2' },
 ];
 
 function resolveIcon(name, categoryId) {
@@ -1171,25 +1176,25 @@ function resolveIcon(name, categoryId) {
     }
 
     const CATEGORY_ICONS = {
-        'entertainment': { icon: 'tv',                color: '#7E57C2' },
-        'music':         { icon: 'music_note',        color: '#1DB954' },
-        'food':          { icon: 'restaurant',        color: '#FF7043' },
-        'dining':        { icon: 'restaurant',        color: '#FF7043' },
-        'shopping':      { icon: 'shopping_bag',      color: '#42A5F5' },
-        'productivity':  { icon: 'work',              color: '#78909C' },
-        'health':        { icon: 'fitness_center',    color: '#EF5350' },
-        'fitness':       { icon: 'fitness_center',    color: '#EF5350' },
-        'utilities':     { icon: 'bolt',              color: '#FFC107' },
-        'transport':     { icon: 'directions_car',    color: '#42A5F5' },
-        'travel':        { icon: 'flight',            color: '#29B6F6' },
-        'education':     { icon: 'school',            color: '#7E57C2' },
-        'finance':       { icon: 'account_balance',   color: '#78909C' },
-        'gaming':        { icon: 'sports_esports',    color: '#5C6BC0' },
-        'news':          { icon: 'newspaper',         color: '#90A4AE' },
-        'cloud':         { icon: 'cloud',             color: '#42A5F5' },
-        'communication': { icon: 'forum',             color: '#26A69A' },
-        'social':        { icon: 'photo_camera',      color: '#EC407A' },
-        'security':      { icon: 'security',          color: '#3F51B5' },
+        'entertainment': { icon: 'tv', color: '#7E57C2' },
+        'music': { icon: 'music_note', color: '#1DB954' },
+        'food': { icon: 'restaurant', color: '#FF7043' },
+        'dining': { icon: 'restaurant', color: '#FF7043' },
+        'shopping': { icon: 'shopping_bag', color: '#42A5F5' },
+        'productivity': { icon: 'work', color: '#78909C' },
+        'health': { icon: 'fitness_center', color: '#EF5350' },
+        'fitness': { icon: 'fitness_center', color: '#EF5350' },
+        'utilities': { icon: 'bolt', color: '#FFC107' },
+        'transport': { icon: 'directions_car', color: '#42A5F5' },
+        'travel': { icon: 'flight', color: '#29B6F6' },
+        'education': { icon: 'school', color: '#7E57C2' },
+        'finance': { icon: 'account_balance', color: '#78909C' },
+        'gaming': { icon: 'sports_esports', color: '#5C6BC0' },
+        'news': { icon: 'newspaper', color: '#90A4AE' },
+        'cloud': { icon: 'cloud', color: '#42A5F5' },
+        'communication': { icon: 'forum', color: '#26A69A' },
+        'social': { icon: 'photo_camera', color: '#EC407A' },
+        'security': { icon: 'security', color: '#3F51B5' },
     };
 
     if (categoryId && categoryId !== 'unlisted') {
@@ -1536,7 +1541,7 @@ function renderNotificationOverview() {
 // AUTO-LOG RENEWALS
 // ═══════════════════════════════════════════
 async function autoLogRenewals() {
-    const today = new Date(); today.setHours(0,0,0,0);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
     for (const sub of subscriptions) {
         if (sub.paused) continue;
         const anchor = sub.startDate || sub.dateAdded;
@@ -1642,7 +1647,7 @@ navItems.forEach(item => {
         const t = item.getAttribute('data-target');
         if (t) {
             const currentIdx = swipePageOrder.indexOf(currentPageId);
-            const targetIdx  = swipePageOrder.indexOf(t);
+            const targetIdx = swipePageOrder.indexOf(t);
             const dir = targetIdx >= currentIdx ? 'right' : 'left';
             switchPage(t, { preserveHistory: false }, dir);
         }
@@ -1674,7 +1679,7 @@ function viewDetails(id) {
         ? `${Math.round((monthlyEquivalent / budget) * 100)}% of ${getCurrencySymbol()}${formatAmount(budget)}`
         : 'No budget set';
 
-    document.getElementById('detail-name').textContent  = sub.name;
+    document.getElementById('detail-name').textContent = sub.name;
     document.getElementById('detail-cycle').textContent = formatCycle(sub.cycle) + ' Plan';
     const ageEl = document.getElementById('detail-age');
     if (ageEl) ageEl.textContent = getSubAge(sub.dateAdded);
@@ -1689,9 +1694,9 @@ function viewDetails(id) {
     renderReminderPreference(sub.id);
 
     // Edit form pre-fill
-    document.getElementById('edit-name').value       = sub.name;
-    document.getElementById('edit-cycle').value      = (sub.cycle === 'Monthly' || sub.cycle === 'Yearly') ? sub.cycle : 'Custom';
-    document.getElementById('edit-price').value      = sub.price;
+    document.getElementById('edit-name').value = sub.name;
+    document.getElementById('edit-cycle').value = (sub.cycle === 'Monthly' || sub.cycle === 'Yearly') ? sub.cycle : 'Custom';
+    document.getElementById('edit-price').value = sub.price;
     document.getElementById('edit-start-date').value = sub.startDate || sub.dateAdded?.split('T')[0] || todayISO();
     renderReminderPreference(sub.id);
 
@@ -1700,7 +1705,7 @@ function viewDetails(id) {
     if (isCustom) document.getElementById('edit-custom-days').value = sub.cycle;
 
     // Pause button state
-    document.getElementById('pause-icon').textContent  = sub.paused ? 'play_arrow' : 'pause';
+    document.getElementById('pause-icon').textContent = sub.paused ? 'play_arrow' : 'pause';
     document.getElementById('pause-label').textContent = sub.paused ? 'Resume Subscription' : 'Pause Subscription';
 
     switchPage('details-page', { pushHistory: true });
@@ -1746,17 +1751,17 @@ document.getElementById('edit-form').addEventListener('submit', async e => {
     }
     const editedName = document.getElementById('edit-name').value.trim() || sub.name;
     const selectedReminder = document.querySelector('#edit-reminder-group .reminder-pill.active')?.getAttribute('data-reminder-value') || 'none';
-    const duplicate  = subscriptions.find(s => s.id !== activeSubId && s.name.toLowerCase().trim() === editedName.toLowerCase().trim());
+    const duplicate = subscriptions.find(s => s.id !== activeSubId && s.name.toLowerCase().trim() === editedName.toLowerCase().trim());
     if (duplicate) {
         showConfirm(`Another subscription called ${editedName} already exists. You can still save this one if it is a separate plan.`, async () => {
-            sub.name      = editedName;
-            sub.cycle     = cycle;
-            sub.price     = parseFloat(document.getElementById('edit-price').value).toFixed(2);
+            sub.name = editedName;
+            sub.cycle = cycle;
+            sub.price = parseFloat(document.getElementById('edit-price').value).toFixed(2);
             sub.startDate = document.getElementById('edit-start-date').value || sub.startDate;
-            sub.reminder  = selectedReminder;
+            sub.reminder = selectedReminder;
             await upsertSubscription(sub);
 
-            document.getElementById('detail-name').textContent  = sub.name;
+            document.getElementById('detail-name').textContent = sub.name;
             document.getElementById('detail-cycle').textContent = formatCycle(sub.cycle) + ' Plan';
             document.getElementById('detail-price').textContent = parseFloat(sub.price).toFixed(2);
             renderReminderPreference(sub.id);
@@ -1769,15 +1774,15 @@ document.getElementById('edit-form').addEventListener('submit', async e => {
         });
         return;
     }
-    sub.name      = editedName;
-    sub.cycle     = cycle;
-    sub.price     = parseFloat(document.getElementById('edit-price').value).toFixed(2);
+    sub.name = editedName;
+    sub.cycle = cycle;
+    sub.price = parseFloat(document.getElementById('edit-price').value).toFixed(2);
     sub.startDate = document.getElementById('edit-start-date').value || sub.startDate;
-    sub.reminder  = selectedReminder;
+    sub.reminder = selectedReminder;
     await upsertSubscription(sub);
 
     // Refresh detail view
-    document.getElementById('detail-name').textContent  = sub.name;
+    document.getElementById('detail-name').textContent = sub.name;
     document.getElementById('detail-cycle').textContent = formatCycle(sub.cycle) + ' Plan';
     document.getElementById('detail-price').textContent = parseFloat(sub.price).toFixed(2);
     renderReminderPreference(sub.id);
@@ -1796,7 +1801,7 @@ document.getElementById('pause-sub-btn').addEventListener('click', async () => {
     sub.paused = !sub.paused;
     await upsertSubscription(sub);
     haptic('medium');
-    document.getElementById('pause-icon').textContent  = sub.paused ? 'play_arrow' : 'pause';
+    document.getElementById('pause-icon').textContent = sub.paused ? 'play_arrow' : 'pause';
     document.getElementById('pause-label').textContent = sub.paused ? 'Resume Subscription' : 'Pause Subscription';
     showToast(sub.paused ? 'Paused' : 'Resumed');
 });
@@ -1824,7 +1829,7 @@ document.getElementById('delete-expense-btn').addEventListener('click', async ()
     if (!activeExpenseId) return;
     const entry = expenses.find(e => e.id === activeExpenseId);
     const isAuto = entry?.type === 'auto';
-    
+
     if (isAuto) {
         const msg = 'Delete this subscription completely? This removes the subscription and all its renewal logs.';
         showConfirm(msg, async () => {
@@ -1905,8 +1910,8 @@ async function scheduleRenewalNotifications() {
     const activeSubs = subscriptions.filter(s => !s.paused);
 
     for (const sub of activeSubs) {
-        const anchor   = sub.startDate || sub.dateAdded;
-        const next     = getNextRenewalDate(anchor, sub.cycle);
+        const anchor = sub.startDate || sub.dateAdded;
+        const next = getNextRenewalDate(anchor, sub.cycle);
         const diffDays = Math.ceil((next - today) / 86400000);
         const reminderDays = getReminderDays(sub.id);
         if (reminderDays.includes(diffDays)) {
@@ -1923,47 +1928,47 @@ async function scheduleRenewalNotifications() {
 }
 
 function renderNotificationStatus() {
-    const btn      = document.getElementById('notif-toggle-btn');
-    const status   = document.getElementById('notif-status');
+    const btn = document.getElementById('notif-toggle-btn');
+    const status = document.getElementById('notif-status');
     const iconWrap = document.getElementById('notif-icon-wrap');
     if (!btn || !status) return;
 
     if (!('Notification' in window)) {
         status.textContent = 'Not supported in this browser';
-        btn.style.display  = 'none';
+        btn.style.display = 'none';
         return;
     }
 
     const perm = Notification.permission;
     if (perm === 'granted') {
-        status.textContent      = 'Enabled — reminders active';
-        status.style.color      = 'var(--secondary)';
-        btn.textContent         = 'On';
-        btn.disabled            = true;
-        btn.style.background    = 'var(--secondary)';
-        btn.style.color         = '#0e0e0e';
-        btn.style.opacity       = '1';
-        btn.style.cursor        = 'default';
+        status.textContent = 'Enabled — reminders active';
+        status.style.color = 'var(--secondary)';
+        btn.textContent = 'On';
+        btn.disabled = true;
+        btn.style.background = 'var(--secondary)';
+        btn.style.color = '#0e0e0e';
+        btn.style.opacity = '1';
+        btn.style.cursor = 'default';
         if (iconWrap) iconWrap.style.background = 'rgba(78,222,163,0.15)';
     } else if (perm === 'denied') {
-        status.textContent      = 'Blocked — allow in browser settings';
-        status.style.color      = 'var(--error)';
-        btn.textContent         = 'Blocked';
-        btn.disabled            = true;
-        btn.style.background    = 'var(--error-bg)';
-        btn.style.color         = 'var(--error)';
-        btn.style.opacity       = '1';
-        btn.style.cursor        = 'default';
+        status.textContent = 'Blocked — allow in browser settings';
+        status.style.color = 'var(--error)';
+        btn.textContent = 'Blocked';
+        btn.disabled = true;
+        btn.style.background = 'var(--error-bg)';
+        btn.style.color = 'var(--error)';
+        btn.style.opacity = '1';
+        btn.style.cursor = 'default';
         if (iconWrap) iconWrap.style.background = 'var(--error-bg)';
     } else {
-        status.textContent      = 'Not enabled';
-        status.style.color      = 'var(--on-surface-variant)';
-        btn.textContent         = 'Enable';
-        btn.disabled            = false;
-        btn.style.background    = 'var(--primary-container)';
-        btn.style.color         = 'var(--primary)';
-        btn.style.opacity       = '1';
-        btn.style.cursor        = 'pointer';
+        status.textContent = 'Not enabled';
+        status.style.color = 'var(--on-surface-variant)';
+        btn.textContent = 'Enable';
+        btn.disabled = false;
+        btn.style.background = 'var(--primary-container)';
+        btn.style.color = 'var(--primary)';
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
         if (iconWrap) iconWrap.style.background = 'var(--primary-container)';
     }
 }
@@ -2120,7 +2125,7 @@ document.getElementById('change-password-form').addEventListener('submit', async
 // ═══════════════════════════════════════════
 const dataModalOverlay = document.getElementById('data-modal-overlay');
 
-function openDataModal()  { dataModalOverlay.style.display = 'flex'; }
+function openDataModal() { dataModalOverlay.style.display = 'flex'; }
 function closeDataModal() { dataModalOverlay.style.display = 'none'; }
 
 document.getElementById('open-data-modal-btn').addEventListener('click', openDataModal);
@@ -2313,8 +2318,8 @@ document.getElementById('dm-clear-btn').addEventListener('click', async () => {
 // ═══════════════════════════════════════════
 // ADD SUBSCRIPTION FORM
 // ═══════════════════════════════════════════
-const addForm         = document.getElementById('add-form');
-const cycleSelect     = document.getElementById('add-cycle');
+const addForm = document.getElementById('add-form');
+const cycleSelect = document.getElementById('add-cycle');
 const customDaysGroup = document.getElementById('custom-days-group');
 
 document.getElementById('add-start-date').value = todayISO();
@@ -2329,11 +2334,11 @@ addForm.addEventListener('submit', async e => {
     e.preventDefault();
     if (isSubmittingSubscription) return;
 
-    const submitBtn  = addForm.querySelector('button[type="submit"]');
-    const name       = document.getElementById('add-name').value.trim();
-    let cycle        = document.getElementById('add-cycle').value;
-    const price      = document.getElementById('add-price').value;
-    const startDate  = document.getElementById('add-start-date').value;
+    const submitBtn = addForm.querySelector('button[type="submit"]');
+    const name = document.getElementById('add-name').value.trim();
+    let cycle = document.getElementById('add-cycle').value;
+    const price = document.getElementById('add-price').value;
+    const startDate = document.getElementById('add-start-date').value;
     const customDays = document.getElementById('add-custom-days').value;
     if (!name || !price) return;
     if (cycle === 'Custom') {
@@ -2353,15 +2358,15 @@ addForm.addEventListener('submit', async e => {
 
             try {
                 const newSub = {
-                    id:        Date.now().toString(),
+                    id: Date.now().toString(),
                     name,
                     cycle,
-                    price:     parseFloat(price).toFixed(2),
+                    price: parseFloat(price).toFixed(2),
                     dateAdded: todayISO(),
                     startDate: startDate || todayISO(),
-                    reminder:  'none',
-                    category:  'unlisted',
-                    paused:    false,
+                    reminder: 'none',
+                    category: 'unlisted',
+                    paused: false,
                 };
                 subscriptions.push(newSub);
                 await upsertSubscription(newSub);
@@ -2390,14 +2395,14 @@ addForm.addEventListener('submit', async e => {
 
     try {
         const newSub = {
-            id:        Date.now().toString(),
+            id: Date.now().toString(),
             name, cycle,
-            price:     parseFloat(price).toFixed(2),
+            price: parseFloat(price).toFixed(2),
             dateAdded: getLocalDateTimeString(),
             startDate: startDate || todayISO(),
-            reminder:  'none',
-            category:  'unlisted',
-            paused:    false,
+            reminder: 'none',
+            category: 'unlisted',
+            paused: false,
         };
         subscriptions.push(newSub);
         await upsertSubscription(newSub);
@@ -2427,9 +2432,9 @@ addExpenseForm.addEventListener('submit', async e => {
     if (isSubmittingExpense) return;
 
     const submitBtn = addExpenseForm.querySelector('button[type="submit"]');
-    const name   = document.getElementById('exp-name').value.trim();
+    const name = document.getElementById('exp-name').value.trim();
     const amount = document.getElementById('exp-amount').value;
-    const date   = document.getElementById('exp-date').value || todayISO();
+    const date = document.getElementById('exp-date').value || todayISO();
     if (!name || !amount) return;
 
     isSubmittingExpense = true;
@@ -2457,7 +2462,7 @@ addExpenseForm.addEventListener('submit', async e => {
 });
 
 const sheetOverlay = document.getElementById('add-sheet-overlay');
-const sheet        = document.getElementById('add-sheet');
+const sheet = document.getElementById('add-sheet');
 const editExpenseSheetForm = document.getElementById('sheet-edit-exp-form');
 const editExpenseDeleteBtn = document.getElementById('edit-expense-delete-btn');
 const editExpenseDeleteConfirm = document.getElementById('edit-expense-delete-confirm');
@@ -2572,11 +2577,11 @@ function closeAddSheet() {
 
 // FAB
 const fabContainer = document.getElementById('fab-container');
-const fabBtn       = document.getElementById('fab-btn');
-const fabOverlay   = document.getElementById('fab-overlay');
+const fabBtn = document.getElementById('fab-btn');
+const fabOverlay = document.getElementById('fab-overlay');
 
 function toggleFab() { const o = fabContainer.classList.toggle('open'); fabOverlay.classList.toggle('open', o); }
-function closeFab()  { fabContainer.classList.remove('open'); fabOverlay.classList.remove('open'); }
+function closeFab() { fabContainer.classList.remove('open'); fabOverlay.classList.remove('open'); }
 
 fabBtn.addEventListener('click', e => { e.preventDefault(); haptic('light'); toggleFab(); });
 fabOverlay.addEventListener('click', closeFab);
@@ -2632,7 +2637,7 @@ document.querySelectorAll('.range-pill').forEach(pill => {
 
 function renderAnalyticsView() {
     const subsView = document.getElementById('analytics-subs-view');
-    const expView  = document.getElementById('analytics-expenses-view');
+    const expView = document.getElementById('analytics-expenses-view');
     if (analyticsView === 'expenses') {
         subsView.style.display = 'none'; expView.style.display = 'block';
         renderExpensesView();
@@ -2685,7 +2690,7 @@ function renderExpensesView() {
     const sorted = [...rangedExpenses].sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date));
     const todayStr = todayISO();
     const yest = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return getLocalDateKey(d); })();
-    const dateLabel = iso => iso === todayStr ? 'Today' : iso === yest ? 'Yesterday' : parseDateValue(iso).toLocaleDateString('en-IN', { day:'numeric', month:'short' });
+    const dateLabel = iso => iso === todayStr ? 'Today' : iso === yest ? 'Yesterday' : parseDateValue(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
     // Build day groups
     const groups = []; const seen = new Map();
@@ -2720,7 +2725,7 @@ function renderExpensesView() {
 
             const right = document.createElement('div');
             right.style.cssText = 'display:flex;align-items:center;gap:10px;';
-            const amtSpan  = document.createElement('span'); amtSpan.className  = 'exp-amount'; amtSpan.textContent = getCurrencySymbol() + formatAmount(exp.amount);
+            const amtSpan = document.createElement('span'); amtSpan.className = 'exp-amount'; amtSpan.textContent = getCurrencySymbol() + formatAmount(exp.amount);
             right.appendChild(amtSpan);
             const chevron = document.createElement('span');
             chevron.className = 'material-symbols-outlined';
@@ -2756,12 +2761,12 @@ function renderExpensesView() {
 // ═══════════════════════════════════════════
 async function renderApp() {
     document.getElementById('user-display-name').textContent = profile.name;
-    document.getElementById('user-avatar-img').src           = profile.avatar;
+    document.getElementById('user-avatar-img').src = profile.avatar;
 
-    const activeSubs   = subscriptions.filter(s => !s.paused);
+    const activeSubs = subscriptions.filter(s => !s.paused);
     const totalMonthly = activeSubs.reduce((s, sub) => s + getMonthlyCost(sub), 0);
 
-    const portfolioList  = document.getElementById('portfolio-list');
+    const portfolioList = document.getElementById('portfolio-list');
     const upcomingScroll = document.getElementById('upcoming-scroll');
     portfolioList.innerHTML = ''; upcomingScroll.innerHTML = '';
 
@@ -2779,16 +2784,16 @@ async function renderApp() {
         document.getElementById('spend-trend').style.display = 'inline-flex';
     }
 
-    const subItems = subscriptions.map(sub => ({ _type:'sub', _sortDate:parseDateValue(sub.startDate || sub.dateAdded), data:sub }));
-    const expItems = expenses.filter(e => e.type === 'manual').map(exp => ({ _type:'exp', _sortDate:parseDateValue(exp.date), data:exp }));
-    const mixed    = [...subItems, ...expItems].sort((a,b) => b._sortDate - a._sortDate);
-    const visible  = mixed.slice(0, 5);
+    const subItems = subscriptions.map(sub => ({ _type: 'sub', _sortDate: parseDateValue(sub.startDate || sub.dateAdded), data: sub }));
+    const expItems = expenses.filter(e => e.type === 'manual').map(exp => ({ _type: 'exp', _sortDate: parseDateValue(exp.date), data: exp }));
+    const mixed = [...subItems, ...expItems].sort((a, b) => b._sortDate - a._sortDate);
+    const visible = mixed.slice(0, 5);
 
     visible.forEach((entry, idx) => {
         if (entry._type === 'sub') {
-            const sub   = entry.data;
+            const sub = entry.data;
             const color = colorFromName(sub.name);
-            const item  = document.createElement('div');
+            const item = document.createElement('div');
             item.className = 'list-item';
             item.classList.add('list-item-stagger');
             item.style.animationDelay = (idx * 40) + 'ms';
@@ -2812,7 +2817,7 @@ async function renderApp() {
 
             const right = document.createElement('div'); right.className = 'text-right';
             const priceEl = document.createElement('div'); priceEl.className = 'list-price'; priceEl.textContent = getCurrencySymbol() + formatAmount(sub.price);
-            const dateEl  = document.createElement('div'); dateEl.className = 'list-date'; dateEl.textContent = formatDate(sub.dateAdded);
+            const dateEl = document.createElement('div'); dateEl.className = 'list-date'; dateEl.textContent = formatDate(sub.dateAdded);
             right.appendChild(priceEl); right.appendChild(dateEl);
 
             item.appendChild(left); item.appendChild(right);
@@ -2820,12 +2825,12 @@ async function renderApp() {
             attachLongPress(item, sub.id);
 
             if (!sub.paused) {
-                const today = new Date(); today.setHours(0,0,0,0);
-                const anchor   = sub.startDate || sub.dateAdded;
-                const renDate  = getNextRenewalDate(anchor, sub.cycle);
+                const today = new Date(); today.setHours(0, 0, 0, 0);
+                const anchor = sub.startDate || sub.dateAdded;
+                const renDate = getNextRenewalDate(anchor, sub.cycle);
                 const diffDays = Math.ceil((renDate - today) / 86400000);
                 const renewalText = diffDays > 0 ? `Renews in ${diffDays} day${diffDays > 1 ? 's' : ''}` : 'Renews today';
-                const textColor   = diffDays <= 3 ? 'var(--error)' : 'var(--primary)';
+                const textColor = diffDays <= 3 ? 'var(--error)' : 'var(--primary)';
                 const miniCard = document.createElement('div');
                 miniCard.className = 'card-mini';
                 miniCard.style.cursor = 'default';
@@ -2837,7 +2842,7 @@ async function renderApp() {
                 upcomingScroll.appendChild(miniCard);
             }
         } else {
-            const exp  = entry.data;
+            const exp = entry.data;
             const item = document.createElement('button');
             item.type = 'button';
             item.className = 'list-item list-item-stagger';
@@ -2849,12 +2854,12 @@ async function renderApp() {
             const _iconWrap2 = document.createElement('div'); _iconWrap2.innerHTML = buildIconCircle(exp.name, null, 'var(--on-surface-variant)', '48px');
             const icon = _iconWrap2.firstElementChild;
             const info = document.createElement('div');
-            const titleEl    = document.createElement('div'); titleEl.className = 'list-title'; titleEl.textContent = exp.name;
+            const titleEl = document.createElement('div'); titleEl.className = 'list-title'; titleEl.textContent = exp.name;
             const subtitleEl = document.createElement('div'); subtitleEl.className = 'list-subtitle'; subtitleEl.textContent = formatDate(exp.date);
             info.appendChild(titleEl); info.appendChild(subtitleEl);
             left.appendChild(icon); left.appendChild(info);
 
-            const right   = document.createElement('div'); right.className = 'text-right';
+            const right = document.createElement('div'); right.className = 'text-right';
             const priceEl = document.createElement('div'); priceEl.className = 'list-price'; priceEl.textContent = getCurrencySymbol() + formatAmount(exp.amount);
             right.appendChild(priceEl);
 
@@ -2893,15 +2898,15 @@ async function renderApp() {
     const now = new Date();
     const thisMonthManualExpenses = expenses
         .filter(e => e.type === 'manual' && (() => { const d = parseDateValue(e.date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); })())
-        .reduce((s,e) => s + parseFloat(e.amount), 0);
+        .reduce((s, e) => s + parseFloat(e.amount), 0);
     animateCounter('total-spend', totalMonthly + thisMonthManualExpenses, 400);
     animateCounter('ytd-spend', totalMonthly, 400);
 
     const dailyAvgEl = document.getElementById('daily-avg');
     if (dailyAvgEl) {
         const daysElapsed = now.getDate();
-        const totalSpend  = totalMonthly + thisMonthManualExpenses;
-        const dailyAvg    = totalSpend / daysElapsed;
+        const totalSpend = totalMonthly + thisMonthManualExpenses;
+        const dailyAvg = totalSpend / daysElapsed;
         if (totalSpend > 0) {
             dailyAvgEl.textContent = `₹${dailyAvg.toLocaleString('en-IN', {
                 minimumFractionDigits: 0,
@@ -2921,7 +2926,7 @@ async function renderApp() {
 
 function updateAppBadge() {
     if (!('setAppBadge' in navigator)) return;
-    const today = new Date(); today.setHours(0,0,0,0);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
     const soonCount = subscriptions.filter(sub => {
         if (sub.paused) return false;
         const anchor = sub.startDate || sub.dateAdded;
@@ -2930,9 +2935,9 @@ function updateAppBadge() {
         return diffDays >= 0 && diffDays <= 3;
     }).length;
     if (soonCount > 0) {
-        navigator.setAppBadge(soonCount).catch(() => {});
+        navigator.setAppBadge(soonCount).catch(() => { });
     } else {
-        navigator.clearAppBadge().catch(() => {});
+        navigator.clearAppBadge().catch(() => { });
     }
 }
 
@@ -2942,34 +2947,34 @@ function updateAppBadge() {
 function renderInsights() {
     const card = document.getElementById('insights-content');
     if (!card) return;
-    const now           = new Date();
-    const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
-    const activeSubs    = subscriptions.filter(s => !s.paused);
-    const totalMonthly  = activeSubs.reduce((s, sub) => s + getMonthlyCost(sub), 0);
-    const totalYearly   = totalMonthly * 12;
-    const subCount      = activeSubs.length;
-    const pausedSubs    = subscriptions.filter(s => s.paused);
-    const manualExp     = expenses.filter(e => e.type === 'manual');
-    const msDay         = 86400000;
-    const weekAgoMs     = now.getTime() - 7  * msDay;
+    const now = new Date();
+    const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+    const activeSubs = subscriptions.filter(s => !s.paused);
+    const totalMonthly = activeSubs.reduce((s, sub) => s + getMonthlyCost(sub), 0);
+    const totalYearly = totalMonthly * 12;
+    const subCount = activeSubs.length;
+    const pausedSubs = subscriptions.filter(s => s.paused);
+    const manualExp = expenses.filter(e => e.type === 'manual');
+    const msDay = 86400000;
+    const weekAgoMs = now.getTime() - 7 * msDay;
     const twoWeeksAgoMs = now.getTime() - 14 * msDay;
-    const thisWeekExps  = manualExp.filter(e => parseDateValue(e.date).getTime() >= weekAgoMs);
-    const lastWeekExps  = manualExp.filter(e => { const t = parseDateValue(e.date).getTime(); return t >= twoWeeksAgoMs && t < weekAgoMs; });
-    const thisWeekTotal = thisWeekExps.reduce((s,e) => s + parseFloat(e.amount), 0);
-    const lastWeekTotal = lastWeekExps.reduce((s,e) => s + parseFloat(e.amount), 0);
-    const thisMonthExp  = manualExp.filter(e => { const d = parseDateValue(e.date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); });
-    const thisMonthExpTotal = thisMonthExp.reduce((s,e) => s + parseFloat(e.amount), 0);
+    const thisWeekExps = manualExp.filter(e => parseDateValue(e.date).getTime() >= weekAgoMs);
+    const lastWeekExps = manualExp.filter(e => { const t = parseDateValue(e.date).getTime(); return t >= twoWeeksAgoMs && t < weekAgoMs; });
+    const thisWeekTotal = thisWeekExps.reduce((s, e) => s + parseFloat(e.amount), 0);
+    const lastWeekTotal = lastWeekExps.reduce((s, e) => s + parseFloat(e.amount), 0);
+    const thisMonthExp = manualExp.filter(e => { const d = parseDateValue(e.date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); });
+    const thisMonthExpTotal = thisMonthExp.reduce((s, e) => s + parseFloat(e.amount), 0);
     const renewalsToday = [], renewalsSoon = [];
     activeSubs.forEach(sub => {
         const anchor = sub.startDate || sub.dateAdded;
-        const next   = getNextRenewalDate(anchor, sub.cycle);
-        const diff   = Math.ceil((next - todayMidnight) / msDay);
+        const next = getNextRenewalDate(anchor, sub.cycle);
+        const diff = Math.ceil((next - todayMidnight) / msDay);
         if (diff === 0) renewalsToday.push(sub);
         else if (diff >= 1 && diff <= 3) renewalsSoon.push({ sub, diffDays: diff });
     });
     const catTotals = {};
     activeSubs.forEach(sub => {
-        const cid   = sub.category || 'unlisted';
+        const cid = sub.category || 'unlisted';
         const cname = cid === 'unlisted' ? 'Unlisted' : (categories.find(c => c.id === cid)?.name || 'Unlisted');
         if (!catTotals[cid]) catTotals[cid] = { name: cname, total: 0, count: 0 };
         catTotals[cid].total += getMonthlyCost(sub);
@@ -2983,23 +2988,23 @@ function renderInsights() {
     const fmt = n => formatAmount(n);
     const candidates = [];
 
-    if (subscriptions.length === 0 && manualExp.length === 0) candidates.push({ score:1000, solo:true, title:'Broke or Just Shy?', text:"No transactions yet. Either you live off the grid or you forgot to add everything. We don't judge. Much." });
-    if (manualExp.length > 0 && subscriptions.length === 0) candidates.push({ score:900, solo:true, title:'Spending Without Tracking', text:"You're logging one-time expenses but haven't added recurring subscriptions yet. Add them to see the real damage." });
-    if (renewalsToday.length > 0) { const total = renewalsToday.reduce((s,sub) => s + parseFloat(sub.price), 0); candidates.push({ score: 850 + (renewalsToday.length-1)*50, title:'Money Leaving Right Now', text: renewalsToday.length === 1 ? `${renewalsToday[0].name} renews today. ${sym}${fmt(renewalsToday[0].price)} is already gone or going. Moment of silence.` : `${renewalsToday[0].name} renews today plus ${renewalsToday.length-1} more totaling ${sym}${fmt(total)}.` }); }
-    if (renewalsSoon.length > 0) { const s = renewalsSoon.sort((a,b) => a.diffDays - b.diffDays)[0]; candidates.push({ score: 700 + (3-s.diffDays)*50, title:'Renewal Incoming', text:`${s.sub.name} hits your wallet in ${s.diffDays} day${s.diffDays > 1 ? 's' : ''} — ${sym}${fmt(s.sub.price)}. Start mentally preparing.` }); }
-    if (subCount > 1 && totalMonthly > 0) { let d = null, dp = 0; activeSubs.forEach(sub => { const p = getMonthlyCost(sub)/totalMonthly*100; if (p > dp) { dp = p; d = sub; } }); if (dp > 50) candidates.push({ score: dp*8, title:'One Sub to Rule Them All', text:`${d.name} is ${Math.round(dp)}% of your monthly spend. That's ${sym}${fmt(getMonthlyCost(d))} out of ${sym}${fmt(totalMonthly)}. At this point just marry it.` }); }
-    Object.values(catTotals).forEach(cat => { if (cat.count > 2) candidates.push({ score: 400+cat.count*30, title:'Category Obsession', text:`You have ${cat.count} ${cat.name} subscriptions worth ${sym}${fmt(cat.total)}/month. We get it. You really love ${cat.name}.` }); });
-    if (oldestSub && oldestDays >= 365) { const months = Math.floor(oldestDays/30); candidates.push({ score: 350+(oldestDays/365)*40, title:'Loyalty or Laziness?', text:`You've had ${oldestSub.name} for ${months} months. Either you love it or forgot it exists. Estimated cost so far: ${sym}${fmt(getMonthlyCost(oldestSub)*months)}.` }); }
-    if (subCount > 4) candidates.push({ score: subCount*45, title:'Subscription Hoarder', text:`You have ${subCount} active subscriptions burning ${sym}${fmt(totalMonthly)}/mo. The average person uses about 3 actively. Think about that.` });
-    if (totalMonthly > 3000) candidates.push({ score: (totalMonthly/1000)*60, title:'Big Spender Energy', text:`You're spending ${sym}${fmt(totalMonthly)}/mo. That's ${sym}${fmt(totalYearly)}/year. That's ${Math.round(totalYearly/250)} plates of biryani. Your call.` });
-    if (totalYearly > 10000) candidates.push({ score: (totalYearly/5000)*40, title:'Annual Reality Check', text:`You're on track for ${sym}${fmt(totalYearly)} this year. Breaking it down: ${sym}${fmt(totalMonthly)}/mo, ${sym}${fmt(totalMonthly*12/52)}/week. Every. Single. Day.` });
-    if (subCount === 1) candidates.push({ score:200, title:'Baby Steps', text:"One subscription tracked. Either you're a minimalist legend or this is just the beginning of a very expensive list." });
-    if (subCount > 0) { const nr = nextRenewalDays === Infinity ? 'N/A' : `${nextRenewalDays} day${nextRenewalDays !== 1 ? 's' : ''}`; candidates.push({ score:100, title:'Looking Clean 👀', text:`Spending looks controlled. ${subCount} subscription${subCount !== 1 ? 's' : ''}, ${sym}${fmt(totalMonthly)}/mo, next renewal in ${nr}. Either you're disciplined or haven't added everything yet.` }); }
-    if (lastWeekTotal > 0 && thisWeekTotal > lastWeekTotal*2) { const ratio = thisWeekTotal/lastWeekTotal; candidates.push({ score:ratio*200, title:'Spending Spike Detected', text:`Your one-time expenses this week are ${ratio.toFixed(1)}x higher than last week. ${sym}${fmt(thisWeekTotal)} vs ${sym}${fmt(lastWeekTotal)}. Something happened. We're not asking questions.` }); }
-    if (totalMonthly > 0) { let lc = null, lp = 0; Object.values(catTotals).forEach(cat => { const p = cat.total/totalMonthly*100; if (p > lp) { lp = p; lc = cat; } }); if (lc && lp > 40) candidates.push({ score:450, title:`${lc.name} is Draining You`, text:`Your ${lc.name} subscriptions alone cost ${sym}${fmt(lc.total)}/mo — ${Math.round(lp)}% of your total. Consider if you need all ${lc.count} of them.` }); }
-    if (thisWeekExps.length > 3) { const da = thisWeekTotal/7; candidates.push({ score:380, title:'Daily Spending Habit', text:`You've logged ${thisWeekExps.length} expenses this week averaging ${sym}${fmt(da)}/day. At this pace that's ${sym}${fmt(da*30)} extra this month.` }); }
+    if (subscriptions.length === 0 && manualExp.length === 0) candidates.push({ score: 1000, solo: true, title: 'Broke or Just Shy?', text: "No transactions yet. Either you live off the grid or you forgot to add everything. We don't judge. Much." });
+    if (manualExp.length > 0 && subscriptions.length === 0) candidates.push({ score: 900, solo: true, title: 'Spending Without Tracking', text: "You're logging one-time expenses but haven't added recurring subscriptions yet. Add them to see the real damage." });
+    if (renewalsToday.length > 0) { const total = renewalsToday.reduce((s, sub) => s + parseFloat(sub.price), 0); candidates.push({ score: 850 + (renewalsToday.length - 1) * 50, title: 'Money Leaving Right Now', text: renewalsToday.length === 1 ? `${renewalsToday[0].name} renews today. ${sym}${fmt(renewalsToday[0].price)} is already gone or going. Moment of silence.` : `${renewalsToday[0].name} renews today plus ${renewalsToday.length - 1} more totaling ${sym}${fmt(total)}.` }); }
+    if (renewalsSoon.length > 0) { const s = renewalsSoon.sort((a, b) => a.diffDays - b.diffDays)[0]; candidates.push({ score: 700 + (3 - s.diffDays) * 50, title: 'Renewal Incoming', text: `${s.sub.name} hits your wallet in ${s.diffDays} day${s.diffDays > 1 ? 's' : ''} — ${sym}${fmt(s.sub.price)}. Start mentally preparing.` }); }
+    if (subCount > 1 && totalMonthly > 0) { let d = null, dp = 0; activeSubs.forEach(sub => { const p = getMonthlyCost(sub) / totalMonthly * 100; if (p > dp) { dp = p; d = sub; } }); if (dp > 50) candidates.push({ score: dp * 8, title: 'One Sub to Rule Them All', text: `${d.name} is ${Math.round(dp)}% of your monthly spend. That's ${sym}${fmt(getMonthlyCost(d))} out of ${sym}${fmt(totalMonthly)}. At this point just marry it.` }); }
+    Object.values(catTotals).forEach(cat => { if (cat.count > 2) candidates.push({ score: 400 + cat.count * 30, title: 'Category Obsession', text: `You have ${cat.count} ${cat.name} subscriptions worth ${sym}${fmt(cat.total)}/month. We get it. You really love ${cat.name}.` }); });
+    if (oldestSub && oldestDays >= 365) { const months = Math.floor(oldestDays / 30); candidates.push({ score: 350 + (oldestDays / 365) * 40, title: 'Loyalty or Laziness?', text: `You've had ${oldestSub.name} for ${months} months. Either you love it or forgot it exists. Estimated cost so far: ${sym}${fmt(getMonthlyCost(oldestSub) * months)}.` }); }
+    if (subCount > 4) candidates.push({ score: subCount * 45, title: 'Subscription Hoarder', text: `You have ${subCount} active subscriptions burning ${sym}${fmt(totalMonthly)}/mo. The average person uses about 3 actively. Think about that.` });
+    if (totalMonthly > 3000) candidates.push({ score: (totalMonthly / 1000) * 60, title: 'Big Spender Energy', text: `You're spending ${sym}${fmt(totalMonthly)}/mo. That's ${sym}${fmt(totalYearly)}/year. That's ${Math.round(totalYearly / 250)} plates of biryani. Your call.` });
+    if (totalYearly > 10000) candidates.push({ score: (totalYearly / 5000) * 40, title: 'Annual Reality Check', text: `You're on track for ${sym}${fmt(totalYearly)} this year. Breaking it down: ${sym}${fmt(totalMonthly)}/mo, ${sym}${fmt(totalMonthly * 12 / 52)}/week. Every. Single. Day.` });
+    if (subCount === 1) candidates.push({ score: 200, title: 'Baby Steps', text: "One subscription tracked. Either you're a minimalist legend or this is just the beginning of a very expensive list." });
+    if (subCount > 0) { const nr = nextRenewalDays === Infinity ? 'N/A' : `${nextRenewalDays} day${nextRenewalDays !== 1 ? 's' : ''}`; candidates.push({ score: 100, title: 'Looking Clean 👀', text: `Spending looks controlled. ${subCount} subscription${subCount !== 1 ? 's' : ''}, ${sym}${fmt(totalMonthly)}/mo, next renewal in ${nr}. Either you're disciplined or haven't added everything yet.` }); }
+    if (lastWeekTotal > 0 && thisWeekTotal > lastWeekTotal * 2) { const ratio = thisWeekTotal / lastWeekTotal; candidates.push({ score: ratio * 200, title: 'Spending Spike Detected', text: `Your one-time expenses this week are ${ratio.toFixed(1)}x higher than last week. ${sym}${fmt(thisWeekTotal)} vs ${sym}${fmt(lastWeekTotal)}. Something happened. We're not asking questions.` }); }
+    if (totalMonthly > 0) { let lc = null, lp = 0; Object.values(catTotals).forEach(cat => { const p = cat.total / totalMonthly * 100; if (p > lp) { lp = p; lc = cat; } }); if (lc && lp > 40) candidates.push({ score: 450, title: `${lc.name} is Draining You`, text: `Your ${lc.name} subscriptions alone cost ${sym}${fmt(lc.total)}/mo — ${Math.round(lp)}% of your total. Consider if you need all ${lc.count} of them.` }); }
+    if (thisWeekExps.length > 3) { const da = thisWeekTotal / 7; candidates.push({ score: 380, title: 'Daily Spending Habit', text: `You've logged ${thisWeekExps.length} expenses this week averaging ${sym}${fmt(da)}/day. At this pace that's ${sym}${fmt(da * 30)} extra this month.` }); }
     const cb = totalMonthly + thisMonthExpTotal;
-    if (cb > 8000) candidates.push({ score:(cb/500)*60, title:'Total Burn Rate', text:`This month: ${sym}${fmt(thisMonthExpTotal)} one-time + ${sym}${fmt(totalMonthly)} subscriptions = ${sym}${fmt(cb)} combined. That's your real monthly spend.` });
+    if (cb > 8000) candidates.push({ score: (cb / 500) * 60, title: 'Total Burn Rate', text: `This month: ${sym}${fmt(thisMonthExpTotal)} one-time + ${sym}${fmt(totalMonthly)} subscriptions = ${sym}${fmt(cb)} combined. That's your real monthly spend.` });
     if (thisMonthExpTotal > 0 && totalMonthly > 0 && thisMonthExpTotal > totalMonthly) {
         candidates.push({
             score: 520,
@@ -3043,7 +3048,7 @@ function renderInsights() {
         }
     });
 
-    candidates.sort((a,b) => b.score - a.score);
+    candidates.sort((a, b) => b.score - a.score);
     let shown = [];
     if (candidates.length === 0) { shown = []; }
     else if (candidates[0].solo) { shown = [candidates[0]]; }
@@ -3153,13 +3158,13 @@ function renderAnalytics() {
             listEl.appendChild(empty);
         }
         visibleSubs.forEach(sub => {
-            const color    = colorFromName(sub.name);
-            const today    = new Date(); today.setHours(0,0,0,0);
-            const anchor   = sub.startDate || sub.dateAdded;
-            const renDate  = getNextRenewalDate(anchor, sub.cycle);
+            const color = colorFromName(sub.name);
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const anchor = sub.startDate || sub.dateAdded;
+            const renDate = getNextRenewalDate(anchor, sub.cycle);
             const diffDays = Math.ceil((renDate - today) / 86400000);
             const renewalText = diffDays > 0 ? `Renews in ${diffDays} day${diffDays > 1 ? 's' : ''}` : 'Renews today';
-            const textColor   = diffDays <= 3 ? 'var(--error)' : 'var(--primary)';
+            const textColor = diffDays <= 3 ? 'var(--error)' : 'var(--primary)';
             const item = document.createElement('div');
             item.className = 'list-item'; item.draggable = true;
             item.style.cssText = 'cursor:grab;margin-bottom:8px;background:var(--surface-high);';
@@ -3169,12 +3174,12 @@ function renderAnalytics() {
             const _iconWrap3 = document.createElement('div'); _iconWrap3.innerHTML = buildIconCircle(sub.name, sub.category, color, '40px');
             const icon = _iconWrap3.firstElementChild;
             const info = document.createElement('div');
-            const titleEl    = document.createElement('div'); titleEl.className = 'list-title'; titleEl.style.fontSize = '0.95rem'; titleEl.textContent = sub.name;
+            const titleEl = document.createElement('div'); titleEl.className = 'list-title'; titleEl.style.fontSize = '0.95rem'; titleEl.textContent = sub.name;
             const subtitleEl = document.createElement('div'); subtitleEl.className = 'list-subtitle'; subtitleEl.style.cssText = `color:${textColor};font-weight:600;`; subtitleEl.textContent = renewalText;
             info.appendChild(titleEl); info.appendChild(subtitleEl);
             left.appendChild(icon); left.appendChild(info);
 
-            const right   = document.createElement('div'); right.className = 'text-right';
+            const right = document.createElement('div'); right.className = 'text-right';
             const priceEl = document.createElement('div'); priceEl.className = 'list-price'; priceEl.style.fontSize = '1.1rem'; priceEl.textContent = getCurrencySymbol() + formatAmount(sub.price);
             right.appendChild(priceEl);
 
@@ -3251,7 +3256,7 @@ async function addCategoryFn(name) {
     const banner = document.getElementById('offline-banner');
     if (!banner) return;
     const update = () => { banner.style.display = navigator.onLine ? 'none' : 'block'; };
-    window.addEventListener('online',  update);
+    window.addEventListener('online', update);
     window.addEventListener('offline', update);
     update(); // initialise on load
 })();
@@ -3259,7 +3264,7 @@ async function addCategoryFn(name) {
 // ═══════════════════════════════════════════
 // PROFILE COLLAPSIBLE SECTIONS
 // ═══════════════════════════════════════════
-window.toggleProfileSection = function(bodyId, chevronId) {
+window.toggleProfileSection = function (bodyId, chevronId) {
     document.querySelectorAll('.profile-collapse-body.is-open').forEach(openBody => {
         if (openBody.id !== bodyId) openBody.classList.remove('is-open');
     });
@@ -3269,7 +3274,7 @@ window.toggleProfileSection = function(bodyId, chevronId) {
         trigger.setAttribute('aria-expanded', isTarget ? trigger.getAttribute('aria-expanded') : 'false');
         if (!isTarget && icon) icon.textContent = 'chevron_right';
     });
-    const body    = document.getElementById(bodyId);
+    const body = document.getElementById(bodyId);
     const chevron = document.getElementById(chevronId);
     if (!body) return;
     const open = !body.classList.contains('is-open');
@@ -3318,7 +3323,7 @@ async function runBootWithLoader(bootFn, minVisible = 0) {
 }
 
 async function renderInitialSessionView() {
-    await loadAllData().catch(() => {});
+    await loadAllData().catch(() => { });
     await renderApp();
     renderProfilePage();
     scheduleRenewalNotifications();
@@ -3348,12 +3353,17 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
 
         currentUser = session.user;
         
+        // Scrub the OAuth hash from the URL so PWA "Add to Home Screen" doesn't permanently save the token!
+        if (hash.includes('access_token=') || hash.includes('type=')) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
         // V42 BUGFIX: Aggressively persist the session to localStorage natively 
         // to bypass any Supabase JS v2 caching race conditions that revert to old ghost accounts.
         try {
             const persistenceKey = 'sb-cnxurdingdhhdcjgujkz-auth-token';
             localStorage.setItem(persistenceKey, JSON.stringify(session));
-        } catch (e) {}
+        } catch (e) { }
 
         await runBootWithLoader(async () => {
             await ensureUserProfile(session.user);
@@ -3434,29 +3444,29 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
 }());
 
 // ── Long Press Context Menu ──────────────────────────────────────
-(function() {
-    const menu    = document.getElementById('context-menu');
+(function () {
+    const menu = document.getElementById('context-menu');
     const overlay = document.getElementById('context-overlay');
-    let ctxSubId  = null;
+    let ctxSubId = null;
     let longPressTimer = null;
 
     function openCtx(subId, x, y) {
         ctxSubId = subId;
         const sub = subscriptions.find(s => s.id === subId);
         if (!sub) return;
-        document.getElementById('ctx-pause-icon').textContent  = sub.paused ? 'play_arrow' : 'pause';
+        document.getElementById('ctx-pause-icon').textContent = sub.paused ? 'play_arrow' : 'pause';
         document.getElementById('ctx-pause-label').textContent = sub.paused ? 'Resume' : 'Pause';
-        menu.style.display    = 'block';
+        menu.style.display = 'block';
         overlay.style.display = 'block';
         const menuW = 180, menuH = 140;
-        const safeX = Math.min(x, window.innerWidth  - menuW - 16);
+        const safeX = Math.min(x, window.innerWidth - menuW - 16);
         const safeY = Math.min(y, window.innerHeight - menuH - 16);
         menu.style.left = safeX + 'px';
-        menu.style.top  = safeY + 'px';
+        menu.style.top = safeY + 'px';
     }
 
     function closeCtx() {
-        menu.style.display    = 'none';
+        menu.style.display = 'none';
         overlay.style.display = 'none';
         ctxSubId = null;
     }
@@ -3489,7 +3499,7 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
         });
     });
 
-    window.attachLongPress = function(el, subId) {
+    window.attachLongPress = function (el, subId) {
         el.addEventListener('touchstart', e => {
             longPressTimer = setTimeout(() => {
                 haptic('medium');
@@ -3497,7 +3507,7 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
                 openCtx(subId, t.clientX, t.clientY);
             }, 500);
         }, { passive: true });
-        el.addEventListener('touchend',  () => clearTimeout(longPressTimer), { passive: true });
+        el.addEventListener('touchend', () => clearTimeout(longPressTimer), { passive: true });
         el.addEventListener('touchmove', () => clearTimeout(longPressTimer), { passive: true });
     };
 })();
@@ -3512,8 +3522,8 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
         const page = document.getElementById('dashboard-page');
         if (!page.classList.contains('active')) return;
         if (window.scrollY > 0) return;
-        startY    = e.touches[0].clientY;
-        pulling   = true;
+        startY = e.touches[0].clientY;
+        pulling = true;
         triggered = false;
     }, { passive: true });
 
