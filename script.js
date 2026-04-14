@@ -52,9 +52,14 @@ const navItems = document.querySelectorAll('.nav-item');
 
 async function sbWrite(fn) {
     try {
-        await fn();
+        const result = await fn();
+        if (result?.error) {
+            console.error('[Atler] Supabase write rejected:', result.error);
+            showToast('Could not save — ' + (result.error.message || 'check your connection'));
+        }
+        return result;
     } catch (err) {
-        console.error('Supabase write error:', err);
+        console.error('[Atler] Supabase write exception:', err);
         showToast('Could not save — check your connection');
     }
 }
@@ -64,6 +69,20 @@ function haptic(style='light') {
     const patterns = { light:15, medium:30, heavy:50, success:[15,50,15], error:[30,50,30,50,30] };
     navigator.vibrate(patterns[style] || 15);
 }
+
+// One-time cleanup: remove stale SWR cache keys left from a previous experiment
+// that was bloating localStorage and could cause quota issues
+try {
+    if (!localStorage.getItem('ghost_nuked_b39')) {
+        localStorage.clear();
+        localStorage.setItem('ghost_nuked_b39', 'true');
+    }
+    
+    Object.keys(localStorage)
+        .filter(k => k.startsWith('atler_cache_'))
+        .forEach(k => localStorage.removeItem(k));
+} catch(e) {}
+
 
 function debounce(fn, delay=600) {
     let t;
@@ -414,7 +433,18 @@ document.getElementById('reset-password-btn').addEventListener('click', async ()
 
 document.getElementById('signout-btn').addEventListener('click', async () => {
     isExplicitSignOut = true;
-    await sb.auth.signOut();
+    
+    // Fallback: forcefully wipe local storage in case the token is corrupted and the API rejects it
+    localStorage.clear();
+    
+    try {
+        await sb.auth.signOut();
+    } catch (err) {
+        console.error('[Atler] signOut API error, forcing local reload:', err);
+    }
+    
+    // Guarantee they are evicted
+    window.location.reload();
 });
 
 // ═══════════════════════════════════════════
@@ -422,7 +452,16 @@ document.getElementById('signout-btn').addEventListener('click', async () => {
 // ═══════════════════════════════════════════
 async function loadAllData() {
     if (!currentUser) return;
-    const uid = currentUser.id;
+    
+    // FORCE Supabase to validate and synchronize the token into the PostgREST client 
+    // before making database calls, otherwise it sends an empty or stale token on refresh!
+    const { data: authData, error: authErr } = await sb.auth.getUser();
+    if (authErr || !authData?.user) {
+        throw new Error('Supabase token failed validation: ' + (authErr?.message || 'Unknown network error'));
+    }
+    
+    const uid = authData.user.id;
+    currentUser = authData.user;
     lastLoadError = '';
 
     let profRes, subsRes, catsRes, expsRes;
@@ -433,7 +472,9 @@ async function loadAllData() {
             sb.from('categories').select('*').eq('user_id', uid),
             sb.from('expenses').select('*').eq('user_id', uid),
         ]);
+        console.log('[Atler] loadAllData success — subs:', subsRes.data?.length, 'errors:', profRes.error, subsRes.error);
     } catch (error) {
+        console.error('[Atler] loadAllData FAILED:', error);
         lastLoadError = navigator.onLine
             ? 'Could not sync your latest data right now.'
             : 'You are offline. Showing what we already have.';
@@ -569,7 +610,8 @@ async function ensureUserProfile(user = currentUser) {
 
 async function upsertSubscription(sub) {
     if (!currentUser) return;
-    await sbWrite(() => sb.from('subscriptions').upsert({
+    console.log('[Atler] upsertSubscription — saving:', sub.name, 'user:', currentUser.id);
+    const { error } = await sbWrite(() => sb.from('subscriptions').upsert({
             id:                  sub.id,
             user_id:             currentUser.id,
             name:                sub.name,
@@ -577,11 +619,12 @@ async function upsertSubscription(sub) {
             price:               sub.price,
             date_added:          sub.dateAdded,
             start_date:          sub.startDate,
-            reminder:            sub.reminder || 'none',
             category:            sub.category || 'unlisted',
             last_logged_renewal: sub.lastLoggedRenewal || null,
             paused:              sub.paused || false,
         }));
+    if (error) console.error('[Atler] upsertSubscription FAILED:', error);
+    else console.log('[Atler] upsertSubscription SUCCESS:', sub.name);
 }
 
 async function deleteSubscription(id) {
@@ -1200,6 +1243,7 @@ function renderMonthlyReview() {
     const now = new Date();
     const thisMonthExpenses = expenses.filter(e => isWithinRange(e.date, 'month'));
     const manualThisMonth = thisMonthExpenses.filter(e => e.type === 'manual');
+    const autoThisMonth = thisMonthExpenses.filter(e => e.type === 'auto');
     const monthlyExpenseTotal = manualThisMonth.reduce((sum, exp) => sum + parseFloat(exp.amount), 0);
     const activeSubs = subscriptions.filter(s => !s.paused);
 
@@ -1215,7 +1259,7 @@ function renderMonthlyReview() {
 
     const topCategory = Object.values(categoryTotals).sort((a, b) => b.total - a.total)[0];
     const biggestSub = [...activeSubs].sort((a, b) => getMonthlyCost(b) - getMonthlyCost(a))[0];
-    const totalMonthly = activeSubs.reduce((sum, sub) => sum + getMonthlyCost(sub), 0);
+    const totalMonthly = autoThisMonth.reduce((sum, exp) => sum + parseFloat(exp.amount), 0);
     const combined = totalMonthly + monthlyExpenseTotal;
 
     if (!activeSubs.length && !manualThisMonth.length) {
@@ -1773,15 +1817,29 @@ document.getElementById('delete-expense-btn').addEventListener('click', async ()
     if (!activeExpenseId) return;
     const entry = expenses.find(e => e.id === activeExpenseId);
     const isAuto = entry?.type === 'auto';
-    const msg = isAuto
-        ? 'Remove this renewal log? Your subscription is kept — only this history line goes away.'
-        : 'Delete this expense? This will remove the manual expense from your history.';
+    
+    if (isAuto) {
+        const msg = 'Delete this subscription completely? This removes the subscription and all its renewal logs.';
+        showConfirm(msg, async () => {
+            haptic('error');
+            const subId = activeExpenseId.split('_')[1];
+            await deleteSubscription(subId);
+            subscriptions = subscriptions.filter(s => s.id !== subId);
+            activeExpenseId = null;
+            showToast('Subscription deleted');
+            goBack();
+            await renderApp();
+        });
+        return;
+    }
+
+    const msg = 'Delete this expense? This will remove the manual expense from your history.';
     showConfirm(msg, async () => {
         haptic('error');
         await sbWrite(() => sb.from('expenses').delete().eq('id', activeExpenseId).eq('user_id', currentUser.id));
         expenses = expenses.filter(exp => exp.id !== activeExpenseId);
         activeExpenseId = null;
-        showToast(isAuto ? 'Renewal log removed' : 'Expense deleted');
+        showToast('Expense deleted');
         goBack();
         await renderApp();
     });
@@ -3261,87 +3319,16 @@ async function renderInitialSessionView() {
     if (lastLoadError) showToast(lastLoadError, 3200);
 }
 
-// Local Cache logic for SWR (Stale-While-Revalidate)
-function loadLocalCache(uid) {
-    try {
-       const cached = localStorage.getItem(`atler_cache_${uid}`);
-       if (cached) {
-           const data = JSON.parse(cached);
-           profile = data.profile || profile;
-           subscriptions = data.subscriptions || [];
-           categories = data.categories || [];
-           expenses = data.expenses || [];
-           applyTheme(profile.theme);
-           return true;
-       }
-    } catch(e) {}
-    return false;
-}
-
-function saveLocalCache(uid) {
-    if (!uid) return;
-    localStorage.setItem(`atler_cache_${uid}`, JSON.stringify({
-        profile, subscriptions, categories, expenses
-    }));
-}
-
-// Global Boot Flag
-let appBooted = false;
-
-// We explicitly fetch the session to guarantee IDB async storage has resolved.
-async function bootstrapApp() {
-    if (appBooted) return;
-    
-    // If a Google OAuth redirect hash is present, defer to SIGNED_IN listener
-    const hash = window.location.hash || window.location.href || '';
-    if (hash.includes('access_token=') || hash.includes('provider_token=')) return;
-
-    const { data: { session } } = await sb.auth.getSession();
-    const authScreen = document.getElementById('auth-screen');
-
-    if (!session?.user) {
-        if (authScreen) authScreen.classList.remove('hidden');
-        return;
-    }
-
-    appBooted = true;
-    await runBootWithLoader(async () => {
-        currentUser = session.user;
-        const hasCache = loadLocalCache(currentUser.id);
-
-        if (hasCache) {
-            if (authScreen) authScreen.classList.add('hidden');
-            renderApp();
-            renderProfilePage();
-            scheduleRenewalNotifications();
-            handleLaunchShortcut();
-            
-            // SWR: Fetch in background
-            loadAllData().then(() => {
-                saveLocalCache(currentUser.id);
-                renderApp();
-                renderProfilePage();
-            }).catch(console.error);
-
-        } else {
-            await ensureUserProfile(session.user);
-            if (authScreen) authScreen.classList.add('hidden');
-            await renderInitialSessionView();
-            saveLocalCache(currentUser.id);
-        }
-        updateAppBadge();
-        showNotificationPrompt();
-    }, 0);
-}
-
-if (sb) {
-    bootstrapApp();
-}
-
 // AUTH STATE CHANGES
 if (sb) sb.auth.onAuthStateChange(async (event, session) => {
     const authScreen = document.getElementById('auth-screen');
     const hash = window.location.hash || window.location.href || '';
+
+    // Skip INITIAL_SESSION when Google OAuth redirect is in progress
+    // (the SIGNED_IN event will fire immediately after and handle it)
+    if (event === 'INITIAL_SESSION' && (hash.includes('access_token=') || hash.includes('provider_token='))) {
+        return;
+    }
 
     if (event === 'PASSWORD_RECOVERY') {
         if (authScreen) authScreen.classList.remove('hidden');
@@ -3349,42 +3336,34 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
         return;
     }
 
-    // SIGNED_IN catches OAuth callbacks and regular logins after the listener binds
-    if (event === 'SIGNED_IN' && session?.user) {
-        if (appBooted && currentUser?.id === session.user.id) return;
-        appBooted = true;
+    if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session?.user) {
+        if (currentUser?.id === session.user.id) return;
+
+        currentUser = session.user;
+        
+        // V42 BUGFIX: Aggressively persist the session to localStorage natively 
+        // to bypass any Supabase JS v2 caching race conditions that revert to old ghost accounts.
+        try {
+            const persistenceKey = 'sb-cnxurdingdhhdcjgujkz-auth-token';
+            localStorage.setItem(persistenceKey, JSON.stringify(session));
+        } catch (e) {}
 
         await runBootWithLoader(async () => {
-            currentUser = session.user;
-            const hasCache = loadLocalCache(currentUser.id);
-
-            if (hasCache) {
-                if (authScreen) authScreen.classList.add('hidden');
-                renderApp();
-                renderProfilePage();
-                scheduleRenewalNotifications();
-                handleLaunchShortcut();
-                
-                loadAllData().then(() => {
-                    saveLocalCache(currentUser.id);
-                    renderApp();
-                    renderProfilePage();
-                }).catch(console.error);
-            } else {
-                await ensureUserProfile(session.user);
-                if (authScreen) authScreen.classList.add('hidden');
-                await renderInitialSessionView();
-                saveLocalCache(currentUser.id);
-            }
+            await ensureUserProfile(session.user);
+            if (authScreen) authScreen.classList.add('hidden');
+            await renderInitialSessionView();
             updateAppBadge();
             showNotificationPrompt();
         }, 0);
+        return;
+    }
+
+    if (event === 'INITIAL_SESSION' && !session?.user) {
+        if (authScreen) authScreen.classList.remove('hidden');
+        return;
     }
 
     if (event === 'SIGNED_OUT') {
-        if (currentUser) {
-            localStorage.removeItem(`atler_cache_${currentUser.id}`);
-        }
         currentUser = null;
         subscriptions = [];
         categories = [];
@@ -3397,15 +3376,16 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
             currency: 'INR',
             lastNotified: null
         };
-        // Only wipe theme preference on an intentional sign-out (not token expiry).
         if (isExplicitSignOut) {
             localStorage.removeItem('atler_theme');
             applyTheme('default');
         }
         isExplicitSignOut = false;
-        authScreen.classList.remove('hidden');
+        if (authScreen) authScreen.classList.remove('hidden');
     }
 });
+
+
 
 // ═══════════════════════════════════════════
 // HORIZONTAL SWIPE NAVIGATION
