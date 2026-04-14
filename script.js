@@ -4,6 +4,13 @@
 const SUPABASE_URL  = 'https://cnxurdingdhhdcjgujkz.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNueHVyZGluZ2RoaGRjamd1amt6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzQ1OTIsImV4cCI6MjA5MDQ1MDU5Mn0.nX0-MR9C1fmKRA9lHw0FBp_r0LYYlntbz9B7BW7HKd8';
 
+try {
+    if (!localStorage.getItem('ghost_nuked_b41')) {
+        localStorage.clear();
+        localStorage.setItem('ghost_nuked_b41', 'true');
+    }
+} catch(e) {}
+
 // IndexedDB-backed storage adapter — survives PWA force-quit on iOS/Android
 // unlike localStorage which can be evicted by the OS on process kill.
 const sb = window.supabase?.createClient
@@ -13,7 +20,7 @@ const sb = window.supabase?.createClient
             autoRefreshToken: true,
             detectSessionInUrl: true,
             storage: localStorage,
-        }
+        } 
     })
     : null;
 
