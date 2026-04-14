@@ -4,13 +4,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover, user-scalable=no">
-    <title>Atler</title>
+    <title>Atler · b42</title>
 
     <!-- PWA Manifest & iOS Support -->
-    <link rel="manifest" href="./manifest.json?v=22">
+    <link rel="manifest" href="./manifest.json?v=37">
     <link rel="icon" type="image/png" sizes="192x192" href="./apple-touch-icon.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
     <meta name="theme-color" content="#0e0e0e">
+
+    <!-- FORCIBLY WIPE OLD GHOST SESSIONS FROM INDEXED DB AND SW -->
+    <script>
+        // Immediately unregister all Service Workers to prevent serving old cached index.html
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                }
+            });
+        }
+        
+        try {
+            window.indexedDB.deleteDatabase('supabasejs');
+            window.indexedDB.deleteDatabase('supabase-auth');
+            window.indexedDB.deleteDatabase('atler-auth');
+            window.indexedDB.deleteDatabase('localforage');
+        } catch(e) {}
+    </script>
+    <link rel="stylesheet" href="./style.css?v=35">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Atler">
@@ -199,7 +219,7 @@
         })();
     </script>
 
-    <link rel="stylesheet" href="./style.css?v=28">
+    <link rel="stylesheet" href="./style.css?v=35">
   <style>
     #ls-star-container {
       position: absolute;
@@ -1241,7 +1261,7 @@
     <div id="context-overlay" style="position:fixed;inset:0;z-index:599;display:none;"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="./script.js?v=31"></script>
+    <script src="./script.js?v=43"></script>
 
     <!-- Service Worker -->
     <script>
