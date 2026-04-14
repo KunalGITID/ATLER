@@ -759,7 +759,7 @@ button.list-item {
 
 .fab-container {
   position: fixed;
-  bottom: 110px;
+  bottom: calc(110px + env(safe-area-inset-bottom, 0px));
   right: 24px;
   z-index: 150;
   display: flex;
@@ -2042,7 +2042,9 @@ button.list-item {
   font-size: 0.9rem;
   text-align: right;
   min-width: 0;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .account-password-form {
