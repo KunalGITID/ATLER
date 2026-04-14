@@ -24,10 +24,7 @@
         }
         
         try {
-            window.indexedDB.deleteDatabase('supabasejs');
-            window.indexedDB.deleteDatabase('supabase-auth');
-            window.indexedDB.deleteDatabase('atler-auth');
-            window.indexedDB.deleteDatabase('localforage');
+            // Unconditional nuclear drop removed to restore iOS PWA persistence capability
         } catch(e) {}
     </script>
     <link rel="stylesheet" href="./style.css?v=35">
@@ -1261,7 +1258,7 @@
     <div id="context-overlay" style="position:fixed;inset:0;z-index:599;display:none;"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="./script.js?v=44"></script>
+    <script src="./script.js?v=45"></script>
 
     <!-- Service Worker -->
     <script>
