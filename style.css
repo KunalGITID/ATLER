@@ -2032,6 +2032,7 @@ button.list-item {
   gap: 4px;
   padding: 8px 0;
   width: 100%;
+  min-width: 0;
 }
 
 .account-row + .account-row {
@@ -2046,6 +2047,8 @@ button.list-item {
   white-space: nowrap;
   overflow-x: auto;
   max-width: 100%;
+  min-width: 0;
+  width: 100%;
   scrollbar-width: none;
 }
 .account-row span:last-child::-webkit-scrollbar {
