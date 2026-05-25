@@ -3396,8 +3396,6 @@ async function runBootWithLoader(bootFn, minVisible = 0) {
 
     } catch (error) {
         console.error('[boot] Boot failed:', error);
-        const authScreen = document.getElementById('auth-screen');
-        if (authScreen && !currentUser) authScreen.classList.remove('hidden');
         throw error;
     } finally {
         clearTimeout(forcedDismissTimer);
