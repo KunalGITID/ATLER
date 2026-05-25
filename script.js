@@ -17,7 +17,7 @@ const IdbStorage = {
         if (this.db) return this.db;
         return new Promise((resolve, reject) => {
             const req = indexedDB.open('atler-v4-auth-db', 1);
-            req.onupgradeneeded = e => {
+            req.onup gradeneeded = e => {
                 if (!e.target.result.objectStoreNames.contains('auth')) {
                     e.target.result.createObjectStore('auth');
                 }
@@ -533,6 +533,8 @@ async function loadAllData() {
             sb.from('categories').select('*').eq('user_id', uid),
             sb.from('expenses').select('*').eq('user_id', uid),
         ]);
+        const queryError = profRes.error || subsRes.error || catsRes.error || expsRes.error;
+        if (queryError) throw queryError;
         console.log('[Atler] loadAllData success — subs:', subsRes.data?.length, 'errors:', profRes.error, subsRes.error);
     } catch (error) {
         console.error('[Atler] loadAllData FAILED:', error);
@@ -3365,6 +3367,7 @@ async function runBootWithLoader(bootFn, minVisible = 0) {
         console.error('[boot] Boot failed:', error);
         const authScreen = document.getElementById('auth-screen');
         if (authScreen && !currentUser) authScreen.classList.remove('hidden');
+        throw error;
     } finally {
         clearTimeout(forcedDismissTimer);
         dismissLoaderAfterPaint();
@@ -3372,7 +3375,7 @@ async function runBootWithLoader(bootFn, minVisible = 0) {
 }
 
 async function renderInitialSessionView() {
-    await loadAllData().catch(() => { });
+    await loadAllData();
     await renderApp();
     renderProfilePage();
     scheduleRenewalNotifications();
@@ -3380,8 +3383,18 @@ async function renderInitialSessionView() {
     if (lastLoadError) showToast(lastLoadError, 3200);
 }
 
-// AUTH STATE CHANGES
-if (sb) sb.auth.onAuthStateChange(async (event, session) => {
+function showSignedOutView(message = '') {
+    currentUser = null;
+    subscriptions = [];
+    categories = [];
+    expenses = [];
+    const authScreen = document.getElementById('auth-screen');
+    const errEl = document.getElementById('auth-error');
+    if (authScreen) authScreen.classList.remove('hidden');
+    if (errEl && message) errEl.textContent = message;
+}
+
+async function handleAuthStateChange(event, session) {
     const authScreen = document.getElementById('auth-screen');
     const hash = window.location.hash || window.location.href || '';
 
@@ -3394,30 +3407,36 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
     if (event === 'PASSWORD_RECOVERY') {
         if (authScreen) authScreen.classList.remove('hidden');
         setRecoveryMode(true);
+        dismissLoaderAfterPaint();
         return;
     }
 
     if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session?.user) {
-        if (currentUser?.id === session.user.id) return;
+        const { data: authData, error: authError } = await sb.auth.getUser(session.access_token);
+        const verifiedUser = authData?.user;
+        if (authError || !verifiedUser || verifiedUser.id !== session.user.id) {
+            console.error('[Atler] Ignoring invalid restored auth session:', authError);
+            showSignedOutView('Your saved session is no longer valid. Please sign in again.');
+            try {
+                await sb.auth.signOut({ scope: 'local' });
+            } catch (_) { }
+            dismissLoaderAfterPaint();
+            return;
+        }
 
-        currentUser = session.user;
+        if (currentUser?.id === verifiedUser.id) return;
+
+        currentUser = verifiedUser;
         
         // Scrub the OAuth hash from the URL so PWA "Add to Home Screen" doesn't permanently save the token!
         if (hash.includes('access_token=') || hash.includes('type=')) {
             window.history.replaceState({}, document.title, window.location.pathname);
         }
 
-        // V42 BUGFIX: Aggressively persist the session to localStorage natively 
-        // to bypass any Supabase JS v2 caching race conditions that revert to old ghost accounts.
-        try {
-            const persistenceKey = 'sb-cnxurdingdhhdcjgujkz-auth-token';
-            localStorage.setItem(persistenceKey, JSON.stringify(session));
-        } catch (e) { }
-
         await runBootWithLoader(async () => {
-            await ensureUserProfile(session.user);
-            if (authScreen) authScreen.classList.add('hidden');
+            await ensureUserProfile(verifiedUser);
             await renderInitialSessionView();
+            if (authScreen) authScreen.classList.add('hidden');
             updateAppBadge();
             showNotificationPrompt();
         }, 0);
@@ -3425,15 +3444,13 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
     }
 
     if (event === 'INITIAL_SESSION' && !session?.user) {
-        if (authScreen) authScreen.classList.remove('hidden');
+        showSignedOutView();
+        dismissLoaderAfterPaint();
         return;
     }
 
     if (event === 'SIGNED_OUT') {
-        currentUser = null;
-        subscriptions = [];
-        categories = [];
-        expenses = [];
+        showSignedOutView();
         const savedTheme = localStorage.getItem('atler_theme') || 'default';
         profile = {
             name: 'Atler',
@@ -3447,8 +3464,18 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
             applyTheme('default');
         }
         isExplicitSignOut = false;
-        if (authScreen) authScreen.classList.remove('hidden');
     }
+}
+
+// Keep auth restoration work outside Supabase's auth callback lock.
+if (sb) sb.auth.onAuthStateChange((event, session) => {
+    setTimeout(() => {
+        handleAuthStateChange(event, session).catch(error => {
+            console.error('[Atler] Auth boot failed:', error);
+            showSignedOutView('Unable to restore your account. Please sign in again.');
+            dismissLoaderAfterPaint();
+        });
+    }, 0);
 });
 
 
