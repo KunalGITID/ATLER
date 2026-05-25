@@ -12,21 +12,6 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
     <meta name="theme-color" content="#0e0e0e">
 
-    <!-- FORCIBLY WIPE OLD GHOST SESSIONS FROM INDEXED DB AND SW -->
-    <script>
-        // Immediately unregister all Service Workers to prevent serving old cached index.html
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                for(let registration of registrations) {
-                    registration.unregister();
-                }
-            });
-        }
-        
-        try {
-            // Unconditional nuclear drop removed to restore iOS PWA persistence capability
-        } catch(e) {}
-    </script>
     <link rel="stylesheet" href="./style.css?v=35">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -457,7 +442,7 @@
     </script>
 
 
-    <div id="auth-screen" class="hidden">
+    <div id="auth-screen">
         <div class="auth-logo">ATŁ​ER</div>
         <p class="auth-tagline">Your personal subscription tracker</p>
         <div class="auth-card">
@@ -1258,7 +1243,7 @@
     <div id="context-overlay" style="position:fixed;inset:0;z-index:599;display:none;"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="./script.js?v=45"></script>
+    <script src="./script.js?v=46"></script>
 
     <!-- Service Worker -->
     <script>
