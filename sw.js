@@ -1,12 +1,12 @@
-const CACHE_NAME = 'atler-v26';
+const CACHE_NAME = 'atler-v27';
 
 const APP_SHELL = [
   './',
   './index.html',
   './offline.html',
-  './style.css?v=25',
-  './script.js?v=23',
-  './manifest.json?v=22',
+  './style.css?v=35',
+  './script.js?v=46',
+  './manifest.json?v=37',
   './apple-touch-icon.png',
 ];
 
