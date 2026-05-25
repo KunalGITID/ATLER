@@ -17,7 +17,7 @@ const IdbStorage = {
         if (this.db) return this.db;
         return new Promise((resolve, reject) => {
             const req = indexedDB.open('atler-v4-auth-db', 1);
-            req.onup gradeneeded = e => {
+            req.onupgradeneeded = e => {
                 if (!e.target.result.objectStoreNames.contains('auth')) {
                     e.target.result.createObjectStore('auth');
                 }
@@ -303,8 +303,13 @@ function applyTheme(name) {
 // ═══════════════════════════════════════════
 let authMode = 'login';
 let isRecoveryMode = false;
+const HOSTED_APP_URL = 'https://kunalgitid.github.io/ATLER/';
 
 function getAppRedirectUrl() {
+    if (window.location.protocol === 'file:') {
+        return HOSTED_APP_URL;
+    }
+
     const path = window.location.pathname.endsWith('.html')
         ? window.location.pathname.replace(/[^/]+$/, '')
         : window.location.pathname;
@@ -362,6 +367,7 @@ document.getElementById('tab-login').addEventListener('click', () => {
     document.getElementById('auth-name-group').style.display = 'none';
     document.getElementById('auth-inline-actions').style.display = 'flex';
     document.getElementById('auth-submit-btn').textContent = 'Sign In';
+    document.getElementById('auth-error').style.color = '';
     document.getElementById('auth-error').textContent = '';
 });
 
@@ -373,6 +379,7 @@ document.getElementById('tab-signup').addEventListener('click', () => {
     document.getElementById('auth-name-group').style.display = 'block';
     document.getElementById('auth-inline-actions').style.display = 'none';
     document.getElementById('auth-submit-btn').textContent = 'Create Account';
+    document.getElementById('auth-error').style.color = '';
     document.getElementById('auth-error').textContent = '';
 });
 
@@ -393,16 +400,28 @@ document.getElementById('auth-submit-btn').addEventListener('click', async () =>
 
     try {
         if (authMode === 'signup') {
-            const { data, error } = await sb.auth.signUp({ email, password });
+            const { data, error } = await sb.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: { name: name || 'Atler' },
+                    emailRedirectTo: getAppRedirectUrl()
+                }
+            });
             if (error) throw error;
-            if (data.user) {
-                await sb.from('profiles').upsert({ user_id: data.user.id, name: name || 'Atler', theme: 'default' });
+            if (!data.session) {
+                errEl.style.color = 'var(--secondary)';
+                errEl.textContent = 'Check your email to confirm your account, then sign in.';
+                btn.disabled = false;
+                btn.textContent = 'Create Account';
+                return;
             }
         } else {
             const { error } = await sb.auth.signInWithPassword({ email, password });
             if (error) throw error;
         }
     } catch (err) {
+        errEl.style.color = '';
         errEl.textContent = err.message || 'Something went wrong.';
         btn.disabled = false;
         btn.textContent = authMode === 'login' ? 'Sign In' : 'Create Account';
