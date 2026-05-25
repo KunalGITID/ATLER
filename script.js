@@ -306,7 +306,8 @@ let isRecoveryMode = false;
 const HOSTED_APP_URL = 'https://kunalgitid.github.io/ATLER/';
 
 function getAppRedirectUrl() {
-    if (window.location.protocol === 'file:') {
+    const hostedOrigin = new URL(HOSTED_APP_URL).origin;
+    if (window.location.protocol === 'file:' || window.location.origin !== hostedOrigin) {
         return HOSTED_APP_URL;
     }
 
@@ -319,18 +320,29 @@ function getAppRedirectUrl() {
 
 async function startOAuthSignIn(provider) {
     const errEl = document.getElementById('auth-error');
+    const googleBtn = document.getElementById('auth-google-btn');
     if (!sb) {
         if (errEl) errEl.textContent = 'Unable to load app services. Refresh and try again.';
         return;
     }
-    if (errEl) errEl.textContent = '';
-    const { error } = await sb.auth.signInWithOAuth({
-        provider,
-        options: {
-            redirectTo: getAppRedirectUrl()
-        }
-    });
-    if (error && errEl) errEl.textContent = error.message || `Unable to start ${provider} sign in.`;
+    if (errEl) {
+        errEl.style.color = '';
+        errEl.textContent = 'Connecting to Google...';
+    }
+    if (googleBtn) googleBtn.disabled = true;
+
+    try {
+        const { error } = await sb.auth.signInWithOAuth({
+            provider,
+            options: {
+                redirectTo: getAppRedirectUrl()
+            }
+        });
+        if (error) throw error;
+    } catch (error) {
+        if (errEl) errEl.textContent = error.message || `Unable to start ${provider} sign in.`;
+        if (googleBtn) googleBtn.disabled = false;
+    }
 }
 
 function setRecoveryMode(on) {
