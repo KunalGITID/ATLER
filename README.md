@@ -10,7 +10,7 @@ Based on the "Financial Atelier" design system.
 - Subscription details view.
 - Complete Vanilla CSS styling with glassmorphism, depth, and custom properties.
 - Dynamic page switching via Vanilla JS.
-
+-yolo achievement earned
 ## Run Locally
 Just open `index.html` in any modern web browser or use a local HTTP server:
 ```bash
