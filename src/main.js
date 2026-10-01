@@ -27,6 +27,7 @@ import { initErrorReporting, reportError } from './lib/errors.js';
 import { budgetUsage } from './lib/budgets.js';
 import { parseBankSmsList } from './lib/sms.js';
 import { savingsSummary } from './lib/savings.js';
+import { recentUnusual, unusualness } from './lib/anomalies.js';
 
 // ═══════════════════════════════════════════
 // SUPABASE CONFIG
@@ -1060,6 +1061,12 @@ async function categoryIdForName(rawName) {
     if ((await upsertCategory(created)).error) return 'unlisted';
     categories.push(created);
     return created.id;
+}
+
+function unusualLabel(exp) {
+    return exp.category && exp.category !== 'unlisted'
+        ? (categories.find(c => c.id === exp.category)?.name || 'category')
+        : exp.name;
 }
 
 function importSummary(imported, skipped, noun) {
@@ -2830,12 +2837,16 @@ addExpenseForm.addEventListener('submit', async e => {
         const category = document.getElementById('exp-category').value || 'unlisted';
         const newExp = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, name, amount: parseFloat(amount), date, type: 'manual', category };
         if ((await insertExpense(newExp)).error) return;
+        const unusual = unusualness(newExp, expenses);
         expenses.push(newExp);
         haptic('success');
         addExpenseForm.reset();
         document.getElementById('exp-date').value = todayISO();
         closeAddSheet();
         await renderApp();
+        if (unusual) {
+            showToast(`Saved. Heads up: that's ${unusual.ratio.toFixed(1)}× your usual ${unusualLabel(newExp)} spend (${getCurrencySymbol()}${formatAmount(unusual.median)})`, 4500);
+        }
     } finally {
         isSubmittingExpense = false;
         if (submitBtn) {
@@ -3437,7 +3448,7 @@ function renderInsights() {
     const candidates = [];
 
     if (subscriptions.length === 0 && manualExp.length === 0) candidates.push({ score: 1000, solo: true, title: 'Broke or Just Shy?', text: "No transactions yet. Either you live off the grid or you forgot to add everything. We don't judge. Much." });
-    if (manualExp.length > 0 && subscriptions.length === 0) candidates.push({ score: 900, solo: true, title: 'Spending Without Tracking', text: "You're logging one-time expenses but haven't added recurring subscriptions yet. Add them to see the real damage." });
+    if (manualExp.length > 0 && subscriptions.length === 0) candidates.push({ score: 350, title: 'Spending Without Tracking', text: "You're logging one-time expenses but haven't added recurring subscriptions yet. Add them to see the real damage." });
     if (renewalsToday.length > 0) { const total = renewalsToday.reduce((s, sub) => s + parseFloat(sub.price), 0); candidates.push({ score: 850 + (renewalsToday.length - 1) * 50, title: 'Money Leaving Right Now', text: renewalsToday.length === 1 ? `${renewalsToday[0].name} renews today. ${sym}${fmt(renewalsToday[0].price)} is already gone or going. Moment of silence.` : `${renewalsToday[0].name} renews today plus ${renewalsToday.length - 1} more totaling ${sym}${fmt(total)}.` }); }
     if (renewalsSoon.length > 0) { const s = renewalsSoon.sort((a, b) => a.diffDays - b.diffDays)[0]; candidates.push({ score: 700 + (3 - s.diffDays) * 50, title: 'Renewal Incoming', text: `${s.sub.name} hits your wallet in ${s.diffDays} day${s.diffDays > 1 ? 's' : ''} — ${sym}${fmt(s.sub.price)}. Start mentally preparing.` }); }
     if (subCount > 1 && totalMonthly > 0) { let d = null, dp = 0; activeSubs.forEach(sub => { const p = getMonthlyCost(sub) / totalMonthly * 100; if (p > dp) { dp = p; d = sub; } }); if (dp > 50) candidates.push({ score: dp * 8, title: 'One Sub to Rule Them All', text: `${d.name} is ${Math.round(dp)}% of your monthly spend. That's ${sym}${fmt(getMonthlyCost(d))} out of ${sym}${fmt(totalMonthly)}. At this point just marry it.` }); }
@@ -3495,6 +3506,16 @@ function renderInsights() {
             });
         }
     });
+
+    const unusualSpends = recentUnusual(expenses, now);
+    if (unusualSpends.length) {
+        const { exp, result } = unusualSpends[0];
+        candidates.push({
+            score: 600,
+            title: 'Unusual Spend',
+            text: `${sym}${fmt(exp.amount)} on ${exp.name} is ${result.ratio.toFixed(1)}× your usual ${unusualLabel(exp)} spend of ${sym}${fmt(result.median)}.${unusualSpends.length > 1 ? ` ${unusualSpends.length - 1} more this week.` : ''}`,
+        });
+    }
 
     const savings = savingsSummary(subscriptions, now);
     if (savings.saved > 0) {
