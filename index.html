@@ -1134,6 +1134,15 @@
                     <h2 style="margin-bottom:4px;">Add Expense</h2>
                     <p class="label" style="text-transform:none;letter-spacing:normal;margin-bottom:24px;">Log a
                         one-time payment.</p>
+                    <details class="sms-paste" id="sms-paste">
+                        <summary><span class="material-symbols-outlined">sms</span>Paste a bank SMS</summary>
+                        <textarea id="sms-text" rows="3" placeholder="e.g. Rs.250.00 debited from a/c **1234 on 01-10-26 to VPA swiggy@icici…"></textarea>
+                        <div class="sms-paste-actions">
+                            <button type="button" class="btn" id="sms-clipboard-btn">Paste</button>
+                            <button type="button" class="btn-primary" id="sms-read-btn">Read SMS</button>
+                        </div>
+                        <div class="data-modal-hint">Read on this phone only. Paste several messages to add them all at once.</div>
+                    </details>
                     <form id="add-expense-form">
                         <div class="input-group"><label>Expense Name</label><input type="text" id="exp-name"
                                 placeholder="e.g. Groceries, Cab ride" autocomplete="off"></div>

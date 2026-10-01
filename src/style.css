@@ -2361,3 +2361,41 @@ button.list-item {
   font-family: var(--font-body);
   margin-left: 6px;
 }
+
+.sms-paste {
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 20px;
+}
+.sms-paste summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 0.9rem;
+  list-style: none;
+}
+.sms-paste summary::-webkit-details-marker { display: none; }
+.sms-paste textarea {
+  width: 100%;
+  margin-top: 12px;
+  background: var(--surface-low);
+  color: var(--on-surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm, 10px);
+  padding: 10px;
+  font: inherit;
+  font-size: 16px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.sms-paste-actions {
+  display: flex;
+  gap: 10px;
+  margin: 10px 0 8px;
+}
+.sms-paste-actions > * { flex: 1; margin: 0; }
