@@ -24,6 +24,7 @@ import { priceChangeImpact, recentIncreases } from './lib/prices.js';
 import { forecastNextMonth } from './lib/forecast.js';
 import { findRecurring, readStatement } from './lib/statement.js';
 import { initErrorReporting, reportError } from './lib/errors.js';
+import { ACCENTS, applyAccent } from './lib/theme.js';
 import { budgetUsage } from './lib/budgets.js';
 import { parseBankSmsList } from './lib/sms.js';
 import { savingsSummary } from './lib/savings.js';
@@ -285,102 +286,19 @@ confirmOverlay?.addEventListener('click', e => {
 // ═══════════════════════════════════════════
 // THEMES
 // ═══════════════════════════════════════════
-const DARK_SURFACES = {
-    bg: '#0e0e0e', surfaceLow: '#1c1b1b', surface: '#201f1f', surfaceHigh: '#2a2a2a',
-    onSurface: '#e5e2e1', onSurfaceVariant: '#c7c4d8',
-    glassBg: 'rgba(19,19,19,0.6)', glassBorder: 'rgba(255,255,255,0.05)',
-    error: '#ffb4ab', errorBg: 'rgba(255,180,171,0.1)',
-    insightsText: 'rgba(255,255,255,0.8)', insightsDivider: 'rgba(255,255,255,0.1)',
-    navBg: 'rgba(19,19,19,0.85)', navShadow: '0 -10px 40px rgba(0,0,0,0.5)',
-};
-
-const themes = {
-    default: { ...DARK_SURFACES, primary: '#c0c1ff', primaryContainer: '#4b4dd8', primaryGlow: 'rgba(192,193,255,0.4)', secondary: '#4edea3', secondaryGlow: 'rgba(78,222,163,0.2)' },
-    midnight: { ...DARK_SURFACES, primary: '#4fc3f7', primaryContainer: '#0d47a1', primaryGlow: 'rgba(79,195,247,0.4)', secondary: '#80deea', secondaryGlow: 'rgba(128,222,234,0.2)' },
-    forest: { ...DARK_SURFACES, primary: '#81c784', primaryContainer: '#1b5e20', primaryGlow: 'rgba(129,199,132,0.4)', secondary: '#aed581', secondaryGlow: 'rgba(174,213,129,0.2)' },
-    paper: {
-        primary: '#1A1A1A', primaryContainer: '#E0E0E0', primaryGlow: 'rgba(26,26,26,0.08)',
-        secondary: '#555555', secondaryGlow: 'rgba(85,85,85,0.08)',
-        bg: '#F5F5F5', surfaceLow: '#EBEBEB', surface: '#F0F0F0', surfaceHigh: '#E2E2E2',
-        onSurface: '#1A1A1A', onSurfaceVariant: '#888888',
-        glassBg: 'rgba(245,245,245,0.88)', glassBorder: 'rgba(0,0,0,0.08)',
-        error: '#cc2222', errorBg: 'rgba(204,34,34,0.08)',
-        insightsText: 'rgba(0,0,0,0.65)', insightsDivider: 'rgba(0,0,0,0.10)',
-        navBg: 'rgba(245,245,245,0.92)', navShadow: '0 -10px 40px rgba(0,0,0,0.08)',
-    },
-    void: {
-        primary: '#E05A4E', primaryContainer: '#2A1210', primaryGlow: 'rgba(224,90,78,0.35)',
-        secondary: '#C04840', secondaryGlow: 'rgba(192,72,64,0.2)',
-        bg: '#0D0D0D', surfaceLow: '#141414', surface: '#1C1C1C', surfaceHigh: '#252525',
-        onSurface: '#E8E8E8', onSurfaceVariant: '#888888',
-        glassBg: 'rgba(13,13,13,0.75)', glassBorder: 'rgba(255,255,255,0.06)',
-        error: '#ff6b6b', errorBg: 'rgba(255,107,107,0.1)',
-        insightsText: 'rgba(232,232,232,0.8)', insightsDivider: 'rgba(224,90,78,0.25)',
-        navBg: 'rgba(13,13,13,0.9)', navShadow: '0 -10px 40px rgba(0,0,0,0.7)',
-    },
-    inferno: {
-        primary: '#FF6A00', primaryContainer: '#1F1000', primaryGlow: 'rgba(255,106,0,0.4)',
-        secondary: '#00FFB2', secondaryGlow: 'rgba(0,255,178,0.2)',
-        bg: '#0A0A0A', surfaceLow: '#111111', surface: '#161616', surfaceHigh: '#1A1A1A',
-        onSurface: '#EFEFEF', onSurfaceVariant: '#444444',
-        glassBg: 'rgba(10,10,10,0.78)', glassBorder: 'rgba(255,106,0,0.12)',
-        error: '#ff6b6b', errorBg: 'rgba(255,107,107,0.1)',
-        insightsText: 'rgba(239,239,239,0.82)', insightsDivider: 'rgba(255,106,0,0.3)',
-        navBg: 'rgba(10,10,10,0.92)', navShadow: '0 -10px 40px rgba(255,106,0,0.12)',
-    },
-    slate: {
-        primary: '#94a3b8', primaryContainer: '#334155', primaryGlow: 'rgba(148,163,184,0.3)',
-        secondary: '#7dd3fc', secondaryGlow: 'rgba(125,211,252,0.2)',
-        bg: '#0f172a', surfaceLow: '#1e293b', surface: '#263348', surfaceHigh: '#334155',
-        onSurface: '#e2e8f0', onSurfaceVariant: '#94a3b8',
-        glassBg: 'rgba(15,23,42,0.75)', glassBorder: 'rgba(148,163,184,0.1)',
-        error: '#fca5a5', errorBg: 'rgba(252,165,165,0.1)',
-        insightsText: 'rgba(226,232,240,0.8)', insightsDivider: 'rgba(148,163,184,0.2)',
-        navBg: 'rgba(15,23,42,0.92)', navShadow: '0 -10px 40px rgba(0,0,0,0.7)',
-    },
-};
 
 function syncThemeChipStyles(activeThemeName) {
     document.querySelectorAll('.theme-chip').forEach(chip => {
-        const dot = chip.querySelector('div');
-        const label = chip.querySelector('span');
-        const key = chip.dataset.theme;
-        const ct = themes[key] || themes.default;
-        const selected = key === activeThemeName;
-        if (dot) dot.style.border = selected ? `2px solid ${ct.primary}` : '2px solid transparent';
-        if (label) label.style.color = selected ? ct.primary : 'var(--on-surface-variant)';
+        chip.classList.toggle('is-selected', chip.dataset.theme === activeThemeName);
     });
 }
 
 function applyTheme(name) {
-    const t = themes[name] || themes.default;
-    const r = document.documentElement.style;
-
-    r.setProperty('--primary', t.primary);
-    r.setProperty('--primary-container', t.primaryContainer);
-    r.setProperty('--primary-glow', t.primaryGlow);
-    r.setProperty('--secondary', t.secondary);
-    r.setProperty('--secondary-glow', t.secondaryGlow);
-
-    r.setProperty('--bg-color', t.bg);
-    r.setProperty('--surface-low', t.surfaceLow);
-    r.setProperty('--surface', t.surface);
-    r.setProperty('--surface-high', t.surfaceHigh);
-    r.setProperty('--on-surface', t.onSurface);
-    r.setProperty('--on-surface-variant', t.onSurfaceVariant);
-    r.setProperty('--glass-bg', t.glassBg);
-    r.setProperty('--glass-border', t.glassBorder);
-    r.setProperty('--error', t.error);
-    r.setProperty('--error-bg', t.errorBg);
-    r.setProperty('--insights-text', t.insightsText);
-    r.setProperty('--insights-divider', t.insightsDivider);
-    r.setProperty('--nav-bg', t.navBg);
-    r.setProperty('--nav-shadow', t.navShadow);
-
-    syncThemeChipStyles(name);
-
-    profile.theme = name;
-    localStorage.setItem('atler_theme', name);
+    const key = name in ACCENTS ? name : 'default';
+    applyAccent(key);
+    syncThemeChipStyles(key);
+    profile.theme = key;
+    try { localStorage.setItem('atler_theme', key); } catch { /* private mode */ }
 }
 
 // ═══════════════════════════════════════════
@@ -1133,7 +1051,8 @@ function formatAmount(amount) {
 
 
 function colorFromName(name) {
-    const palette = ['#1db954', '#e50914', '#c0c1ff', '#4edea3', '#ffb4ab', '#4b4dd8', '#f59e0b', '#06b6d4'];
+    // iOS system colours
+    const palette = ['#0A84FF', '#30D158', '#FF9F0A', '#FF453A', '#5E5CE6', '#BF5AF2', '#FF375F', '#64D2FF', '#AC8E68'];
     let hash = 0;
     for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
     return palette[Math.abs(hash) % palette.length];
@@ -1338,16 +1257,16 @@ function resolveIcon(name, categoryId) {
     return { type: 'letter' };
 }
 
-function buildIconCircle(name, categoryId, fallbackColor, size = '48px') {
+// Settings-style app icon: a solid rounded square with a white glyph.
+function buildIconCircle(name, categoryId, fallbackColor, size = '36px') {
     const result = resolveIcon(name, categoryId);
-    const iconColor = result.color || fallbackColor;
-    const bg = iconColor + '22';
-
+    const px = parseFloat(size);
+    const color = result.color || (String(fallbackColor).startsWith('#') ? fallbackColor : colorFromName(name || '?'));
+    const box = `width:${size};height:${size};border-radius:${Math.round(px * 0.225)}px;background:${color};color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;`;
     if (result.type === 'material') {
-        return `<div class="list-icon-wrapper" style="width:${size};height:${size};background:${bg};color:${iconColor};display:flex;align-items:center;justify-content:center;border-radius:50%;flex-shrink:0;"><span class="material-symbols-outlined" style="font-size:calc(${size} * 0.45);">${result.icon}</span></div>`;
+        return `<div class="list-icon-wrapper" style="${box}"><span class="material-symbols-outlined" style="font-size:${Math.round(px * 0.58)}px;font-variation-settings:'FILL' 1;">${result.icon}</span></div>`;
     }
-
-    return `<div class="list-icon-wrapper" style="width:${size};height:${size};background:${fallbackColor}22;color:${fallbackColor};font-size:calc(${size} * 0.45);display:flex;align-items:center;justify-content:center;border-radius:50%;flex-shrink:0;font-family:var(--font-headline);font-weight:800;">${(name || '?').charAt(0).toUpperCase()}</div>`;
+    return `<div class="list-icon-wrapper" style="${box}font:600 ${Math.round(px * 0.5)}px/1 var(--font-headline);">${escapeHTML((name || '?').charAt(0).toUpperCase())}</div>`;
 }
 
 function getReminderPreference(subId) {
@@ -1784,6 +1703,8 @@ const swipePageOrder = ['dashboard-page', 'analytics-page', 'profile-page'];
 
 function switchPage(targetId, options = {}, direction = 'right') {
     const { pushHistory: shouldPushHistory = false, preserveHistory = false } = options;
+    // The add button belongs to the three main tabs only.
+    document.body.classList.toggle('is-subpage', !ROOT_PAGES.has(targetId));
     if (shouldPushHistory && currentPageId && currentPageId !== targetId) {
         pageHistory.push(currentPageId);
     } else if (!preserveHistory && ROOT_PAGES.has(targetId)) {
@@ -3347,7 +3268,7 @@ async function renderAppInner() {
             if (sub.paused) item.style.opacity = '0.5';
 
             const left = document.createElement('div'); left.className = 'list-item-left';
-            const _iconWrap1 = document.createElement('div'); _iconWrap1.innerHTML = buildIconCircle(sub.name, sub.category, color, '48px');
+            const _iconWrap1 = document.createElement('div'); _iconWrap1.innerHTML = buildIconCircle(sub.name, sub.category, color, '36px');
             const icon = _iconWrap1.firstElementChild;
             const info = document.createElement('div');
             const titleEl = document.createElement('div'); titleEl.className = 'list-title'; titleEl.textContent = sub.name;
@@ -3402,7 +3323,7 @@ async function renderAppInner() {
             item.addEventListener('click', () => openEditExpenseSheet(exp.id));
 
             const left = document.createElement('div'); left.className = 'list-item-left';
-            const _iconWrap2 = document.createElement('div'); _iconWrap2.innerHTML = buildIconCircle(exp.name, null, 'var(--on-surface-variant)', '48px');
+            const _iconWrap2 = document.createElement('div'); _iconWrap2.innerHTML = buildIconCircle(exp.name, null, '#636366', '36px');
             const icon = _iconWrap2.firstElementChild;
             const info = document.createElement('div');
             const titleEl = document.createElement('div'); titleEl.className = 'list-title'; titleEl.textContent = exp.name;
@@ -3726,13 +3647,17 @@ function renderAnalytics() {
         const visibleSubs = q ? subs.filter(s => s.name.toLowerCase().includes(q)) : subs;
         // Hide entire group if nothing matches (only when searching)
         if (q && visibleSubs.length === 0) return;
-        const groupEl = document.createElement('div'); groupEl.style.marginBottom = '20px';
+        const groupEl = document.createElement('div'); groupEl.className = 'category-group';
         if (showHeading) {
-            const header = document.createElement('h2');
-            header.style.cssText = 'cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-top:1rem;margin-bottom:0.5rem;';
-            const headerText = document.createTextNode(name);
-            const headerIcon = document.createElement('span'); headerIcon.className = 'material-symbols-outlined'; headerIcon.style.fontSize = '20px'; headerIcon.textContent = 'chevron_right';
-            header.appendChild(headerText); header.appendChild(headerIcon);
+            const header = document.createElement('button');
+            header.type = 'button';
+            header.className = 'category-group-head';
+            const headerText = document.createElement('span'); headerText.textContent = name;
+            const headerMeta = document.createElement('span'); headerMeta.className = 'category-group-meta';
+            const headerCount = document.createElement('span'); headerCount.textContent = String(subs.length);
+            const headerIcon = document.createElement('span'); headerIcon.className = 'material-symbols-outlined'; headerIcon.textContent = 'chevron_right';
+            headerMeta.appendChild(headerCount); headerMeta.appendChild(headerIcon);
+            header.appendChild(headerText); header.appendChild(headerMeta);
             header.addEventListener('click', () => {
                 const list = groupEl.querySelector('.cat-list');
                 const open = list.style.display === 'none';
@@ -3744,7 +3669,7 @@ function renderAnalytics() {
         const listEl = document.createElement('div');
         listEl.className = 'cat-list'; listEl.dataset.categoryId = id;
         if (showHeading) listEl.style.display = 'none';
-        listEl.style.cssText += 'min-height:50px;padding:10px 0;border-radius:var(--radius-md);transition:background 0.2s;';
+        listEl.style.minHeight = showHeading ? '' : '50px';
         listEl.addEventListener('dragover', e => { e.preventDefault(); listEl.style.background = 'var(--surface)'; listEl.style.border = '1px dashed var(--primary)'; });
         listEl.addEventListener('dragleave', () => { listEl.style.background = 'transparent'; listEl.style.border = 'none'; });
         listEl.addEventListener('drop', e => {

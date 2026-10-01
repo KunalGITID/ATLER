@@ -50,6 +50,18 @@ export async function goTo(page, target) {
 
 export async function openSubscription(page, name) {
     await goTo(page, 'analytics-page');
-    await page.locator('#category-groups-container .list-item', { hasText: name }).click();
+    const item = page.locator('#category-groups-container .list-item', { hasText: name });
+    if (!(await item.isVisible())) {
+        // Categories start collapsed: open the group that holds it.
+        const groups = page.locator('#category-groups-container .category-group');
+        for (let i = 0; i < await groups.count(); i++) {
+            const group = groups.nth(i);
+            if (await group.locator('.list-item', { hasText: name }).count()) {
+                await group.locator('.category-group-head').click();
+                break;
+            }
+        }
+    }
+    await item.click();
     await expect(page.locator('#detail-name')).toHaveText(name);
 }
