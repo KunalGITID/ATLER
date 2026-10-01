@@ -2,12 +2,17 @@ import { useEffect, useState } from 'react';
 
 // Hash routes so the phone's back button works without a server:
 //   #/            the month
+//   #/plans       every plan
+//   #/you         account and data
 //   #/plan/<id>   one plan
-export type Route = { name: 'month' } | { name: 'plan'; id: string };
+export type Route = { name: 'month' } | { name: 'plans' } | { name: 'you' } | { name: 'plan'; id: string };
 
 function parse(hash: string): Route {
   const m = hash.match(/^#\/plan\/([\w-]+)$/);
-  return m ? { name: 'plan', id: m[1]! } : { name: 'month' };
+  if (m) return { name: 'plan', id: m[1]! };
+  if (hash === '#/plans') return { name: 'plans' };
+  if (hash === '#/you') return { name: 'you' };
+  return { name: 'month' };
 }
 
 export const planHref = (id: string) => `#/plan/${id}`;

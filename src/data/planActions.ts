@@ -8,10 +8,11 @@ import { newId, type AtlerDB } from './db.ts';
 const stamp = () => ({ updatedAt: Date.now() });
 
 // Omit applied to each member of the union, so a price event keeps from/to.
-type NewEvent = PlanEvent extends infer E ? (E extends PlanEvent ? Omit<E, 'id'> : never) : never;
+type NewEvent = PlanEvent extends infer E ? (E extends PlanEvent ? Omit<E, 'id' | 'at'> : never) : never;
 
 async function record(db: AtlerDB, event: NewEvent) {
-  await db.events.add({ ...event, id: newId(), ...stamp() } as PlanEvent & { updatedAt: number });
+  const now = Date.now();
+  await db.events.add({ ...event, id: newId(), at: now, updatedAt: now } as PlanEvent & { updatedAt: number });
 }
 
 export async function editPlan(db: AtlerDB, plan: Plan, changes: { name: string; price: Paise; cycle: Cycle }, today: Day) {

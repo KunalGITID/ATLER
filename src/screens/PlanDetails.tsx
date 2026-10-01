@@ -25,7 +25,7 @@ export function PlanDetails({ db, plan, events }: { db: AtlerDB; plan: Plan; eve
     <div className="flex flex-col gap-2.5">
       <button type="button" onClick={goBack} className="inline-flex items-center gap-1 self-start px-1 pb-1.5 text-[15px] font-bold">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-        Month
+        Back
       </button>
 
       {/* Coral only when a charge is a week or less away: that's what coral means. */}

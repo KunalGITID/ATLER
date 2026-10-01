@@ -13,7 +13,7 @@ test('Next up opens the plan with its countdown and payments', async ({ page }) 
   await expect(page.getByRole('heading', { name: 'Netflix' })).toBeVisible();
   await expect(page.getByRole('img', { name: /^1 of \d+ days left until the next charge$/ })).toBeVisible();
   await expect(page.getByText('Paid so far')).toBeVisible();
-  await page.getByRole('button', { name: 'Month' }).click();
+  await page.getByRole('button', { name: 'Back' }).click();
   await expect(page.getByRole('heading', { name: 'Your month' })).toBeAttached();
 });
 
@@ -26,7 +26,7 @@ test('a price change is recorded and shows up as price creep on the month', asyn
   await sheet.getByRole('button', { name: 'SAVE' }).click();
   await expect(page.getByText('₹249/MO')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Month' }).click();
+  await page.getByRole('button', { name: 'Back' }).click();
   await expect(page.getByRole('link', { name: /Price creep \+₹600\/yr Netflix went up/ })).toBeVisible();
 });
 
@@ -44,7 +44,7 @@ test('pause and resume, then cancel keeps the plan as cancelled', async ({ page 
   await expect(page.getByRole('button', { name: 'Restart' })).toBeVisible();
 
   // Off the month: nothing coming from a cancelled plan.
-  await page.getByRole('button', { name: 'Month' }).click();
+  await page.getByRole('button', { name: 'Back' }).click();
   await expect(page.getByRole('link', { name: /Next up/ })).toHaveCount(0);
 });
 

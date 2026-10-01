@@ -38,6 +38,10 @@ export interface Category {
 
 // Plan history (price changes, pauses, cancellations) is a list of events, so
 // "what did this cost me" and "what have I saved" are always computed, never stored twice.
+// `on` is the calendar day it applies from; `at` is when it was recorded
+// (ms), which orders several changes made on the same day.
 export type PlanEvent =
-  | { id: string; planId: string; on: Day; kind: 'price'; from: Paise; to: Paise }
-  | { id: string; planId: string; on: Day; kind: 'paused' | 'resumed' | 'cancelled' | 'restarted' };
+  | { id: string; planId: string; on: Day; at: number; kind: 'price'; from: Paise; to: Paise }
+  | { id: string; planId: string; on: Day; at: number; kind: 'paused' | 'resumed' | 'cancelled' | 'restarted' };
+
+export const byWhen = (a: PlanEvent, b: PlanEvent) => (a.on < b.on ? -1 : a.on > b.on ? 1 : a.at - b.at);

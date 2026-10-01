@@ -3,7 +3,7 @@
 // backfill, nothing to duplicate, nothing billed while paused.
 import { datesUntil, type Day } from './dates.ts';
 import type { Paise } from './money.ts';
-import type { Plan, PlanEvent } from './model.ts';
+import { byWhen, type Plan, type PlanEvent } from './model.ts';
 
 export interface Renewal {
   planId: string;
@@ -17,7 +17,7 @@ export interface Renewal {
 export function priceOn(plan: Plan, events: readonly PlanEvent[], on: Day): Paise {
   const changes = events
     .filter((e): e is Extract<PlanEvent, { kind: 'price' }> => e.planId === plan.id && e.kind === 'price')
-    .sort((a, b) => (a.on < b.on ? -1 : 1));
+    .sort(byWhen);
   if (!changes.length) return plan.price;
   let price = changes[0]!.from;
   for (const c of changes) if (c.on <= on) price = c.to;
@@ -28,7 +28,7 @@ export function priceOn(plan: Plan, events: readonly PlanEvent[], on: Day): Pais
 function stoppedSpans(planId: string, events: readonly PlanEvent[]): Array<[Day, Day | null]> {
   const spans: Array<[Day, Day | null]> = [];
   let stoppedAt: Day | null = null;
-  for (const e of [...events].filter(e => e.planId === planId).sort((a, b) => (a.on < b.on ? -1 : 1))) {
+  for (const e of events.filter(e => e.planId === planId).sort(byWhen)) {
     if ((e.kind === 'paused' || e.kind === 'cancelled') && !stoppedAt) stoppedAt = e.on;
     if ((e.kind === 'resumed' || e.kind === 'restarted') && stoppedAt) {
       spans.push([stoppedAt, e.on]);

@@ -18,7 +18,7 @@ const plans = [
   plan({ id: 'airtel', name: 'Airtel', price: paise(34900), anchor: d('2026-09-29'), cycle: { unit: 'day', every: 28 } }),
   plan({ id: 'gym', name: 'Gym', anchor: d('2026-01-10'), status: 'cancelled' }),
 ];
-const events: PlanEvent[] = [{ id: 'g', planId: 'gym', on: d('2026-06-01'), kind: 'cancelled' }];
+const events: PlanEvent[] = [{ id: 'g', planId: 'gym', on: d('2026-06-01'), at: 1, kind: 'cancelled' }];
 const payments = [pay('2026-10-12', 120000), pay('2026-09-30', 99999)];
 
 describe('monthRing', () => {
@@ -61,8 +61,8 @@ describe('month comparisons and tiles', () => {
 
   it('price creep is the biggest recent rise on a live plan, per year', () => {
     const rises: PlanEvent[] = [
-      { id: 'a', planId: 'netflix', on: d('2026-10-01'), kind: 'price', from: paise(14900), to: paise(19900) },
-      { id: 'b', planId: 'icloud', on: d('2026-03-01'), kind: 'price', from: paise(5000), to: paise(7500) }, // too old
+      { id: 'a', planId: 'netflix', on: d('2026-10-01'), at: 1, kind: 'price', from: paise(14900), to: paise(19900) },
+      { id: 'b', planId: 'icloud', on: d('2026-03-01'), at: 2, kind: 'price', from: paise(5000), to: paise(7500) }, // too old
     ];
     expect(priceCreep(today, plans, rises)).toMatchObject({ plan: { name: 'Netflix' }, perYear: 60000 });
     expect(priceCreep(today, plans, [])).toBeNull();

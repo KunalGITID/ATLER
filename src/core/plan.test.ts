@@ -9,7 +9,8 @@ const netflix: Plan = {
   id: 'n', name: 'Netflix', price: paise(19900), cycle: MONTHLY, anchor: d('2026-01-19'), categoryId: null,
   status: 'active', trialEnds: null, remind: 'off', createdOn: d('2026-01-19'),
 };
-const ev = (on: string, kind: PlanEvent['kind'], extra: object = {}) => ({ id: on + kind, planId: 'n', on: d(on), kind, ...extra }) as PlanEvent;
+let seq = 0;
+const ev = (on: string, kind: PlanEvent['kind'], extra: object = {}) => ({ id: on + kind, planId: 'n', on: d(on), at: ++seq, kind, ...extra }) as PlanEvent;
 const today = d('2026-10-18');
 
 describe('planView', () => {

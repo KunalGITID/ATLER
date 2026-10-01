@@ -7,6 +7,8 @@ import { AddSheet } from './screens/AddSheet.tsx';
 import { Month } from './screens/Month.tsx';
 import { SignIn } from './screens/SignIn.tsx';
 import { PlanDetails } from './screens/PlanDetails.tsx';
+import { Plans } from './screens/Plans.tsx';
+import { You } from './screens/You.tsx';
 import { useRoute } from './route.ts';
 
 export function App() {
@@ -31,7 +33,6 @@ function SignedIn({ session }: { session: Session }) {
   const db = useMemo(() => dbFor(session.user.id), [session.user.id]);
   const data = useLiveQuery(() => readAll(db), [db]);
   const [adding, setAdding] = useState(false);
-  const [menu, setMenu] = useState(false);
   const route = useRoute();
 
   useEffect(() => { window.atlerLaunch?.step(0.85, 'Opening your data…'); }, []);
@@ -43,38 +44,30 @@ function SignedIn({ session }: { session: Session }) {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col px-4 pt-[max(16px,env(safe-area-inset-top))] pb-32">
-      <header className="relative flex items-center justify-between px-1 pt-2 pb-3">
+      <header className="flex items-center justify-between px-1 pt-2 pb-3">
         <div className="font-display text-xl leading-none font-bold tracking-[0.08em]">ATLER</div>
-        <button
-          type="button"
-          aria-label={`Account: ${who}`}
-          aria-expanded={menu}
-          onClick={() => setMenu(m => !m)}
-          className="flex size-[38px] items-center justify-center rounded-xl bg-block-2 font-extrabold"
-        >
+        <a href="#/you" aria-label={`You: ${who}`} className="flex size-[38px] items-center justify-center rounded-xl bg-block-2 font-extrabold text-ink no-underline">
           {who.charAt(0).toUpperCase()}
-        </button>
-        {menu && (
-          <div className="absolute top-14 right-1 z-10 w-60 rounded-tile bg-block-2 p-3 shadow-2xl">
-            <div className="truncate px-1 pb-2 text-sm text-ink-2">{session.user.email}</div>
-            <button type="button" onClick={() => supabase.auth.signOut()} className="h-11 w-full rounded-control bg-block text-sm font-bold text-danger">Sign out</button>
-          </div>
-        )}
+        </a>
       </header>
 
       <main>
-        {route.name === 'plan' && plan
-          ? <PlanDetails db={db} plan={plan} events={data.events.filter(e => e.planId === plan.id)} />
-          : (
-            <>
-              <h1 className="sr-only">Your month</h1>
-              <Month plans={data.plans} events={data.events} payments={data.payments} onAdd={() => setAdding(true)} />
-            </>
-          )}
+        {route.name === 'plan' && plan ? <PlanDetails db={db} plan={plan} events={data.events.filter(e => e.planId === plan.id)} />
+          : route.name === 'plans' ? <><h1 className="sr-only">Your plans</h1><Plans plans={data.plans} events={data.events} onAdd={() => setAdding(true)} /></>
+          : route.name === 'you' ? <><h1 className="sr-only">You</h1><You db={db} session={session} /></>
+          : <><h1 className="sr-only">Your month</h1><Month plans={data.plans} events={data.events} payments={data.payments} onAdd={() => setAdding(true)} /></>}
       </main>
 
       <nav aria-label="Main" className="fixed bottom-[max(20px,env(safe-area-inset-bottom))] left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-block-2 p-2">
-        <a href="#/" aria-current={route.name === 'month' ? 'page' : undefined} className={`flex h-11 items-center rounded-full px-5 text-[13px] font-extrabold ${route.name === 'month' ? 'bg-here text-on-color' : 'text-ink'}`}>Month</a>
+        {([['#/', 'month', 'Month'], ['#/plans', 'plans', 'Plans'], ['#/you', 'you', 'You']] as const).map(([href, name, label]) => {
+          const here = route.name === name;
+          return (
+            <a key={name} href={href} aria-current={here ? 'page' : undefined}
+              className={`flex h-11 items-center rounded-full px-4 text-[13px] no-underline ${here ? 'bg-here font-extrabold text-on-color' : 'font-bold text-ink'}`}>
+              {label}
+            </a>
+          );
+        })}
         <button type="button" aria-label="Add a plan or expense" onClick={() => setAdding(true)} className="flex size-11 items-center justify-center rounded-full bg-money text-on-color">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
         </button>

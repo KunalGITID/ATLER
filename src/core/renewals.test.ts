@@ -9,7 +9,8 @@ const plan: Plan = {
   id: 'n', name: 'Netflix', price: paise(19900), cycle: MONTHLY, anchor: d('2026-01-19'), categoryId: null,
   status: 'active', trialEnds: null, remind: 'off', createdOn: d('2026-01-19'),
 };
-const ev = (on: string, kind: PlanEvent['kind'], extra: object = {}) => ({ id: on + kind, planId: 'n', on: d(on), kind, ...extra }) as PlanEvent;
+let seq = 0;
+const ev = (on: string, kind: PlanEvent['kind'], extra: object = {}) => ({ id: on + kind, planId: 'n', on: d(on), at: ++seq, kind, ...extra }) as PlanEvent;
 
 describe('renewalsBetween', () => {
   it('lists every charge in the window', () => {
@@ -35,5 +36,18 @@ describe('renewalsBetween', () => {
   it('a trial charges from the day it ends', () => {
     const trial = { ...plan, status: 'trial' as const, trialEnds: d('2026-10-25') };
     expect(renewalsBetween(trial, [], d('2026-10-01'), d('2026-11-30')).map(r => r.on)).toEqual(['2026-10-25', '2026-11-25']);
+  });
+
+  it('several changes on one day apply in the order they were made', () => {
+    // paused, resumed, then cancelled — all on the 1st. Written out of order on purpose.
+    const sameDay = [
+      { ...ev('2026-10-01', 'cancelled'), at: 30 },
+      { ...ev('2026-10-01', 'paused'), at: 10 },
+      { ...ev('2026-10-01', 'resumed'), at: 20 },
+    ] as PlanEvent[];
+    expect(renewalsBetween(plan, sameDay, d('2026-10-01'), d('2026-12-31'))).toEqual([]);
+    // and the reverse story: cancelled, then restarted the same day -> billing continues
+    const restarted = [{ ...ev('2026-10-01', 'cancelled'), at: 1 }, { ...ev('2026-10-01', 'restarted'), at: 2 }] as PlanEvent[];
+    expect(renewalsBetween(plan, restarted, d('2026-10-01'), d('2026-11-30')).map(r => r.on)).toEqual(['2026-10-19', '2026-11-19']);
   });
 });

@@ -1,7 +1,7 @@
 // What the plan details screen shows. Pure: plan + its events + today.
 import { addDays, cycleProgress, monthlyCost, nthDate, type Day } from './dates.ts';
 import { paise, sum, type Paise } from './money.ts';
-import type { Plan, PlanEvent } from './model.ts';
+import { byWhen, type Plan, type PlanEvent } from './model.ts';
 import { renewalsBetween, type Renewal } from './renewals.ts';
 
 export interface PlanView {
@@ -16,7 +16,7 @@ export interface PlanView {
 }
 
 const lastStop = (plan: Plan, events: readonly PlanEvent[]) =>
-  [...events].filter(e => e.planId === plan.id && (e.kind === 'paused' || e.kind === 'cancelled')).sort((a, b) => (a.on < b.on ? 1 : -1))[0]?.on ?? null;
+  events.filter(e => e.planId === plan.id && (e.kind === 'paused' || e.kind === 'cancelled')).sort(byWhen).at(-1)?.on ?? null;
 
 export function planView(plan: Plan, events: readonly PlanEvent[], today: Day): PlanView {
   const billing = plan.status === 'active' || plan.status === 'trial';
