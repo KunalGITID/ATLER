@@ -9,6 +9,7 @@ import {
     getMonthlyCost,
     getNextRenewalDate,
     getUnloggedRenewals,
+    getResumeLoggedThrough,
     isWithinRange,
     formatCycle,
     todayISO,
@@ -171,6 +172,19 @@ function debounce(fn, delay = 600) {
     };
 }
 
+// One timer per record id. A shared timer would drop every write but the
+// last when several different records change within the delay.
+function debounceById(fn, delay = 600) {
+    const timers = new Map();
+    return item => {
+        clearTimeout(timers.get(item.id));
+        timers.set(item.id, setTimeout(() => {
+            timers.delete(item.id);
+            fn(item);
+        }, delay));
+    };
+}
+
 let _toastTimer = null;
 function showToast(message, duration = 2200) {
     const el = document.getElementById('toast');
@@ -207,9 +221,11 @@ function showConfirm(message, onConfirm) {
 
 confirmOkBtn?.addEventListener('click', async () => {
     const handler = confirmHandler;
+    // Close first: a second tap while the handler awaits the network would
+    // otherwise run the delete/import twice.
+    closeConfirm();
     haptic('medium');
     if (handler) await handler();
-    closeConfirm();
 });
 
 confirmCancelBtn?.addEventListener('click', () => {
@@ -547,10 +563,14 @@ document.getElementById('signout-btn').addEventListener('click', async () => {
     // Fallback: forcefully wipe local storage in case the token is corrupted and the API rejects it
     localStorage.clear();
 
-    try {
-        await sb.auth.signOut();
-    } catch (err) {
-        console.error('[Atler] signOut API error, forcing local reload:', err);
+    const signOutError = await sb.auth.signOut()
+        .then(({ error }) => error)
+        .catch(err => err);
+    if (signOutError) {
+        // Offline or the server rejected the call: supabase-js then keeps the
+        // session, so drop it from our IndexedDB store ourselves.
+        console.error('[Atler] signOut failed, clearing the local session:', signOutError);
+        await IdbStorage.removeItem(`sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`);
     }
 
     // Guarantee they are evicted
@@ -726,9 +746,8 @@ async function ensureUserProfile(user = currentUser) {
 }
 
 async function upsertSubscription(sub) {
-    if (!currentUser) return;
-    console.log('[Atler] upsertSubscription — saving:', sub.name, 'user:', currentUser.id);
-    const { error } = await sbWrite(() => sb.from('subscriptions').upsert({
+    if (!currentUser) return { error: new Error('Not signed in') };
+    return sbWrite(() => sb.from('subscriptions').upsert({
         id: sub.id,
         user_id: currentUser.id,
         name: sub.name,
@@ -741,8 +760,6 @@ async function upsertSubscription(sub) {
         paused: sub.paused || false,
         reminder: sub.reminder || 'none',
     }));
-    if (error) console.error('[Atler] upsertSubscription FAILED:', error);
-    else console.log('[Atler] upsertSubscription SUCCESS:', sub.name);
 }
 
 function isAutoExpenseOf(exp, subId) {
@@ -768,8 +785,8 @@ async function deleteSubscription(id) {
 }
 
 async function upsertCategory(cat) {
-    if (!currentUser) return;
-    await sbWrite(() => sb.from('categories').upsert({
+    if (!currentUser) return { error: new Error('Not signed in') };
+    return sbWrite(() => sb.from('categories').upsert({
         id: cat.id,
         user_id: currentUser.id,
         name: cat.name,
@@ -796,8 +813,8 @@ window.deleteCategory = async function (id) {
 };
 
 async function insertExpense(exp) {
-    if (!currentUser) return;
-    await sbWrite(() => sb.from('expenses').insert({
+    if (!currentUser) return { error: new Error('Not signed in') };
+    return sbWrite(() => sb.from('expenses').insert({
         id: exp.id,
         user_id: currentUser.id,
         name: exp.name,
@@ -825,8 +842,8 @@ async function insertExpenses(exps) {
 }
 
 async function updateExpense(exp) {
-    if (!currentUser) return;
-    await sbWrite(() => sb
+    if (!currentUser) return { error: new Error('Not signed in') };
+    return sbWrite(() => sb
         .from('expenses')
         .update({
             name: exp.name,
@@ -856,8 +873,8 @@ async function clearAllData() {
     return true;
 }
 
-const debouncedUpsertSub = debounce(upsertSubscription, 600);
-const debouncedUpsertCat = debounce(upsertCategory, 600);
+const debouncedUpsertSub = debounceById(upsertSubscription, 600);
+const debouncedUpsertCat = debounceById(upsertCategory, 600);
 const debouncedSaveProfile = debounce(saveProfile, 800);
 
 // ═══════════════════════════════════════════
@@ -1522,7 +1539,15 @@ function renderNotificationOverview() {
 // ═══════════════════════════════════════════
 // Logs every renewal the user hasn't seen yet — not just the latest one —
 // so months where the app wasn't opened still show up in spending.
-async function autoLogRenewals() {
+// Runs are queued: two overlapping runs (startup + an add) would both see the
+// same renewal as missing and push it into the local list twice.
+let autoLogQueue = Promise.resolve();
+function autoLogRenewals() {
+    autoLogQueue = autoLogQueue.then(runAutoLogRenewals, runAutoLogRenewals);
+    return autoLogQueue;
+}
+
+async function runAutoLogRenewals() {
     const today = normalizeDateOnly(new Date());
     for (const sub of subscriptions) {
         if (sub.paused) continue;
@@ -1650,10 +1675,10 @@ function viewDetails(id) {
     const nextRenewal = getNextRenewalDate(anchor, sub.cycle);
     const category = categories.find(c => c.id === sub.category);
     const monthlyEquivalent = getMonthlyCost(sub);
-    const yearsActive = Math.max(0, (Date.now() - parseDateValue(anchor).getTime()) / (1000 * 60 * 60 * 24 * 365));
-    const spentSoFar = sub.cycle === 'Yearly'
-        ? parseFloat(sub.price) * Math.max(1, Math.ceil(yearsActive))
-        : monthlyEquivalent * Math.max(1, Math.ceil(((Date.now() - parseDateValue(anchor).getTime()) / (1000 * 60 * 60 * 24 * 30))));
+    // What was actually logged for this plan, not an estimate from its age.
+    const spentSoFar = expenses
+        .filter(exp => isAutoExpenseOf(exp, sub.id))
+        .reduce((sum, exp) => sum + parseFloat(exp.amount), 0);
     const budget = category?.budget ? parseFloat(category.budget) : null;
     const budgetPressure = budget
         ? `${Math.round((monthlyEquivalent / budget) * 100)}% of ${getCurrencySymbol()}${formatAmount(budget)}`
@@ -1718,6 +1743,21 @@ document.getElementById('edit-cycle').addEventListener('change', e => {
     document.getElementById('edit-custom-days-group').style.display = e.target.value === 'Custom' ? 'block' : 'none';
 });
 
+async function saveSubscriptionEdit(sub, name, cycle, reminder) {
+    const update = {
+        ...sub,
+        name,
+        cycle,
+        price: parseFloat(document.getElementById('edit-price').value).toFixed(2),
+        startDate: document.getElementById('edit-start-date').value || sub.startDate,
+        reminder,
+    };
+    if ((await upsertSubscription(update)).error) return false;
+    Object.assign(sub, update);
+    await autoLogRenewals();
+    return true;
+}
+
 // Edit form submit
 document.getElementById('edit-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -1734,12 +1774,7 @@ document.getElementById('edit-form').addEventListener('submit', async e => {
     const duplicate = subscriptions.find(s => s.id !== activeSubId && s.name.toLowerCase().trim() === editedName.toLowerCase().trim());
     if (duplicate) {
         showConfirm(`Another subscription called ${editedName} already exists. You can still save this one if it is a separate plan.`, async () => {
-            sub.name = editedName;
-            sub.cycle = cycle;
-            sub.price = parseFloat(document.getElementById('edit-price').value).toFixed(2);
-            sub.startDate = document.getElementById('edit-start-date').value || sub.startDate;
-            sub.reminder = selectedReminder;
-            await upsertSubscription(sub);
+            if (!await saveSubscriptionEdit(sub, editedName, cycle, selectedReminder)) return;
 
             document.getElementById('detail-name').textContent = sub.name;
             document.getElementById('detail-cycle').textContent = formatCycle(sub.cycle) + ' Plan';
@@ -1754,12 +1789,7 @@ document.getElementById('edit-form').addEventListener('submit', async e => {
         });
         return;
     }
-    sub.name = editedName;
-    sub.cycle = cycle;
-    sub.price = parseFloat(document.getElementById('edit-price').value).toFixed(2);
-    sub.startDate = document.getElementById('edit-start-date').value || sub.startDate;
-    sub.reminder = selectedReminder;
-    await upsertSubscription(sub);
+    if (!await saveSubscriptionEdit(sub, editedName, cycle, selectedReminder)) return;
 
     // Refresh detail view
     document.getElementById('detail-name').textContent = sub.name;
@@ -1774,12 +1804,25 @@ document.getElementById('edit-form').addEventListener('submit', async e => {
     setTimeout(() => { btn.textContent = 'Save Changes'; }, 1500);
 });
 
+// Pausing means "not paying". On resume, mark every renewal that fell inside
+// the pause as already handled so autoLogRenewals doesn't bill for it; the
+// next renewal from today on is logged as usual.
+async function togglePaused(sub) {
+    const update = { ...sub, paused: !sub.paused };
+    if (!update.paused) {
+        const loggedThrough = getResumeLoggedThrough(sub);
+        if (loggedThrough) update.lastLoggedRenewal = loggedThrough;
+    }
+    if ((await upsertSubscription(update)).error) return false;
+    Object.assign(sub, update);
+    if (!sub.paused) await autoLogRenewals();
+    return true;
+}
+
 // Pause button
 document.getElementById('pause-sub-btn').addEventListener('click', async () => {
     const sub = subscriptions.find(s => s.id === activeSubId);
-    if (!sub) return;
-    sub.paused = !sub.paused;
-    await upsertSubscription(sub);
+    if (!sub || !await togglePaused(sub)) return;
     haptic('medium');
     document.getElementById('pause-icon').textContent = sub.paused ? 'play_arrow' : 'pause';
     document.getElementById('pause-label').textContent = sub.paused ? 'Resume Subscription' : 'Pause Subscription';
@@ -2040,6 +2083,26 @@ document.getElementById('notif-toggle-btn').addEventListener('click', async () =
     showNotificationPrompt();
 });
 
+// The avatar is stored inline in profiles.avatar and loaded on every start,
+// so a phone photo (several MB as base64) is cut down to a small JPEG first.
+function shrinkImage(file, maxSize) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('bad image')); };
+        img.src = url;
+    });
+}
+
 document.getElementById('profile-avatar-circle').addEventListener('click', () => {
     document.getElementById('avatar-file-input').click();
 });
@@ -2047,14 +2110,13 @@ document.getElementById('profile-avatar-circle').addEventListener('click', () =>
 document.getElementById('avatar-file-input').addEventListener('change', function () {
     const file = this.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async function (e) {
-        profile.avatar = e.target.result;
-        document.getElementById('profile-avatar-preview').src = e.target.result;
-        document.getElementById('user-avatar-img').src = e.target.result;
+    this.value = '';
+    shrinkImage(file, 256).then(async dataUrl => {
+        profile.avatar = dataUrl;
+        document.getElementById('profile-avatar-preview').src = dataUrl;
+        document.getElementById('user-avatar-img').src = dataUrl;
         await saveProfile();
-    };
-    reader.readAsDataURL(file);
+    }).catch(() => showToast('Could not read that image'));
 });
 
 document.getElementById('profile-name-save').addEventListener('click', async () => {
@@ -2364,8 +2426,9 @@ addForm.addEventListener('submit', async e => {
                     category: 'unlisted',
                     paused: false,
                 };
+                if ((await upsertSubscription(newSub)).error) return;
                 subscriptions.push(newSub);
-                await upsertSubscription(newSub);
+                await autoLogRenewals();
                 haptic('success');
                 addForm.reset();
                 document.getElementById('add-start-date').value = todayISO();
@@ -2400,8 +2463,9 @@ addForm.addEventListener('submit', async e => {
             category: 'unlisted',
             paused: false,
         };
+        if ((await upsertSubscription(newSub)).error) return;
         subscriptions.push(newSub);
-        await upsertSubscription(newSub);
+        await autoLogRenewals();
         haptic('success');
         addForm.reset();
         document.getElementById('add-start-date').value = todayISO();
@@ -2441,8 +2505,8 @@ addExpenseForm.addEventListener('submit', async e => {
 
     try {
         const newExp = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, name, amount: parseFloat(amount), date, type: 'manual' };
+        if ((await insertExpense(newExp)).error) return;
         expenses.push(newExp);
-        await insertExpense(newExp);
         haptic('success');
         addExpenseForm.reset();
         document.getElementById('exp-date').value = todayISO();
@@ -2481,10 +2545,9 @@ document.getElementById('sheet-edit-expense-form').addEventListener('submit', as
     submitBtn.textContent = 'Saving...';
 
     try {
-        expense.name = name;
-        expense.amount = parseFloat(amount);
-        expense.date = date;
-        await updateExpense(expense);
+        const edited = { ...expense, name, amount: parseFloat(amount), date };
+        if ((await updateExpense(edited)).error) return;
+        Object.assign(expense, edited);
         haptic('success');
         closeAddSheet();
         await renderApp();
@@ -2511,7 +2574,8 @@ document.getElementById('edit-expense-delete-confirm-btn')?.addEventListener('cl
     if (!activeSheetExpenseId || !currentUser) return;
     const expenseId = activeSheetExpenseId;
     haptic('error');
-    await sbWrite(() => sb.from('expenses').delete().eq('id', expenseId).eq('user_id', currentUser.id));
+    const { error } = await sbWrite(() => sb.from('expenses').delete().eq('id', expenseId).eq('user_id', currentUser.id));
+    if (error) return;
     expenses = expenses.filter(exp => exp.id !== expenseId);
     closeAddSheet();
     await renderApp();
@@ -3239,8 +3303,8 @@ async function addCategoryFn(name) {
     name = name.trim();
     if (!name || categories.find(c => c.name.toLowerCase() === name.toLowerCase())) return;
     const cat = { id: 'cat_' + Date.now(), name };
+    if ((await upsertCategory(cat)).error) return;
     categories.push(cat);
-    debouncedUpsertCat(cat);
     document.getElementById('add-category-input').value = '';
     renderAnalytics();
     showToast('Category added');
@@ -3501,8 +3565,7 @@ if (sb) sb.auth.onAuthStateChange((event, session) => {
         const sub = subscriptions.find(s => s.id === ctxSubId);
         if (!sub) return;
         closeCtx();
-        sub.paused = !sub.paused;
-        await upsertSubscription(sub);
+        if (!await togglePaused(sub)) return;
         showToast(sub.paused ? 'Subscription paused' : 'Subscription resumed');
         renderApp();
     });

@@ -140,15 +140,28 @@ export function formatCycle(cycle) {
 
 export function todayISO() { return getLocalDateKey(new Date()); }
 
-// Renewals that should become expenses: on or after the day the subscription
-// was added (no backfilling history before the user tracked it) and after the
-// last one already logged.
+// Renewals that should become expenses. History before the user started
+// tracking isn't backfilled, but the charge for the period they were in when
+// they added it is (a plan billed on the 10th and added on the 15th has been
+// paid this month). Anything already logged is skipped.
 export function getUnloggedRenewals(sub, today = new Date()) {
     const anchor = sub.startDate || sub.dateAdded;
-    const added = normalizeDateOnly(sub.dateAdded);
+    const firstCounted = getLastRenewalDate(anchor, sub.cycle, sub.dateAdded);
     const lastLogged = sub.lastLoggedRenewal ? normalizeDateOnly(sub.lastLoggedRenewal) : null;
     return getRenewalDatesUntil(anchor, sub.cycle, normalizeDateOnly(today))
-        .filter(d => d >= added && (!lastLogged || d > lastLogged));
+        .filter(d => d >= firstCounted && (!lastLogged || d > lastLogged));
+}
+
+// When a paused plan is resumed: the date to record as "logged through" so
+// renewals that fell inside the pause are never billed, or null if nothing
+// needs to change. A renewal due today still gets logged.
+export function getResumeLoggedThrough(sub, today = new Date()) {
+    const yesterday = normalizeDateOnly(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const last = getLastRenewalDate(sub.startDate || sub.dateAdded, sub.cycle, yesterday);
+    if (last > yesterday) return null;
+    const key = getLocalDateKey(last);
+    return !sub.lastLoggedRenewal || key > sub.lastLoggedRenewal ? key : null;
 }
 
 // Strict YYYY-MM-DD (a timestamp's date part is fine) that is a real calendar

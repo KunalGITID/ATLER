@@ -6,6 +6,7 @@ import {
     getMonthlyCost,
     getNextRenewalDate,
     getRenewalDatesUntil,
+    getResumeLoggedThrough,
     getUnloggedRenewals,
     isWithinRange,
     normalizeCycle,
@@ -82,9 +83,14 @@ describe('getUnloggedRenewals', () => {
         expect(getUnloggedRenewals({ ...sub, lastLoggedRenewal: '2026-05-10' }, day(2026, 5, 15))).toEqual([]);
     });
 
-    it('never logs renewals from before the subscription was added', () => {
+    it('starts from the period the plan was in when it was added', () => {
         const old = { cycle: 'Monthly', startDate: '2025-06-05', dateAdded: '2026-03-01', lastLoggedRenewal: null };
-        expect(keys(getUnloggedRenewals(old, day(2026, 4, 20)))).toEqual(['2026-03-05', '2026-04-05']);
+        expect(keys(getUnloggedRenewals(old, day(2026, 4, 20)))).toEqual(['2026-02-05', '2026-03-05', '2026-04-05']);
+    });
+
+    it('counts this month when added a few days after the billing date', () => {
+        const sub = { cycle: 'Monthly', startDate: '2026-01-10', dateAdded: '2026-10-15T09:00:00', lastLoggedRenewal: null };
+        expect(keys(getUnloggedRenewals(sub, day(2026, 10, 15)))).toEqual(['2026-10-10']);
     });
 
     it('logs the start date itself on the day it is added', () => {
@@ -148,5 +154,24 @@ describe('import validation', () => {
         ['1.5', null],
     ])('normalizeCycle(%j) -> %j', (input, expected) => {
         expect(normalizeCycle(input)).toBe(expected);
+    });
+});
+
+describe('getResumeLoggedThrough', () => {
+    const sub = { cycle: 'Monthly', startDate: '2026-01-10', dateAdded: '2026-01-10', lastLoggedRenewal: '2026-03-10' };
+
+    it('skips the renewals that fell inside the pause', () => {
+        expect(getResumeLoggedThrough(sub, day(2026, 6, 20))).toBe('2026-06-10');
+        const resumed = { ...sub, lastLoggedRenewal: '2026-06-10' };
+        expect(keys(getUnloggedRenewals(resumed, day(2026, 6, 20)))).toEqual([]);
+        expect(keys(getUnloggedRenewals(resumed, day(2026, 7, 10)))).toEqual(['2026-07-10']);
+    });
+
+    it('still bills a renewal that is due on the resume day', () => {
+        expect(getResumeLoggedThrough(sub, day(2026, 6, 10))).toBe('2026-05-10');
+    });
+
+    it('changes nothing when no renewal was missed', () => {
+        expect(getResumeLoggedThrough(sub, day(2026, 3, 20))).toBeNull();
     });
 });
