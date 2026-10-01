@@ -2331,3 +2331,9 @@ button.list-item {
   flex: 1;
   margin: 0;
 }
+
+.budget-card-split {
+  font-size: 0.78rem;
+  color: var(--on-surface-variant);
+  margin: -2px 0 10px;
+}
