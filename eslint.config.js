@@ -17,7 +17,7 @@ export default [
     languageOptions: { globals: { ...globals.serviceworker, __ASSETS__: 'readonly' } },
   },
   {
-    files: ['*.config.js', 'test/**'],
+    files: ['*.config.js', 'test/**', 'e2e/**'],
     languageOptions: { globals: { ...globals.node } },
   },
 ];
