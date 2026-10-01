@@ -1216,6 +1216,10 @@
         <div class="statement-sheet" role="dialog" aria-modal="true" aria-labelledby="statement-title">
             <div class="statement-title" id="statement-title">Found in your statement</div>
             <div class="data-modal-hint" id="statement-summary"></div>
+            <form id="statement-password-form" class="statement-password" style="display:none;">
+                <input type="password" id="statement-password" placeholder="PDF password" autocomplete="off">
+                <button type="submit" class="btn-primary">Open</button>
+            </form>
             <div id="statement-list" class="statement-list"></div>
             <div class="statement-actions">
                 <button type="button" class="btn" id="statement-cancel-btn">Cancel</button>
@@ -1263,9 +1267,9 @@
                 subscriptions in a bank statement
             </button>
             <div class="data-modal-hint">
-                Pick your bank's CSV statement. It is read on this device only and never uploaded.
+                Pick your bank's statement as CSV or PDF. It is read on this device only and never uploaded.
             </div>
-            <input type="file" id="statement-file-input" accept=".csv,text/csv" style="display:none;">
+            <input type="file" id="statement-file-input" accept=".csv,text/csv,.pdf,application/pdf" style="display:none;">
             <button id="dm-clear-btn"
                 style="display:flex;align-items:center;gap:12px;background:var(--error-bg);border:1px solid var(--error);color:var(--error);padding:14px 16px;border-radius:var(--radius-md);font-size:0.92rem;font-family:var(--font-body);cursor:pointer;width:100%;text-align:left;">
                 <span class="material-symbols-outlined" style="font-size:20px;">delete_forever</span>Clear All Data

@@ -2622,22 +2622,62 @@ document.getElementById('dm-statement-btn').addEventListener('click', () => {
     document.getElementById('statement-file-input').click();
 });
 
+let pendingPdf = null;
+
+const isPdf = file => file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+
+async function scanStatement(file, password) {
+    try {
+        const text = isPdf(file)
+            ? await (await import('./lib/pdf-statement.js')).pdfStatementToCsv(file, password)
+            : await file.text();
+        const debits = readStatement(text);
+        pendingPdf = null;
+        statementFound = findRecurring(debits, { existingNames: subscriptions.map(s => s.name) });
+        openStatementResults(debits.length);
+    } catch (err) {
+        if (err.code === 'PDF_PASSWORD') {
+            pendingPdf = file;
+            askStatementPassword(err.message);
+            return;
+        }
+        showToast(err.message || 'Could not read that statement', 4000);
+    }
+}
+
+// Many Indian banks lock statement PDFs (often with your date of birth or customer ID).
+function askStatementPassword(message) {
+    statementFound = [];
+    document.getElementById('statement-title').textContent = 'Password needed';
+    document.getElementById('statement-summary').textContent = `${message} Banks usually use your date of birth or customer ID; check the email it came with.`;
+    document.getElementById('statement-list').innerHTML = '';
+    document.getElementById('statement-password-form').style.display = 'flex';
+    document.getElementById('statement-add-btn').style.display = 'none';
+    document.getElementById('statement-overlay').style.display = 'flex';
+    document.getElementById('statement-password').value = '';
+    document.getElementById('statement-password').focus();
+}
+
+document.getElementById('statement-password-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const password = document.getElementById('statement-password').value;
+    if (pendingPdf && password) scanStatement(pendingPdf, password);
+});
+
 document.getElementById('statement-file-input').addEventListener('change', async function () {
     const file = this.files[0];
     this.value = '';
     if (!file) return;
     closeDataModal();
-    try {
-        const debits = readStatement(await file.text());
-        statementFound = findRecurring(debits, { existingNames: subscriptions.map(s => s.name) });
-        openStatementResults(debits.length);
-    } catch (err) {
-        showToast(err.message || 'Could not read that statement', 4000);
-    }
+    if (isPdf(file)) showToast('Reading PDF…');
+    await scanStatement(file);
 });
 
 function openStatementResults(debitCount) {
     const list = document.getElementById('statement-list');
+    document.getElementById('statement-title').textContent = 'Found in your statement';
+    document.getElementById('statement-password-form').style.display = 'none';
+    document.getElementById('statement-add-btn').style.display = '';
     document.getElementById('statement-summary').textContent = statementFound.length
         ? `${statementFound.length} repeating charge${statementFound.length > 1 ? 's' : ''} in ${debitCount} debits. Untick anything that isn't a subscription.`
         : `No repeating charges found in ${debitCount} debits. A statement covering 3+ months works best.`;
@@ -2671,6 +2711,7 @@ function updateStatementAddButton() {
 function closeStatementResults() {
     document.getElementById('statement-overlay').style.display = 'none';
     statementFound = [];
+    pendingPdf = null;
 }
 
 document.getElementById('statement-list').addEventListener('change', updateStatementAddButton);
