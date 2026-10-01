@@ -17,7 +17,12 @@ time zone, and `sent_reminders` stops repeats.
    ```bash
    supabase functions deploy send-reminders --project-ref cnxurdingdhhdcjgujkz --no-verify-jwt
    ```
-4. **Schedule:** put the CRON_SECRET into `cron.sql` and run it in the SQL editor.
+4. **Schedule:** store the same CRON_SECRET in Vault, then run
+   `supabase/migrations/006_schedule_send_reminders.sql`:
+   ```sql
+   select vault.create_secret('<CRON_SECRET>', 'atler_cron_secret');
+   ```
+   Check a run with `select status_code, content from net._http_response order by id desc limit 1;`
 
 Try it without waiting for the hour:
 ```bash

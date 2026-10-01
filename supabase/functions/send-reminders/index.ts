@@ -1,5 +1,5 @@
 // Supabase Edge Function: send-reminders
-// Called hourly by pg_cron (cron.sql). For every user with a push
+// Called hourly by pg_cron (migration 006). For every user with a push
 // subscription, once their local time is past 9 AM, sends the renewal
 // reminders due today. sent_reminders makes each one go out only once.
 import { createClient } from 'npm:@supabase/supabase-js@2';
