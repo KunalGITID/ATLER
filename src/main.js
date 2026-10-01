@@ -1,3 +1,20 @@
+import { createClient } from '@supabase/supabase-js';
+import './style.css';
+import {
+    parseDateValue,
+    getLocalDateKey,
+    getLocalDateTimeString,
+    formatDate,
+    normalizeDateOnly,
+    getMonthlyCost,
+    getNextRenewalDate,
+    getRenewalDatesUntil,
+    isWithinRange,
+    formatCycle,
+    todayISO,
+} from './lib/dates.js';
+import { toCsv, parseCsvRecords } from './lib/csv.js';
+
 // ═══════════════════════════════════════════
 // SUPABASE CONFIG
 // ═══════════════════════════════════════════
@@ -62,16 +79,14 @@ const IdbStorage = {
 
 // IndexedDB-backed storage adapter — survives PWA force-quit on iOS/Android
 // unlike localStorage which can be evicted by the OS on process kill.
-const sb = window.supabase?.createClient
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
-        auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-            detectSessionInUrl: true,
-            storage: IdbStorage,
-        }
-    })
-    : null;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
+    auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: IdbStorage,
+    }
+});
 
 // ═══════════════════════════════════════════
 // GLOBAL STATE
@@ -887,29 +902,6 @@ function wireEmptyStateActions(scope = document) {
         });
     });
 }
-function pad2(value) {
-    return String(value).padStart(2, '0');
-}
-function parseDateValue(dateLike) {
-    if (dateLike instanceof Date) return new Date(dateLike.getTime());
-    if (typeof dateLike === 'string') {
-        const match = dateLike.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (match) {
-            return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-        }
-    }
-    return new Date(dateLike);
-}
-function getLocalDateKey(date = new Date()) {
-    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
-}
-function getLocalDateTimeString(date = new Date()) {
-    return `${getLocalDateKey(date)}T${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
-}
-function formatDate(ds) {
-    return parseDateValue(ds).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-function todayISO() { return getLocalDateKey(new Date()); }
 
 function makeClientId(prefix = 'item') {
     if (window.crypto?.randomUUID) return `${prefix}_${window.crypto.randomUUID()}`;
@@ -926,71 +918,9 @@ function downloadTextFile(content, filename, mimeType = 'text/plain;charset=utf-
     URL.revokeObjectURL(url);
 }
 
-function csvEscape(value) {
-    const str = value == null ? '' : String(value);
-    if (/[",\n]/.test(str)) {
-        return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
-}
 
-function toCsv(rows, headers) {
-    const headerLine = headers.map(col => csvEscape(col.label)).join(',');
-    const lines = rows.map(row => headers.map(col => csvEscape(row[col.key])).join(','));
-    return [headerLine, ...lines].join('\n');
-}
 
-function parseCsv(text) {
-    const rows = [];
-    let row = [];
-    let value = '';
-    let inQuotes = false;
 
-    for (let i = 0; i < text.length; i++) {
-        const char = text[i];
-        const next = text[i + 1];
-        if (char === '"') {
-            if (inQuotes && next === '"') {
-                value += '"';
-                i++;
-            } else {
-                inQuotes = !inQuotes;
-            }
-        } else if (char === ',' && !inQuotes) {
-            row.push(value);
-            value = '';
-        } else if ((char === '\n' || char === '\r') && !inQuotes) {
-            if (char === '\r' && next === '\n') i++;
-            row.push(value);
-            if (row.some(cell => cell !== '')) rows.push(row);
-            row = [];
-            value = '';
-        } else {
-            value += char;
-        }
-    }
-
-    if (value !== '' || row.length) {
-        row.push(value);
-        if (row.some(cell => cell !== '')) rows.push(row);
-    }
-    return rows;
-}
-
-function parseCsvRecords(text) {
-    const rows = parseCsv(text.trim());
-    if (rows.length < 2) return [];
-    const headers = rows[0].map(h => String(h).trim());
-    return rows.slice(1)
-        .filter(row => row.some(cell => String(cell).trim() !== ''))
-        .map(row => {
-            const record = {};
-            headers.forEach((header, index) => {
-                record[header] = row[index] != null ? String(row[index]).trim() : '';
-            });
-            return record;
-        });
-}
 
 // ═══════════════════════════════════════════
 // CURRENCY HELPERS
@@ -1041,100 +971,10 @@ function formatAmount(amount) {
     return parseFloat(amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function normalizeDateOnly(dateLike) {
-    const d = parseDateValue(dateLike);
-    d.setHours(0, 0, 0, 0);
-    return d;
-}
 
-function addMonthsClamped(dateLike, months) {
-    const base = normalizeDateOnly(dateLike);
-    const originalDay = base.getDate();
-    const next = new Date(base);
-    next.setDate(1);
-    next.setMonth(next.getMonth() + months);
-    const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
-    next.setDate(Math.min(originalDay, lastDay));
-    return next;
-}
 
-function addYearsClamped(dateLike, years) {
-    const base = normalizeDateOnly(dateLike);
-    const originalDay = base.getDate();
-    const next = new Date(base);
-    next.setDate(1);
-    next.setFullYear(next.getFullYear() + years);
-    const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
-    next.setDate(Math.min(originalDay, lastDay));
-    return next;
-}
 
-function addBillingCycle(dateLike, cycle, step = 1) {
-    if (cycle === 'Monthly') return addMonthsClamped(dateLike, step);
-    if (cycle === 'Yearly') return addYearsClamped(dateLike, step);
-    const days = parseInt(cycle, 10);
-    const next = normalizeDateOnly(dateLike);
-    next.setDate(next.getDate() + ((Number.isFinite(days) && days > 0 ? days : 30) * step));
-    return next;
-}
 
-function getMonthlyCost(sub) {
-    const price = parseFloat(sub.price);
-    if (sub.cycle === 'Yearly') return price / 12;
-    if (sub.cycle === 'Monthly') return price;
-    const days = parseInt(sub.cycle);
-    if (!days || days <= 0) return price;
-    return (price / days) * 30;
-}
-// Renewal dates are always counted from the anchor (step n = anchor + n
-// cycles), never from the previous renewal — otherwise a plan started on the
-// 31st gets clamped to the 28th in February and stays on the 28th forever.
-function getNextRenewalDate(dateAdded, cycle, today = new Date()) {
-    const start = normalizeDateOnly(dateAdded);
-    const until = normalizeDateOnly(today);
-    let step = 0;
-    let next = start;
-    while (next <= until) {
-        step += 1;
-        next = addBillingCycle(start, cycle, step);
-    }
-    return next;
-}
-function getLastRenewalDate(dateAdded, cycle, today = new Date()) {
-    const start = normalizeDateOnly(dateAdded);
-    const until = normalizeDateOnly(today);
-    let step = 0;
-    let last = start;
-    let next = addBillingCycle(start, cycle, 1);
-    while (next <= until) {
-        step += 1;
-        last = next;
-        next = addBillingCycle(start, cycle, step + 1);
-    }
-    return last;
-}
-function isWithinRange(dateString, range) {
-    const date = normalizeDateOnly(dateString);
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    if (range === 'month') {
-        return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-    }
-    if (range === '30d') {
-        const cutoff = new Date(today);
-        cutoff.setDate(cutoff.getDate() - 29);
-        return date >= cutoff && date <= now;
-    }
-    if (range === 'year') {
-        return date.getFullYear() === now.getFullYear();
-    }
-    return true;
-}
-function formatCycle(cycle) {
-    if (cycle === 'Monthly' || cycle === 'Yearly') return cycle;
-    return `Every ${cycle} days`;
-}
 function colorFromName(name) {
     const palette = ['#1db954', '#e50914', '#c0c1ff', '#4edea3', '#ffb4ab', '#4b4dd8', '#f59e0b', '#06b6d4'];
     let hash = 0;
@@ -1672,19 +1512,6 @@ function renderNotificationOverview() {
 // ═══════════════════════════════════════════
 // AUTO-LOG RENEWALS
 // ═══════════════════════════════════════════
-// Every renewal date from the anchor up to today. Capped so a bad cycle
-// value can never spin forever.
-function getRenewalDatesUntil(anchor, cycle, until, maxCount = 1000) {
-    const start = normalizeDateOnly(anchor);
-    const dates = [];
-    let d = start;
-    while (d <= until && dates.length < maxCount) {
-        dates.push(d);
-        d = addBillingCycle(start, cycle, dates.length);
-    }
-    return dates;
-}
-
 // Logs every renewal the user hasn't seen yet — not just the latest one —
 // so months where the app wasn't opened still show up in spending.
 async function autoLogRenewals() {
@@ -2982,7 +2809,7 @@ async function renderApp() {
 
             item.appendChild(left); item.appendChild(right);
             portfolioList.appendChild(item);
-            attachLongPress(item, sub.id);
+            window.attachLongPress(item, sub.id);
 
             if (!sub.paused) {
                 const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -3209,7 +3036,7 @@ function renderInsights() {
     });
 
     candidates.sort((a, b) => b.score - a.score);
-    let shown = [];
+    let shown;
     if (candidates.length === 0) { shown = []; }
     else if (candidates[0].solo) { shown = [candidates[0]]; }
     else { const m = candidates.filter(c => c.score > 300); shown = (m.length > 0 ? m : candidates).slice(0, 3); }
