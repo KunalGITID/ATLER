@@ -8,7 +8,7 @@ import {
     normalizeDateOnly,
     getMonthlyCost,
     getNextRenewalDate,
-    getRenewalDatesUntil,
+    getUnloggedRenewals,
     isWithinRange,
     formatCycle,
     todayISO,
@@ -1518,11 +1518,7 @@ async function autoLogRenewals() {
     const today = normalizeDateOnly(new Date());
     for (const sub of subscriptions) {
         if (sub.paused) continue;
-        const anchor = sub.startDate || sub.dateAdded;
-        const subAddedDate = normalizeDateOnly(sub.dateAdded);
-        const lastLogged = sub.lastLoggedRenewal ? normalizeDateOnly(sub.lastLoggedRenewal) : null;
-        const due = getRenewalDatesUntil(anchor, sub.cycle, today)
-            .filter(d => d >= subAddedDate && (!lastLogged || d > lastLogged));
+        const due = getUnloggedRenewals(sub, today);
         if (!due.length) continue;
 
         const newExps = due

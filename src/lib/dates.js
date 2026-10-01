@@ -139,3 +139,14 @@ export function formatCycle(cycle) {
 }
 
 export function todayISO() { return getLocalDateKey(new Date()); }
+
+// Renewals that should become expenses: on or after the day the subscription
+// was added (no backfilling history before the user tracked it) and after the
+// last one already logged.
+export function getUnloggedRenewals(sub, today = new Date()) {
+    const anchor = sub.startDate || sub.dateAdded;
+    const added = normalizeDateOnly(sub.dateAdded);
+    const lastLogged = sub.lastLoggedRenewal ? normalizeDateOnly(sub.lastLoggedRenewal) : null;
+    return getRenewalDatesUntil(anchor, sub.cycle, normalizeDateOnly(today))
+        .filter(d => d >= added && (!lastLogged || d > lastLogged));
+}
