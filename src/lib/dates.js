@@ -73,6 +73,9 @@ export function getMonthlyCost(sub) {
     return (price / days) * 30;
 }
 
+// Renewal dates are always counted from the anchor (step n = anchor + n
+// cycles), never from the previous renewal — otherwise a plan started on the
+// 31st gets clamped to the 28th in February and stays on the 28th forever.
 export function getNextRenewalDate(dateAdded, cycle, today = new Date()) {
     const start = normalizeDateOnly(dateAdded);
     const until = normalizeDateOnly(today);
@@ -99,6 +102,8 @@ export function getLastRenewalDate(dateAdded, cycle, today = new Date()) {
     return last;
 }
 
+// Every renewal date from the anchor up to today. Capped so a bad cycle
+// value can never spin forever.
 export function getRenewalDatesUntil(anchor, cycle, until, maxCount = 1000) {
     const start = normalizeDateOnly(anchor);
     const dates = [];

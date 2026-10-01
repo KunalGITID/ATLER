@@ -975,9 +975,6 @@ function formatAmount(amount) {
 
 
 
-// Renewal dates are always counted from the anchor (step n = anchor + n
-// cycles), never from the previous renewal — otherwise a plan started on the
-// 31st gets clamped to the 28th in February and stays on the 28th forever.
 function colorFromName(name) {
     const palette = ['#1db954', '#e50914', '#c0c1ff', '#4edea3', '#ffb4ab', '#4b4dd8', '#f59e0b', '#06b6d4'];
     let hash = 0;
@@ -1515,9 +1512,6 @@ function renderNotificationOverview() {
 // ═══════════════════════════════════════════
 // AUTO-LOG RENEWALS
 // ═══════════════════════════════════════════
-// Every renewal date from the anchor up to today. Capped so a bad cycle
-// value can never spin forever.
-
 // Logs every renewal the user hasn't seen yet — not just the latest one —
 // so months where the app wasn't opened still show up in spending.
 async function autoLogRenewals() {
