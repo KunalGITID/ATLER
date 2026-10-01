@@ -109,14 +109,20 @@ const navItems = document.querySelectorAll('.nav-item');
 async function sbWrite(fn) {
     try {
         const result = await fn();
-        if (result?.error) {
-            console.error('[Atler] Supabase write rejected:', result.error);
-            showToast('Could not save — ' + (result.error.message || 'check your connection'));
+        // Some callers run several writes together with Promise.all — surface
+        // the first failure from any of them, not just a single result.
+        const error = Array.isArray(result)
+            ? result.find(r => r?.error)?.error || null
+            : result?.error || null;
+        if (error) {
+            console.error('[Atler] Supabase write rejected:', error);
+            showToast('Could not save — ' + (error.message || 'check your connection'));
         }
-        return result;
+        return { error, result };
     } catch (err) {
         console.error('[Atler] Supabase write exception:', err);
         showToast('Could not save — check your connection');
+        return { error: err, result: null };
     }
 }
 
@@ -716,18 +722,32 @@ async function upsertSubscription(sub) {
         category: sub.category || 'unlisted',
         last_logged_renewal: sub.lastLoggedRenewal || null,
         paused: sub.paused || false,
+        reminder: sub.reminder || 'none',
     }));
     if (error) console.error('[Atler] upsertSubscription FAILED:', error);
     else console.log('[Atler] upsertSubscription SUCCESS:', sub.name);
 }
 
+function isAutoExpenseOf(exp, subId) {
+    return String(exp.id).startsWith(`auto_${subId}_`);
+}
+
+function findSubForAutoExpense(expenseId) {
+    return subscriptions.find(sub => isAutoExpenseOf({ id: expenseId }, sub.id)) || null;
+}
+
 async function deleteSubscription(id) {
-    if (!currentUser) return;
-    await sbWrite(() => Promise.all([
-        sb.from('subscriptions').delete().eq('id', id).eq('user_id', currentUser.id),
-        sb.from('expenses').delete().eq('user_id', currentUser.id).like('id', `auto_${id}_%`)
-    ]));
-    expenses = expenses.filter(exp => !String(exp.id).startsWith(`auto_${id}_`));
+    if (!currentUser) return false;
+    const autoIds = expenses.filter(exp => isAutoExpenseOf(exp, id)).map(exp => exp.id);
+    const writes = [sb.from('subscriptions').delete().eq('id', id).eq('user_id', currentUser.id)];
+    if (autoIds.length) {
+        writes.push(sb.from('expenses').delete().in('id', autoIds).eq('user_id', currentUser.id));
+    }
+    const { error } = await sbWrite(() => Promise.all(writes));
+    if (error) return false;
+    expenses = expenses.filter(exp => !isAutoExpenseOf(exp, id));
+    subscriptions = subscriptions.filter(s => s.id !== id);
+    return true;
 }
 
 async function upsertCategory(cat) {
@@ -770,6 +790,23 @@ async function insertExpense(exp) {
     }));
 }
 
+// Upsert with ignoreDuplicates so two open tabs logging the same renewal
+// don't fail on the primary key.
+async function insertExpenses(exps) {
+    if (!currentUser || !exps.length) return { error: null };
+    return sbWrite(() => sb.from('expenses').upsert(
+        exps.map(exp => ({
+            id: exp.id,
+            user_id: currentUser.id,
+            name: exp.name,
+            amount: exp.amount,
+            date: exp.date,
+            type: exp.type || 'manual',
+        })),
+        { onConflict: 'id', ignoreDuplicates: true },
+    ));
+}
+
 async function updateExpense(exp) {
     if (!currentUser) return;
     await sbWrite(() => sb
@@ -784,16 +821,22 @@ async function updateExpense(exp) {
 }
 
 async function clearAllData() {
-    if (!currentUser) return;
+    if (!currentUser) return false;
     const uid = currentUser.id;
-    await sbWrite(() => Promise.all([
+    const { error } = await sbWrite(() => Promise.all([
         sb.from('subscriptions').delete().eq('user_id', uid),
         sb.from('categories').delete().eq('user_id', uid),
         sb.from('expenses').delete().eq('user_id', uid),
     ]));
+    if (error) {
+        // Some deletes may have gone through — reload so the screen matches the server.
+        await loadAllData().catch(console.error);
+        return false;
+    }
     subscriptions = [];
     categories = [];
     expenses = [];
+    return true;
 }
 
 const debouncedUpsertSub = debounce(upsertSubscription, 600);
@@ -1043,23 +1086,30 @@ function getMonthlyCost(sub) {
     if (!days || days <= 0) return price;
     return (price / days) * 30;
 }
-function getNextRenewalDate(dateAdded, cycle) {
+// Renewal dates are always counted from the anchor (step n = anchor + n
+// cycles), never from the previous renewal — otherwise a plan started on the
+// 31st gets clamped to the 28th in February and stays on the 28th forever.
+function getNextRenewalDate(dateAdded, cycle, today = new Date()) {
     const start = normalizeDateOnly(dateAdded);
-    const today = normalizeDateOnly(new Date());
-    let next = new Date(start);
-    while (next <= today) {
-        next = addBillingCycle(next, cycle, 1);
+    const until = normalizeDateOnly(today);
+    let step = 0;
+    let next = start;
+    while (next <= until) {
+        step += 1;
+        next = addBillingCycle(start, cycle, step);
     }
     return next;
 }
-function getLastRenewalDate(dateAdded, cycle) {
+function getLastRenewalDate(dateAdded, cycle, today = new Date()) {
     const start = normalizeDateOnly(dateAdded);
-    const today = normalizeDateOnly(new Date());
-    let last = new Date(start);
-    let next = addBillingCycle(last, cycle, 1);
-    while (next <= today) {
+    const until = normalizeDateOnly(today);
+    let step = 0;
+    let last = start;
+    let next = addBillingCycle(start, cycle, 1);
+    while (next <= until) {
+        step += 1;
         last = next;
-        next = addBillingCycle(next, cycle, 1);
+        next = addBillingCycle(start, cycle, step + 1);
     }
     return last;
 }
@@ -1622,25 +1672,42 @@ function renderNotificationOverview() {
 // ═══════════════════════════════════════════
 // AUTO-LOG RENEWALS
 // ═══════════════════════════════════════════
+// Every renewal date from the anchor up to today. Capped so a bad cycle
+// value can never spin forever.
+function getRenewalDatesUntil(anchor, cycle, until, maxCount = 1000) {
+    const start = normalizeDateOnly(anchor);
+    const dates = [];
+    let d = start;
+    while (d <= until && dates.length < maxCount) {
+        dates.push(d);
+        d = addBillingCycle(start, cycle, dates.length);
+    }
+    return dates;
+}
+
+// Logs every renewal the user hasn't seen yet — not just the latest one —
+// so months where the app wasn't opened still show up in spending.
 async function autoLogRenewals() {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today = normalizeDateOnly(new Date());
     for (const sub of subscriptions) {
         if (sub.paused) continue;
         const anchor = sub.startDate || sub.dateAdded;
-        const lastRenewal = getLastRenewalDate(anchor, sub.cycle);
-        if (lastRenewal > today) continue;
-        const lastRenewalISO = getLocalDateKey(lastRenewal);
-        if (sub.lastLoggedRenewal === lastRenewalISO) continue;
         const subAddedDate = normalizeDateOnly(sub.dateAdded);
-        if (lastRenewal < subAddedDate) continue;
-        const expId = 'auto_' + sub.id + '_' + lastRenewalISO;
-        const exists = expenses.find(e => e.id === expId);
-        if (!exists) {
-            const newExp = { id: expId, name: sub.name, amount: parseFloat(sub.price), date: lastRenewalISO, type: 'auto' };
-            expenses.push(newExp);
-            await insertExpense(newExp);
+        const lastLogged = sub.lastLoggedRenewal ? normalizeDateOnly(sub.lastLoggedRenewal) : null;
+        const due = getRenewalDatesUntil(anchor, sub.cycle, today)
+            .filter(d => d >= subAddedDate && (!lastLogged || d > lastLogged));
+        if (!due.length) continue;
+
+        const newExps = due
+            .map(d => getLocalDateKey(d))
+            .map(iso => ({ id: `auto_${sub.id}_${iso}`, name: sub.name, amount: parseFloat(sub.price), date: iso, type: 'auto' }))
+            .filter(exp => !expenses.some(e => e.id === exp.id));
+        if (newExps.length) {
+            const { error } = await insertExpenses(newExps);
+            if (error) continue;
+            expenses.push(...newExps);
         }
-        sub.lastLoggedRenewal = lastRenewalISO;
+        sub.lastLoggedRenewal = getLocalDateKey(due[due.length - 1]);
         debouncedUpsertSub(sub);
     }
 }
@@ -1899,8 +1966,7 @@ document.querySelectorAll('#edit-reminder-group .reminder-pill').forEach(btn => 
 document.getElementById('delete-sub-btn').addEventListener('click', async () => {
     showConfirm('Delete this subscription? Its linked renewal expenses will be removed too, so this change is permanent.', async () => {
         haptic('error');
-        await deleteSubscription(activeSubId);
-        subscriptions = subscriptions.filter(s => s.id !== activeSubId);
+        if (!await deleteSubscription(activeSubId)) return;
         showToast('Subscription deleted');
         goBack();
         await renderApp();
@@ -1916,9 +1982,8 @@ document.getElementById('delete-expense-btn').addEventListener('click', async ()
         const msg = 'Delete this subscription completely? This removes the subscription and all its renewal logs.';
         showConfirm(msg, async () => {
             haptic('error');
-            const subId = activeExpenseId.split('_')[1];
-            await deleteSubscription(subId);
-            subscriptions = subscriptions.filter(s => s.id !== subId);
+            const sub = findSubForAutoExpense(activeExpenseId);
+            if (!sub || !await deleteSubscription(sub.id)) return;
             activeExpenseId = null;
             showToast('Subscription deleted');
             goBack();
@@ -1980,6 +2045,18 @@ document.getElementById('edit-expense-form').addEventListener('submit', async e 
 // ═══════════════════════════════════════════
 // NOTIFICATIONS
 // ═══════════════════════════════════════════
+// Android Chrome rejects `new Notification()` ("Illegal constructor");
+// showNotification() through the service worker works on every platform.
+async function showLocalNotification(title, options) {
+    try {
+        const reg = await navigator.serviceWorker?.getRegistration();
+        if (reg) return await reg.showNotification(title, options);
+        new Notification(title, options);
+    } catch (err) {
+        console.error('[Atler] Notification failed:', err);
+    }
+}
+
 async function scheduleRenewalNotifications() {
     if (!currentUser || !('Notification' in window)) return;
     localStorage.setItem('atler_last_notification_check', new Date().toISOString());
@@ -1998,9 +2075,10 @@ async function scheduleRenewalNotifications() {
         const reminderDays = getReminderDays(sub.id);
         if (reminderDays.includes(diffDays)) {
             const price = formatAmount(sub.price);
-            new Notification('Atler — Renewal Reminder', {
+            await showLocalNotification('Atler — Renewal Reminder', {
                 body: `${sub.name} renews in ${diffDays} day${diffDays > 1 ? 's' : ''} — ${getCurrencySymbol()}${price}`,
-                icon: './icon-192.png',
+                icon: './apple-touch-icon.png',
+                tag: `renewal-${sub.id}-${getLocalDateKey(next)}`,
             });
         }
     }
@@ -2365,7 +2443,7 @@ document.getElementById('import-file-input').addEventListener('change', function
         }
         showConfirm('Replace current data? JSON restore replaces your current subscriptions, expenses, and categories with the backup snapshot.', async () => {
             closeDataModal();
-            await clearAllData();
+            if (!await clearAllData()) return;
             for (const sub of (parsed.subscriptions || [])) await upsertSubscription(sub);
             for (const cat of (parsed.categories || [])) await upsertCategory(cat);
             for (const exp of (parsed.expenses || [])) await insertExpense(exp);
@@ -2390,10 +2468,10 @@ document.getElementById('import-file-input').addEventListener('change', function
 document.getElementById('dm-clear-btn').addEventListener('click', async () => {
     showConfirm('Clear all tracked data? Subscriptions, expenses, and categories will be deleted. Your account profile stays intact.', async () => {
         closeDataModal();
-        await clearAllData();
+        const cleared = await clearAllData();
         await renderApp();
         renderProfilePage();
-        showToast('All data cleared');
+        if (cleared) showToast('All data cleared');
     });
 });
 
@@ -3597,8 +3675,7 @@ if (sb) sb.auth.onAuthStateChange((event, session) => {
         const id = ctxSubId;
         closeCtx();
         showConfirm('Delete this subscription?', async () => {
-            await deleteSubscription(id);
-            subscriptions = subscriptions.filter(s => s.id !== id);
+            if (!await deleteSubscription(id)) return;
             showToast('Subscription deleted');
             renderApp();
         });
