@@ -5,6 +5,7 @@ import { canCompareWithLastMonth, monthRing, nextUp, plansPerMonth, priceCreep, 
 import { renewalsBetween } from '../core/renewals.ts';
 import { Block, Kicker } from '../ui/Block.tsx';
 import { Button } from '../ui/Button.tsx';
+import { planHref } from '../route.ts';
 import { MonthRing } from '../ui/MonthRing.tsx';
 
 const monthName = (d: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { month: 'short', timeZone: 'UTC' }).toUpperCase();
@@ -60,18 +61,18 @@ export function Month({ plans, events, payments, onAdd }: {
       {(next || creep) && (
         <div className={`grid gap-2.5 ${next && creep ? 'grid-cols-2' : 'grid-cols-1'}`}>
           {next && (
-            <Block tone="soon" className="flex min-h-[112px] flex-col !p-4">
+            <a href={planHref(next.planId)} className="flex min-h-[112px] flex-col rounded-block bg-soon p-4 text-on-color no-underline active:opacity-80">
               <Kicker>Next up</Kicker>
               <div className="mt-auto font-display text-[26px] leading-tight font-bold">{next.name}</div>
               <div className="text-[13px] font-extrabold">{when(today, next.on)} · {formatRupees(next.amount)}</div>
-            </Block>
+            </a>
           )}
           {creep && (
-            <Block className="flex min-h-[112px] flex-col !p-4">
+            <a href={planHref(creep.plan.id)} className="flex min-h-[112px] flex-col rounded-block bg-block p-4 text-ink no-underline active:opacity-80">
               <Kicker className="text-ink-2">Price creep</Kicker>
               <div className="num mt-auto text-[26px] leading-tight font-bold">{formatRupees(creep.perYear, { sign: true })}/yr</div>
               <div className="text-[13px] font-bold text-ink-2">{creep.plan.name} went up</div>
-            </Block>
+            </a>
           )}
         </div>
       )}
@@ -81,7 +82,8 @@ export function Month({ plans, events, payments, onAdd }: {
           <h2 id="coming-up" className="sr-only">Coming up</h2>
           <ul>
             {coming.map((r, i) => (
-              <li key={r.planId + r.on} className={`flex items-center justify-between py-2.5 ${i ? 'border-t-2 border-ground' : ''}`}>
+              <li key={r.planId + r.on} className={i ? 'border-t-2 border-ground' : ''}>
+                <a href={planHref(r.planId)} className="flex items-center justify-between py-2.5 text-ink no-underline active:opacity-70">
                 <div className="flex items-center gap-3">
                   <div className="flex size-11 flex-col items-center justify-center rounded-[13px] bg-block-2" aria-hidden="true">
                     <div className="num text-[17px] leading-none font-bold">{Number(r.on.slice(8))}</div>
@@ -93,6 +95,7 @@ export function Month({ plans, events, payments, onAdd }: {
                   </div>
                 </div>
                 <div className="num text-lg font-bold">{formatRupees(r.amount)}</div>
+                </a>
               </li>
             ))}
           </ul>

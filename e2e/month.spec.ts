@@ -19,7 +19,7 @@ test('plans and expenses fill in the month: ring, next up, coming up', async ({ 
   await addPlan(page, { name: 'Spotify', amount: '139', lastCharged: daysFromToday(-30 + 6) });
   await addExpense(page, { name: 'Groceries', amount: '1200', on: daysFromToday(0) });
 
-  const ring = page.getByRole('img', { name: /day \d+ of \d+/ });
+  const ring = page.getByRole('group', { name: /day \d+ of \d+/ });
   await expect(ring).toBeVisible();
   await expect(page.getByText('Next up')).toBeVisible();
   await expect(page.locator('text=Next up').locator('..')).toContainText('Netflix');
@@ -36,5 +36,5 @@ test('the month survives a reload (stored on the device)', async ({ page }) => {
   await signIn(page);
   await addPlan(page, { name: 'iCloud', amount: '75', lastCharged: daysFromToday(-3) });
   await page.reload();
-  await expect(page.getByRole('img', { name: /iCloud ₹75/ })).toBeVisible();
+  await expect(page.getByRole('group', { name: /iCloud ₹75/ })).toBeVisible();
 });

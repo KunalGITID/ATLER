@@ -1,5 +1,6 @@
 import type { MonthRing as Ring } from '../core/month.ts';
 import { formatRupees } from '../core/money.ts';
+import { planHref } from '../route.ts';
 
 // The calendar of the month, drawn on the money block (black on lime).
 //   faint track = the whole month, shaded arc = 1st -> today,
@@ -20,7 +21,7 @@ export function MonthRing({ ring, label }: { ring: Ring; label: string }) {
   ].join(' ');
   return (
     <div className="relative shrink-0" style={{ width: SIZE, height: SIZE }}>
-      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} fill="none" role="img" aria-label={description}>
+      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} fill="none" role="group" aria-label={description}>
         <circle cx={SIZE / 2} cy={SIZE / 2} r={R} stroke="rgb(10 10 10 / 0.14)" strokeWidth={16} />
         <circle
           cx={SIZE / 2} cy={SIZE / 2} r={R}
@@ -32,11 +33,17 @@ export function MonthRing({ ring, label }: { ring: Ring; label: string }) {
           const p = point(m.at + 0.5 / ring.days);
           return m.status === 'paid'
             ? <circle key={m.planId + m.on} cx={p.x} cy={p.y} r={6} fill="#0a0a0a" />
-            : <circle key={m.planId + m.on} cx={p.x} cy={p.y} r={7} className="fill-soon" stroke="#0a0a0a" strokeWidth={2} />;
+            : (
+              // A coming charge: tap it to open that plan.
+              <a key={m.planId + m.on} href={planHref(m.planId)} aria-label={`${m.name}, ${formatRupees(m.amount)} on the ${Number(m.on.slice(8))}`}>
+                <circle cx={p.x} cy={p.y} r={14} fill="transparent" />
+                <circle cx={p.x} cy={p.y} r={7} className="fill-soon" stroke="#0a0a0a" strokeWidth={2} />
+              </a>
+            );
         })}
         <circle cx={todayAt.x} cy={todayAt.y} r={5} className="fill-money" stroke="#0a0a0a" strokeWidth={3} />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-on-color">
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-on-color">
         <div className="text-[10px] font-extrabold tracking-[0.12em] uppercase">Spent · {label}</div>
         <div className="num text-[30px] leading-tight font-bold">{formatRupees(ring.spent)}</div>
       </div>

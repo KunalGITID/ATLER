@@ -1,0 +1,106 @@
+import { useState } from 'react';
+import { describeCycle, today as todayDay, type Day } from '../core/dates.ts';
+import { formatRupees } from '../core/money.ts';
+import type { Plan, PlanEvent } from '../core/model.ts';
+import { planView } from '../core/plan.ts';
+import type { AtlerDB } from '../data/db.ts';
+import { deletePlan, setStatus } from '../data/planActions.ts';
+import { goBack } from '../route.ts';
+import { Block, Kicker } from '../ui/Block.tsx';
+import { Button } from '../ui/Button.tsx';
+import { CountdownRing } from '../ui/CountdownRing.tsx';
+import { PaymentBars } from '../ui/PaymentBars.tsx';
+import { ConfirmSheet, EditPlanSheet } from './PlanSheets.tsx';
+
+const fmtDay = (d: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+const perLabel = (p: Plan) => (p.cycle.unit === 'month' && p.cycle.every === 1 ? '/MO' : p.cycle.unit === 'year' && p.cycle.every === 1 ? '/YR' : '');
+
+export function PlanDetails({ db, plan, events }: { db: AtlerDB; plan: Plan; events: PlanEvent[] }) {
+  const today = todayDay();
+  const v = planView(plan, events, today);
+  const [sheet, setSheet] = useState<'edit' | 'cancel' | 'delete' | null>(null);
+  const close = () => setSheet(null);
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <button type="button" onClick={goBack} className="inline-flex items-center gap-1 self-start px-1 pb-1.5 text-[15px] font-bold">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+        Month
+      </button>
+
+      {/* Coral only when a charge is a week or less away: that's what coral means. */}
+      <Block tone={v.soon ? 'soon' : 'dark'} className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="truncate font-display text-[32px] leading-none font-bold">{plan.name}</h1>
+          <div className="num mt-2 text-[44px] leading-none font-bold">
+            {formatRupees(plan.price)}<span className="text-lg">{perLabel(plan)}</span>
+          </div>
+          <div className={`mt-2 text-sm font-bold ${v.soon ? '' : 'text-ink-2'}`}>
+            {plan.status === 'paused' && v.stoppedOn ? `Paused since ${fmtDay(v.stoppedOn)}`
+              : plan.status === 'cancelled' && v.stoppedOn ? `Cancelled ${fmtDay(v.stoppedOn)}`
+              : `${describeCycle(plan.cycle)} · next ${v.countdown ? fmtDay(v.countdown.end) : ''}`}
+          </div>
+        </div>
+        {v.countdown && (
+          <div className={v.soon ? '' : 'rounded-[22px] bg-money p-1.5'}>
+            <CountdownRing done={v.countdown.done} left={v.countdown.left} total={v.countdown.total} />
+          </div>
+        )}
+      </Block>
+
+      {plan.status === 'cancelled' && v.saved > 0 && (
+        <Block tone="money" className="!p-4">
+          <Kicker>Kept since cancelling</Kicker>
+          <div className="num mt-1 text-[30px] leading-tight font-bold">{formatRupees(v.saved)}</div>
+          <div className="text-[13px] font-bold">and {formatRupees(v.perYear)} every year</div>
+        </Block>
+      )}
+
+      {v.history.length > 0 && (
+        <Block className="!p-4">
+          <div className="mb-3.5 flex justify-between">
+            <Kicker className="text-ink-2">Paid so far</Kicker>
+            <span className="num text-sm font-bold">{formatRupees(v.paidSoFar)}</span>
+          </div>
+          <PaymentBars history={v.history} current={plan.price} />
+        </Block>
+      )}
+
+      <Block className="!px-4 !py-1">
+        <div className="flex justify-between border-b-2 border-ground py-3 text-sm"><span className="text-ink-2">Per year</span><span className="num font-bold">{formatRupees(v.perYear)}</span></div>
+        <div className="flex justify-between py-3 text-sm"><span className="text-ink-2">Tracked since</span><span className="font-bold">{fmtDay(plan.createdOn)}</span></div>
+      </Block>
+
+      <div className="mt-2 grid grid-cols-2 gap-2.5">
+        <Button kind="plain" onClick={() => setSheet('edit')}>Edit</Button>
+        {plan.status === 'active' || plan.status === 'trial'
+          ? <Button kind="quiet" className="!h-14 !rounded-[20px]" onClick={() => setStatus(db, plan, 'pause', today)}>Pause</Button>
+          : plan.status === 'paused'
+            ? <Button kind="quiet" className="!h-14 !rounded-[20px]" onClick={() => setStatus(db, plan, 'resume', today)}>Resume</Button>
+            : <Button kind="quiet" className="!h-14 !rounded-[20px]" onClick={() => setStatus(db, plan, 'restart', today)}>Restart</Button>}
+      </div>
+      {plan.status !== 'cancelled' && (
+        <Button kind="primary" className="!text-base" onClick={() => setSheet('cancel')}>I CANCELLED IT · KEEP {formatRupees(v.perYear)}/YR</Button>
+      )}
+      <Button kind="danger" onClick={() => setSheet('delete')}>Delete</Button>
+
+      <EditPlanSheet key={plan.id + plan.price + plan.name} db={db} plan={plan} open={sheet === 'edit'} onClose={close} />
+      <ConfirmSheet
+        open={sheet === 'cancel'}
+        title={`Cancelled ${plan.name}?`}
+        body={`ATLER stops counting its charges from today and shows what you keep: ${formatRupees(v.perYear)} a year.`}
+        confirm="Yes, I cancelled it"
+        onConfirm={async () => { await setStatus(db, plan, 'cancel', today); close(); }}
+        onClose={close}
+      />
+      <ConfirmSheet
+        open={sheet === 'delete'}
+        title={`Delete ${plan.name}?`}
+        body="Its whole history goes too, and it stops counting in every month, past ones included. To keep the history, use “I cancelled it” instead."
+        confirm="Delete for good"
+        onConfirm={async () => { await deletePlan(db, plan); close(); location.hash = '#/'; }}
+        onClose={close}
+      />
+    </div>
+  );
+}
