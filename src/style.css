@@ -2252,3 +2252,82 @@ button.list-item {
     transition: opacity 0.3s ease !important;
   }
 }
+
+/* Bank statement scan results */
+.statement-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 310;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.statement-sheet {
+  background: var(--surface-low);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 24px 16px calc(16px + env(safe-area-inset-bottom));
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.statement-title {
+  font-size: 1rem;
+  font-weight: 800;
+  font-family: var(--font-display);
+  color: var(--on-surface);
+}
+.statement-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0;
+}
+.statement-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.statement-item input {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  flex-shrink: 0;
+}
+.statement-item-name {
+  font-weight: 600;
+  color: var(--on-surface);
+}
+.statement-item-meta {
+  font-size: 0.8rem;
+  color: var(--on-surface-variant);
+  margin-top: 2px;
+}
+.statement-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  padding: 1px 8px;
+  border-radius: 99px;
+  margin-left: 6px;
+  background: var(--surface-high);
+  color: var(--on-surface-variant);
+  vertical-align: 1px;
+}
+.statement-actions {
+  display: flex;
+  gap: 10px;
+}
+.statement-actions > * {
+  flex: 1;
+  margin: 0;
+}

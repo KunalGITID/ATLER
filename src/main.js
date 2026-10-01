@@ -22,6 +22,7 @@ import { dueReminders, reminderMessage } from './lib/reminders.js';
 import { getPushSubscription, pushSupported, unsubscribePush } from './lib/push.js';
 import { priceChangeImpact, recentIncreases } from './lib/prices.js';
 import { forecastNextMonth } from './lib/forecast.js';
+import { findRecurring, readStatement } from './lib/statement.js';
 
 // ═══════════════════════════════════════════
 // SUPABASE CONFIG
@@ -2487,6 +2488,103 @@ document.getElementById('import-file-input').addEventListener('change', function
     };
     reader.readAsText(file);
     this.value = '';
+});
+
+// ── Find subscriptions in a bank statement ──
+let statementFound = [];
+
+document.getElementById('dm-statement-btn').addEventListener('click', () => {
+    document.getElementById('statement-file-input').click();
+});
+
+document.getElementById('statement-file-input').addEventListener('change', async function () {
+    const file = this.files[0];
+    this.value = '';
+    if (!file) return;
+    closeDataModal();
+    try {
+        const debits = readStatement(await file.text());
+        statementFound = findRecurring(debits, { existingNames: subscriptions.map(s => s.name) });
+        openStatementResults(debits.length);
+    } catch (err) {
+        showToast(err.message || 'Could not read that statement', 4000);
+    }
+});
+
+function openStatementResults(debitCount) {
+    const list = document.getElementById('statement-list');
+    document.getElementById('statement-summary').textContent = statementFound.length
+        ? `${statementFound.length} repeating charge${statementFound.length > 1 ? 's' : ''} in ${debitCount} debits. Untick anything that isn't a subscription.`
+        : `No repeating charges found in ${debitCount} debits. A statement covering 3+ months works best.`;
+    list.innerHTML = statementFound.map((f, i) => {
+        const checked = f.active && !f.alreadyTracked && f.confidence >= 50;
+        const badges = [
+            !f.active ? '<span class="statement-badge">No recent charge</span>' : '',
+            f.alreadyTracked ? '<span class="statement-badge">Already tracked</span>' : '',
+        ].join('');
+        return `
+            <label class="statement-item">
+                <input type="checkbox" data-index="${i}" ${checked ? 'checked' : ''}>
+                <div>
+                    <div class="statement-item-name">${escapeHTML(f.name)}${badges}</div>
+                    <div class="statement-item-meta">${getCurrencySymbol()}${formatAmount(f.price)} · ${escapeHTML(formatCycle(f.cycle))}</div>
+                    <div class="statement-item-meta">Last charged ${escapeHTML(formatDate(f.lastCharged))} · seen ${f.charges} times</div>
+                </div>
+            </label>`;
+    }).join('');
+    updateStatementAddButton();
+    document.getElementById('statement-overlay').style.display = 'flex';
+}
+
+function updateStatementAddButton() {
+    const n = document.querySelectorAll('#statement-list input:checked').length;
+    const btn = document.getElementById('statement-add-btn');
+    btn.textContent = n ? `Add ${n}` : 'Add selected';
+    btn.disabled = !n;
+}
+
+function closeStatementResults() {
+    document.getElementById('statement-overlay').style.display = 'none';
+    statementFound = [];
+}
+
+document.getElementById('statement-list').addEventListener('change', updateStatementAddButton);
+document.getElementById('statement-cancel-btn').addEventListener('click', closeStatementResults);
+document.getElementById('statement-overlay').addEventListener('click', e => {
+    if (e.target.id === 'statement-overlay') closeStatementResults();
+});
+
+document.getElementById('statement-add-btn').addEventListener('click', async () => {
+    const picked = [...document.querySelectorAll('#statement-list input:checked')]
+        .map(input => statementFound[Number(input.getAttribute('data-index'))]);
+    if (!picked.length) return;
+    const btn = document.getElementById('statement-add-btn');
+    btn.disabled = true;
+    btn.textContent = 'Adding...';
+    let added = 0;
+    for (const f of picked) {
+        // Anchored on the last charge, so the next renewal date lines up with
+        // the bank and the charge already paid this period is logged.
+        const newSub = {
+            id: makeClientId('sub'),
+            name: f.name,
+            cycle: f.cycle,
+            price: Number(f.price).toFixed(2),
+            dateAdded: todayISO(),
+            startDate: f.lastCharged,
+            reminder: 'none',
+            category: 'unlisted',
+            lastLoggedRenewal: null,
+            paused: !f.active,
+        };
+        if ((await upsertSubscription(newSub)).error) continue;
+        subscriptions.push(newSub);
+        added++;
+    }
+    await autoLogRenewals();
+    closeStatementResults();
+    await renderApp();
+    showToast(added === picked.length ? `${added} subscription${added > 1 ? 's' : ''} added` : `${added} of ${picked.length} added`);
 });
 
 document.getElementById('dm-clear-btn').addEventListener('click', async () => {
