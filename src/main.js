@@ -21,6 +21,7 @@ import { toCsv, parseCsvRecords } from './lib/csv.js';
 import { dueReminders, reminderMessage } from './lib/reminders.js';
 import { getPushSubscription, pushSupported, unsubscribePush } from './lib/push.js';
 import { priceChangeImpact, recentIncreases } from './lib/prices.js';
+import { forecastNextMonth } from './lib/forecast.js';
 
 // ═══════════════════════════════════════════
 // SUPABASE CONFIG
@@ -1384,6 +1385,34 @@ function getMonthlySpendTotalForOffset(offset = 0) {
         const expDate = parseDateValue(exp.date);
         return expDate >= start && expDate <= end ? sum + parseFloat(exp.amount) : sum;
     }, 0);
+}
+
+function renderForecast() {
+    const section = document.getElementById('forecast-section');
+    if (!section) return;
+    const f = forecastNextMonth(subscriptions, expenses);
+    if (!f.renewals.length && !f.everyday.months) {
+        section.style.display = 'none';
+        return;
+    }
+    section.style.display = 'block';
+    const sym = getCurrencySymbol();
+    const money = n => `${sym}${formatAmount(n)}`;
+    const monthName = f.month.toLocaleDateString('en-IN', { month: 'long' });
+
+    document.getElementById('forecast-title').textContent = `${monthName} Forecast`;
+    document.getElementById('forecast-copy').textContent = f.everyday.months
+        ? `Your renewals, plus everyday spending based on your last ${f.everyday.months} month${f.everyday.months > 1 ? 's' : ''}.`
+        : 'Your renewals only. Log everyday expenses for a month to include them.';
+    document.getElementById('forecast-total').textContent = money(f.estimate);
+    document.getElementById('forecast-range').textContent = f.high > f.low
+        ? `Probably between ${money(f.low)} and ${money(f.high)}`
+        : 'Renewals are fixed amounts';
+    document.getElementById('forecast-fixed').textContent = money(f.fixed);
+    const biggest = [...f.renewals].sort((a, b) => b.amount - a.amount)[0];
+    document.getElementById('forecast-fixed-note').textContent = f.renewals.length
+        ? `${f.renewals.length} renewal${f.renewals.length > 1 ? 's' : ''}, biggest ${biggest.sub.name} on ${biggest.date.getDate()} ${monthName.slice(0, 3)}`
+        : 'Nothing renews that month';
 }
 
 function renderTrendChart() {
@@ -3255,6 +3284,7 @@ function renderAnalytics() {
     }
     document.getElementById('ytd-spend').textContent = formatAmount(summaryValue);
     renderTrendChart();
+    renderForecast();
     renderBudgetProgress();
 
     // ── JS-injected search input (only when subscriptions.length > 7) ──
