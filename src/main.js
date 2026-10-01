@@ -10,6 +10,7 @@ import {
     getNextRenewalDate,
     getUnloggedRenewals,
     getResumeLoggedThrough,
+    getLastRenewalDate,
     isWithinRange,
     formatCycle,
     todayISO,
@@ -19,6 +20,7 @@ import {
 import { toCsv, parseCsvRecords } from './lib/csv.js';
 import { dueReminders, reminderMessage } from './lib/reminders.js';
 import { getPushSubscription, pushSupported, unsubscribePush } from './lib/push.js';
+import { priceChangeImpact, recentIncreases } from './lib/prices.js';
 
 // ═══════════════════════════════════════════
 // SUPABASE CONFIG
@@ -108,6 +110,7 @@ let profile = {
 let subscriptions = [];
 let categories = [];
 let expenses = [];
+let priceChanges = [];
 let activeSubId = null;
 let activeExpenseId = null;
 let analyticsView = 'subscriptions';
@@ -605,17 +608,18 @@ async function loadAllData() {
     currentUser = authData.user;
     lastLoadError = '';
 
-    let profRes, subsRes, catsRes, expsRes;
+    let profRes, subsRes, catsRes, expsRes, pricesRes;
     try {
-        [profRes, subsRes, catsRes, expsRes] = await Promise.all([
-            sb.from('profiles').select('*').eq('user_id', uid).single(),
+        [profRes, subsRes, catsRes, expsRes, pricesRes] = await Promise.all([
+            // maybeSingle: a missing profile row is not an error (ensureUserProfile creates it).
+            sb.from('profiles').select('*').eq('user_id', uid).maybeSingle(),
             sb.from('subscriptions').select('*').eq('user_id', uid),
             sb.from('categories').select('*').eq('user_id', uid),
             sb.from('expenses').select('*').eq('user_id', uid),
+            sb.from('price_changes').select('*').eq('user_id', uid),
         ]);
-        const queryError = profRes.error || subsRes.error || catsRes.error || expsRes.error;
+        const queryError = profRes.error || subsRes.error || catsRes.error || expsRes.error || pricesRes.error;
         if (queryError) throw queryError;
-        console.log('[Atler] loadAllData success — subs:', subsRes.data?.length, 'errors:', profRes.error, subsRes.error);
     } catch (error) {
         console.error('[Atler] loadAllData FAILED:', error);
         lastLoadError = navigator.onLine
@@ -651,6 +655,14 @@ async function loadAllData() {
         id: c.id,
         name: c.name,
         budget: c.budget,
+    }));
+
+    priceChanges = (pricesRes.data || []).map(c => ({
+        id: c.id,
+        subscriptionId: c.subscription_id,
+        oldPrice: Number(c.old_price),
+        newPrice: Number(c.new_price),
+        changedOn: c.changed_on,
     }));
 
     expenses = (expsRes.data || []).map(e => ({
@@ -810,6 +822,7 @@ async function deleteSubscription(id) {
     if (error) return false;
     expenses = expenses.filter(exp => !isAutoExpenseOf(exp, id));
     subscriptions = subscriptions.filter(s => s.id !== id);
+    priceChanges = priceChanges.filter(c => c.subscriptionId !== id);
     return true;
 }
 
@@ -899,6 +912,7 @@ async function clearAllData() {
     subscriptions = [];
     categories = [];
     expenses = [];
+    priceChanges = [];
     return true;
 }
 
@@ -1724,6 +1738,7 @@ function viewDetails(id) {
     document.getElementById('detail-category-name').textContent = category?.name || 'Unlisted';
     document.getElementById('detail-budget-pressure').textContent = budgetPressure;
     renderReminderPreference(sub.id);
+    renderPriceHistory(sub);
 
     // Edit form pre-fill
     document.getElementById('edit-name').value = sub.name;
@@ -1780,9 +1795,48 @@ async function saveSubscriptionEdit(sub, name, cycle, reminder) {
         reminder,
     };
     if ((await upsertSubscription(update)).error) return false;
+    const oldPrice = parseFloat(sub.price);
+    const newPrice = parseFloat(update.price);
     Object.assign(sub, update);
+    if (oldPrice !== newPrice) {
+        await recordPriceChange(sub.id, oldPrice, newPrice);
+        renderPriceHistory(sub);
+    }
     await autoLogRenewals();
     return true;
+}
+
+async function recordPriceChange(subscriptionId, oldPrice, newPrice) {
+    const change = { id: makeClientId('price'), subscriptionId, oldPrice, newPrice, changedOn: todayISO() };
+    const { error } = await sbWrite(() => sb.from('price_changes').insert({
+        id: change.id,
+        user_id: currentUser.id,
+        subscription_id: subscriptionId,
+        old_price: oldPrice,
+        new_price: newPrice,
+        changed_on: change.changedOn,
+    }));
+    if (!error) priceChanges.push(change);
+}
+
+function renderPriceHistory(sub) {
+    const card = document.getElementById('detail-price-history');
+    const list = document.getElementById('detail-price-history-list');
+    if (!card || !list) return;
+    const mine = priceChanges
+        .filter(c => c.subscriptionId === sub.id)
+        .sort((a, b) => (a.changedOn < b.changedOn ? 1 : -1));
+    card.style.display = mine.length ? 'block' : 'none';
+    list.innerHTML = mine.map(c => {
+        const { yearly, percent } = priceChangeImpact(c, sub.cycle);
+        const up = yearly > 0;
+        const pct = percent == null ? '' : ` (${up ? '+' : ''}${percent}%)`;
+        return `
+            <div class="expense-detail-row">
+                <span class="label">${escapeHTML(formatDate(c.changedOn))}</span>
+                <span>${getCurrencySymbol()}${formatAmount(c.oldPrice)} → ${getCurrencySymbol()}${formatAmount(c.newPrice)}<span style="color:${up ? 'var(--error)' : 'var(--secondary)'};">${pct}</span></span>
+            </div>`;
+    }).join('');
 }
 
 // Edit form submit
@@ -1860,6 +1914,22 @@ document.querySelectorAll('#edit-reminder-group .reminder-pill').forEach(btn => 
     btn.addEventListener('click', () => {
         document.querySelectorAll('#edit-reminder-group .reminder-pill').forEach(pill => pill.classList.remove('active'));
         btn.classList.add('active');
+    });
+});
+
+// The reminder pills on the details card save straight away.
+const DETAIL_REMINDER_VALUES = { off: 'none', 3: '3days', 1: '1day', '3,1': 'both' };
+document.querySelectorAll('#detail-reminder-group .reminder-pill').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const sub = subscriptions.find(s => s.id === activeSubId);
+        const reminder = DETAIL_REMINDER_VALUES[btn.getAttribute('data-reminder')];
+        if (!sub || !reminder || sub.reminder === reminder) return;
+        if ((await upsertSubscription({ ...sub, reminder })).error) return;
+        sub.reminder = reminder;
+        renderReminderPreference(sub.id);
+        haptic('light');
+        showToast(reminder === 'none' ? 'Reminders off' : 'Reminder saved');
+        if (reminder !== 'none') showNotificationPrompt();
     });
 });
 
@@ -2207,7 +2277,7 @@ document.getElementById('dm-cancel-btn').addEventListener('click', closeDataModa
 dataModalOverlay.addEventListener('click', e => { if (e.target === dataModalOverlay) closeDataModal(); });
 
 document.getElementById('dm-export-btn').addEventListener('click', () => {
-    const data = { profile, subscriptions, categories, expenses, exportedAt: new Date().toISOString() };
+    const data = { profile, subscriptions, categories, expenses, priceChanges, exportedAt: new Date().toISOString() };
     downloadTextFile(JSON.stringify(data, null, 2), `atler-backup-${todayISO()}.json`, 'application/json');
     closeDataModal();
     showToast('Full backup exported');
@@ -2365,7 +2435,13 @@ document.getElementById('import-file-input').addEventListener('change', function
             if (!await clearAllData()) return;
             for (const sub of (parsed.subscriptions || [])) await upsertSubscription(sub);
             for (const cat of (parsed.categories || [])) await upsertCategory(cat);
-            for (const exp of (parsed.expenses || [])) await insertExpense(exp);
+            await insertExpenses(parsed.expenses || []);
+            for (const c of (parsed.priceChanges || [])) {
+                await sbWrite(() => sb.from('price_changes').insert({
+                    id: c.id, user_id: currentUser.id, subscription_id: c.subscriptionId,
+                    old_price: c.oldPrice, new_price: c.newPrice, changed_on: c.changedOn,
+                }));
+            }
             if (parsed.profile) {
                 profile.name = parsed.profile.name || profile.name;
                 profile.avatar = parsed.profile.avatar || profile.avatar;
@@ -3048,10 +3124,14 @@ function renderInsights() {
     const renewalsToday = [], renewalsSoon = [];
     activeSubs.forEach(sub => {
         const anchor = sub.startDate || sub.dateAdded;
+        // getNextRenewalDate is always after today, so "today" has to come from the last renewal.
+        if (getLocalDateKey(getLastRenewalDate(anchor, sub.cycle)) === getLocalDateKey(todayMidnight)) {
+            renewalsToday.push(sub);
+            return;
+        }
         const next = getNextRenewalDate(anchor, sub.cycle);
-        const diff = Math.ceil((next - todayMidnight) / msDay);
-        if (diff === 0) renewalsToday.push(sub);
-        else if (diff >= 1 && diff <= 3) renewalsSoon.push({ sub, diffDays: diff });
+        const diff = Math.round((next - todayMidnight) / msDay);
+        if (diff >= 1 && diff <= 3) renewalsSoon.push({ sub, diffDays: diff });
     });
     const catTotals = {};
     activeSubs.forEach(sub => {
@@ -3128,6 +3208,17 @@ function renderInsights() {
             });
         }
     });
+
+    const increases = recentIncreases(priceChanges, new Map(subscriptions.map(s => [s.id, s])), now);
+    if (increases.length) {
+        const { sub, change, impact } = increases[0];
+        const more = increases.length > 1 ? ` ${increases.length - 1} other plan${increases.length > 2 ? 's' : ''} went up too.` : '';
+        candidates.push({
+            score: 780,
+            title: 'Price Creep Spotted',
+            text: `${sub.name} went from ${sym}${fmt(change.oldPrice)} to ${sym}${fmt(change.newPrice)}${impact.percent != null ? ` (+${impact.percent}%)` : ''}. That's ${sym}${fmt(impact.yearly)} more a year.${more}`,
+        });
+    }
 
     candidates.sort((a, b) => b.score - a.score);
     let shown;
