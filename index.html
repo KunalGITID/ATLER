@@ -694,6 +694,11 @@
                     <span id="pause-label">Pause Subscription</span>
                 </button>
 
+                <button id="cancel-sub-btn" class="cancel-sub-btn">
+                    <span class="material-symbols-outlined" id="cancel-icon">savings</span>
+                    <span id="cancel-label">I cancelled this</span>
+                </button>
+
                 <!-- Delete -->
                 <button class="btn-primary" id="delete-sub-btn"
                     style="background:var(--error-bg);color:var(--error);box-shadow:none;border:1px solid var(--error);margin-top:12px;">
@@ -828,6 +833,28 @@
                             <div class="trend-summary-note" id="forecast-fixed-note"></div>
                         </div>
                     </div>
+                </section>
+
+                <section id="savings-section" style="display:none;">
+                    <div class="trend-section-head">
+                        <div>
+                            <h2 style="margin-bottom:4px;">Savings</h2>
+                            <p class="trend-section-copy">What cancelled plans would have cost you since you stopped them.</p>
+                        </div>
+                    </div>
+                    <div class="trend-summary-grid">
+                        <div class="trend-summary-card trend-summary-current">
+                            <div class="label">Saved so far</div>
+                            <div class="trend-summary-value" id="savings-total">₹0.00</div>
+                            <div class="trend-summary-note" id="savings-note"></div>
+                        </div>
+                        <div class="trend-summary-card">
+                            <div class="label">Every year</div>
+                            <div class="trend-summary-value" id="savings-yearly">₹0.00</div>
+                            <div class="trend-summary-note">kept in your pocket</div>
+                        </div>
+                    </div>
+                    <div id="savings-list" class="expense-detail-card" style="margin-top:12px;"></div>
                 </section>
 
                 <section id="budget-progress-section" style="display:none;">
