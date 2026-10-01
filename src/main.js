@@ -26,6 +26,7 @@ import { findRecurring, readStatement } from './lib/statement.js';
 import { initErrorReporting, reportError } from './lib/errors.js';
 import { budgetUsage } from './lib/budgets.js';
 import { parseBankSmsList } from './lib/sms.js';
+import { savingsSummary } from './lib/savings.js';
 
 // ═══════════════════════════════════════════
 // SUPABASE CONFIG
@@ -658,6 +659,7 @@ async function loadAllData() {
         lastLoggedRenewal: s.last_logged_renewal,
         paused: s.paused || false,
         trialEnds: s.trial_ends || null,
+        cancelledOn: s.cancelled_on || null,
     }));
 
     categories = (catsRes.data || []).map(c => ({
@@ -811,6 +813,7 @@ async function upsertSubscription(sub) {
         paused: sub.paused || false,
         reminder: sub.reminder || 'none',
         trial_ends: sub.trialEnds || null,
+        cancelled_on: sub.cancelledOn || null,
     }));
 }
 
@@ -1416,6 +1419,27 @@ function getMonthlySpendTotalForOffset(offset = 0) {
     }, 0);
 }
 
+function renderSavings() {
+    const section = document.getElementById('savings-section');
+    if (!section) return;
+    const summary = savingsSummary(subscriptions);
+    if (!summary.items.length) {
+        section.style.display = 'none';
+        return;
+    }
+    section.style.display = 'block';
+    const money = n => `${getCurrencySymbol()}${formatAmount(n)}`;
+    document.getElementById('savings-total').textContent = money(summary.saved);
+    document.getElementById('savings-note').textContent =
+        `from ${summary.items.length} cancelled plan${summary.items.length > 1 ? 's' : ''}`;
+    document.getElementById('savings-yearly').textContent = money(summary.perYear);
+    document.getElementById('savings-list').innerHTML = summary.items.map(i => `
+        <div class="expense-detail-row">
+            <span class="label">${escapeHTML(i.sub.name)} · since ${escapeHTML(formatDate(i.sub.cancelledOn))}</span>
+            <span>${money(i.saved)}</span>
+        </div>`).join('');
+}
+
 function renderForecast() {
     const section = document.getElementById('forecast-section');
     if (!section) return;
@@ -1798,9 +1822,7 @@ function viewDetails(id) {
     document.getElementById('edit-custom-days-group').style.display = isCustom ? 'block' : 'none';
     if (isCustom) document.getElementById('edit-custom-days').value = sub.cycle;
 
-    // Pause button state
-    document.getElementById('pause-icon').textContent = sub.paused ? 'play_arrow' : 'pause';
-    document.getElementById('pause-label').textContent = sub.paused ? 'Resume Subscription' : 'Pause Subscription';
+    renderPauseCancelButtons(sub);
 
     switchPage('details-page', { pushHistory: true });
 }
@@ -1947,6 +1969,7 @@ document.getElementById('edit-form').addEventListener('submit', async e => {
 async function togglePaused(sub) {
     const update = { ...sub, paused: !sub.paused };
     if (!update.paused) {
+        update.cancelledOn = null;
         const loggedThrough = getResumeLoggedThrough(sub);
         if (loggedThrough) update.lastLoggedRenewal = loggedThrough;
     }
@@ -1956,13 +1979,41 @@ async function togglePaused(sub) {
     return true;
 }
 
+function renderPauseCancelButtons(sub) {
+    const cancelled = Boolean(sub.cancelledOn);
+    document.getElementById('pause-sub-btn').style.display = cancelled ? 'none' : 'flex';
+    document.getElementById('pause-icon').textContent = sub.paused ? 'play_arrow' : 'pause';
+    document.getElementById('pause-label').textContent = sub.paused ? 'Resume Subscription' : 'Pause Subscription';
+    document.getElementById('cancel-icon').textContent = cancelled ? 'restart_alt' : 'savings';
+    document.getElementById('cancel-label').textContent = cancelled
+        ? `Cancelled ${formatDate(sub.cancelledOn)} · Restart`
+        : 'I cancelled this';
+}
+
+// Cancelling keeps the plan (paused, with the date) so savings can be counted.
+document.getElementById('cancel-sub-btn').addEventListener('click', async () => {
+    const sub = subscriptions.find(s => s.id === activeSubId);
+    if (!sub) return;
+    if (sub.cancelledOn) {
+        // A cancelled plan is paused, so resuming it restarts billing from today.
+        if (!await togglePaused(sub)) return;
+        showToast('Subscription restarted');
+    } else {
+        const update = { ...sub, paused: true, cancelledOn: todayISO() };
+        if ((await upsertSubscription(update)).error) return;
+        Object.assign(sub, update);
+        haptic('success');
+        showToast(`Nice. That's ${getCurrencySymbol()}${formatAmount(getMonthlyCost(sub) * 12)} a year you keep.`, 3500);
+    }
+    renderPauseCancelButtons(sub);
+});
+
 // Pause button
 document.getElementById('pause-sub-btn').addEventListener('click', async () => {
     const sub = subscriptions.find(s => s.id === activeSubId);
     if (!sub || !await togglePaused(sub)) return;
     haptic('medium');
-    document.getElementById('pause-icon').textContent = sub.paused ? 'play_arrow' : 'pause';
-    document.getElementById('pause-label').textContent = sub.paused ? 'Resume Subscription' : 'Pause Subscription';
+    renderPauseCancelButtons(sub);
     showToast(sub.paused ? 'Paused' : 'Resumed');
 });
 
@@ -3196,7 +3247,7 @@ async function renderApp() {
             if (sub.paused) {
                 const badge = document.createElement('span');
                 badge.style.cssText = 'font-size:0.65rem;background:var(--surface-high);color:var(--on-surface-variant);padding:2px 8px;border-radius:99px;font-family:var(--font-body);margin-left:6px;';
-                badge.textContent = 'Paused';
+                badge.textContent = sub.cancelledOn ? 'Cancelled' : 'Paused';
                 titleEl.appendChild(badge);
             } else if (isInTrial(sub)) {
                 const badge = document.createElement('span');
@@ -3445,6 +3496,16 @@ function renderInsights() {
         }
     });
 
+    const savings = savingsSummary(subscriptions, now);
+    if (savings.saved > 0) {
+        const top = savings.items[0];
+        candidates.push({
+            score: 320,
+            title: 'Cancelling Paid Off',
+            text: `You've kept ${sym}${fmt(savings.saved)} since cancelling ${savings.items.length > 1 ? `${savings.items.length} plans` : top.sub.name}. That's ${sym}${fmt(savings.perYear)} a year.`,
+        });
+    }
+
     const endingTrials = activeSubs
         .filter(sub => isInTrial(sub))
         .map(sub => ({ sub, days: Math.round((parseDateValue(sub.trialEnds) - todayMidnight) / msDay) }))
@@ -3506,6 +3567,7 @@ function renderAnalytics() {
     document.getElementById('ytd-spend').textContent = formatAmount(summaryValue);
     renderTrendChart();
     renderForecast();
+    renderSavings();
     renderBudgetProgress();
 
     // ── JS-injected search input (only when subscriptions.length > 7) ──
