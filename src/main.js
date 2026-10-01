@@ -23,6 +23,7 @@ import { getPushSubscription, pushSupported, unsubscribePush } from './lib/push.
 import { priceChangeImpact, recentIncreases } from './lib/prices.js';
 import { forecastNextMonth } from './lib/forecast.js';
 import { findRecurring, readStatement } from './lib/statement.js';
+import { initErrorReporting, reportError } from './lib/errors.js';
 
 // ═══════════════════════════════════════════
 // SUPABASE CONFIG
@@ -97,6 +98,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
         storage: IdbStorage,
     }
 });
+initErrorReporting(sb);
 
 // ═══════════════════════════════════════════
 // GLOBAL STATE
@@ -141,11 +143,13 @@ async function sbWrite(fn) {
             : result?.error || null;
         if (error) {
             console.error('[Atler] Supabase write rejected:', error);
+            reportError('write', error, { code: error.code ?? null, details: error.details ?? null });
             showToast('Could not save — ' + (error.message || 'check your connection'));
         }
         return { error, result };
     } catch (err) {
         console.error('[Atler] Supabase write exception:', err);
+        if (navigator.onLine) reportError('write', err);
         showToast('Could not save — check your connection');
         return { error: err, result: null };
     }

@@ -8,7 +8,7 @@ import { createServer } from 'node:http';
 
 const PORT = Number(process.env.MOCK_PORT || 54329);
 const USER_ID = '00000000-0000-4000-8000-0000000000a1';
-const TABLES = ['profiles', 'subscriptions', 'categories', 'expenses', 'push_subscriptions', 'sent_reminders', 'price_changes'];
+const TABLES = ['profiles', 'subscriptions', 'categories', 'expenses', 'push_subscriptions', 'sent_reminders', 'price_changes', 'error_log'];
 const PRIMARY_KEY = {
     profiles: ['user_id'],
     push_subscriptions: ['endpoint'],

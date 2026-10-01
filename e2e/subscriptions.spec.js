@@ -21,6 +21,11 @@ test('a subscription that fails to save does not stay on screen', async ({ page,
     await expect(page.locator('#toast')).toContainText('Could not save');
     await expect(page.locator('#portfolio-list')).not.toContainText('Spotify');
     expect(await dbRows(request, 'subscriptions')).toEqual([]);
+    // ...and the failure is reported for debugging.
+    await expect.poll(async () => (await dbRows(request, 'error_log')).map(e => [e.kind, e.message]))
+        .toEqual([['write', 'mock failure']]);
+    const [logged] = await dbRows(request, 'error_log');
+    expect(logged.release).toMatch(/^[0-9a-f]{7}$|^dev$/);
 });
 
 const seededSub = overrides => ({

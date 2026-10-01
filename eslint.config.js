@@ -5,7 +5,7 @@ export default [
   { ignores: ['dist/', 'dist-e2e/', 'node_modules/', 'test-results/', 'playwright-report/'] },
   js.configs.recommended,
   {
-    languageOptions: { globals: { ...globals.browser } },
+    languageOptions: { globals: { ...globals.browser, __APP_RELEASE__: 'readonly' } },
     rules: {
       // The UI code predates linting; keep the signal on real bugs.
       'no-unused-vars': 'warn',

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { execSync } from 'node:child_process';
 import { defineConfig } from 'vite';
 
 // Emits sw.js with the hashed build assets in its precache list and a cache
@@ -22,7 +23,18 @@ function serviceWorker() {
   };
 }
 
+// Which build an error came from: the commit on CI, else the local HEAD.
+function release() {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7);
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim();
+  } catch {
+    return 'dev';
+  }
+}
+
 export default defineConfig({
+  define: { __APP_RELEASE__: JSON.stringify(release()) },
   // GitHub Pages serves the app from /ATLER/, so keep every URL relative.
   base: './',
   plugins: [serviceWorker()],

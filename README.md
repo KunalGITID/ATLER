@@ -46,3 +46,10 @@ The app talks to the hosted Supabase project. The key in `src/main.js` is the pu
 
 ## Database
 Migrations live in `supabase/migrations/`. `001_baseline.sql` records the schema as it was before migrations were tracked here. Apply new ones in order from the Supabase SQL editor.
+
+## Errors from real users
+Uncaught errors, unhandled rejections and failed saves are written to `error_log` (insert-only from the app; max 20 per session, duplicates dropped). Read them in the Supabase SQL editor:
+```sql
+select created_at, kind, message, release, context, url
+from error_log order by created_at desc limit 50;
+```
