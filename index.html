@@ -1163,6 +1163,17 @@
     </div>
 
     <!-- Data Management Modal -->
+    <div id="statement-overlay" class="statement-overlay" style="display:none;">
+        <div class="statement-sheet" role="dialog" aria-modal="true" aria-labelledby="statement-title">
+            <div class="statement-title" id="statement-title">Found in your statement</div>
+            <div class="data-modal-hint" id="statement-summary"></div>
+            <div id="statement-list" class="statement-list"></div>
+            <div class="statement-actions">
+                <button type="button" class="btn" id="statement-cancel-btn">Cancel</button>
+                <button type="button" class="btn-primary" id="statement-add-btn">Add selected</button>
+            </div>
+        </div>
+    </div>
     <div id="data-modal-overlay"
         style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;">
         <div id="data-modal"
@@ -1197,6 +1208,15 @@
                 CSV imports append rows into Atler. JSON imports replace the current data with a full backup snapshot.
             </div>
             <input type="file" id="import-file-input" accept=".json,.csv,text/csv,application/json" style="display:none;">
+            <button id="dm-statement-btn"
+                style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--glass-border);color:var(--on-surface);padding:14px 16px;border-radius:var(--radius-md);font-size:0.92rem;font-family:var(--font-body);cursor:pointer;width:100%;text-align:left;">
+                <span class="material-symbols-outlined" style="font-size:20px;color:var(--primary);">manage_search</span>Find
+                subscriptions in a bank statement
+            </button>
+            <div class="data-modal-hint">
+                Pick your bank's CSV statement. It is read on this device only and never uploaded.
+            </div>
+            <input type="file" id="statement-file-input" accept=".csv,text/csv" style="display:none;">
             <button id="dm-clear-btn"
                 style="display:flex;align-items:center;gap:12px;background:var(--error-bg);border:1px solid var(--error);color:var(--error);padding:14px 16px;border-radius:var(--radius-md);font-size:0.92rem;font-family:var(--font-body);cursor:pointer;width:100%;text-align:left;">
                 <span class="material-symbols-outlined" style="font-size:20px;">delete_forever</span>Clear All Data
