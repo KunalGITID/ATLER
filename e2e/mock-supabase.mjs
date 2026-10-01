@@ -18,9 +18,28 @@ const PRIMARY_KEY = {
 let db = Object.fromEntries(TABLES.map(t => [t, []]));
 const failNext = new Set();
 
+function matchesOne(row, key, raw) {
+    const [op, ...rest] = raw.split('.');
+    const value = rest.join('.');
+    const cell = row[key] == null ? null : String(row[key]);
+    if (op === 'is') return value === 'null' ? cell === null : String(cell) === value;
+    if (op === 'not') return !matchesOne(row, key, value);
+    return matches(row, [[key, raw]]);
+}
+
 function matches(row, params) {
     for (const [key, raw] of params) {
         if (['select', 'on_conflict', 'order', 'columns', 'limit'].includes(key)) continue;
+        if (key === 'or') {
+            // or=(a.op.value,b.op.value): any one condition is enough
+            const parts = raw.replace(/^\(|\)$/g, '').split(',');
+            if (!parts.some(p => { const [k, ...r] = p.split('.'); return matchesOne(row, k, r.join('.')); })) return false;
+            continue;
+        }
+        if (raw.startsWith('is.') || raw.startsWith('not.')) {
+            if (!matchesOne(row, key, raw)) return false;
+            continue;
+        }
         const [op, ...rest] = raw.split('.');
         const value = rest.join('.');
         const cell = row[key] == null ? null : String(row[key]);

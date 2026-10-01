@@ -2337,3 +2337,27 @@ button.list-item {
   color: var(--on-surface-variant);
   margin: -2px 0 10px;
 }
+
+.trial-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: var(--on-surface);
+  margin: 4px 0 16px;
+  cursor: pointer;
+}
+.trial-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+.trial-badge {
+  font-size: 0.65rem;
+  background: var(--primary-container);
+  color: var(--primary);
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-family: var(--font-body);
+  margin-left: 6px;
+}

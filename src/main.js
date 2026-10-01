@@ -18,7 +18,7 @@ import {
     normalizeCycle,
 } from './lib/dates.js';
 import { toCsv, parseCsvRecords } from './lib/csv.js';
-import { dueReminders, reminderMessage } from './lib/reminders.js';
+import { dueReminders, isInTrial, reminderMessage } from './lib/reminders.js';
 import { getPushSubscription, pushSupported, unsubscribePush } from './lib/push.js';
 import { priceChangeImpact, recentIncreases } from './lib/prices.js';
 import { forecastNextMonth } from './lib/forecast.js';
@@ -656,6 +656,7 @@ async function loadAllData() {
         category: s.category || 'unlisted',
         lastLoggedRenewal: s.last_logged_renewal,
         paused: s.paused || false,
+        trialEnds: s.trial_ends || null,
     }));
 
     categories = (catsRes.data || []).map(c => ({
@@ -808,6 +809,7 @@ async function upsertSubscription(sub) {
         last_logged_renewal: sub.lastLoggedRenewal || null,
         paused: sub.paused || false,
         reminder: sub.reminder || 'none',
+        trial_ends: sub.trialEnds || null,
     }));
 }
 
@@ -1766,7 +1768,8 @@ function viewDetails(id) {
         : 'No budget set';
 
     document.getElementById('detail-name').textContent = sub.name;
-    document.getElementById('detail-cycle').textContent = formatCycle(sub.cycle) + ' Plan';
+    document.getElementById('detail-cycle').textContent = formatCycle(sub.cycle) + ' Plan'
+        + (isInTrial(sub) ? ` · free trial until ${formatDate(sub.trialEnds)}` : '');
     const ageEl = document.getElementById('detail-age');
     if (ageEl) ageEl.textContent = getSubAge(sub.dateAdded);
     const detailIconEl = document.getElementById('detail-icon-circle');
@@ -1786,6 +1789,8 @@ function viewDetails(id) {
     document.getElementById('edit-price').value = sub.price;
     document.getElementById('edit-start-date').value = sub.startDate || sub.dateAdded?.split('T')[0] || todayISO();
     fillCategorySelect(document.getElementById('edit-category'), sub.category);
+    document.getElementById('edit-trial-group').style.display = isInTrial(sub) ? 'block' : 'none';
+    document.getElementById('edit-trial-ends').value = isInTrial(sub) ? sub.trialEnds : '';
     renderReminderPreference(sub.id);
 
     const isCustom = sub.cycle !== 'Monthly' && sub.cycle !== 'Yearly';
@@ -1836,6 +1841,12 @@ async function saveSubscriptionEdit(sub, name, cycle, reminder) {
         category: document.getElementById('edit-category').value || sub.category || 'unlisted',
         reminder,
     };
+    if (isInTrial(sub)) {
+        // Moving the end date moves the first charge with it; clearing it means it already converted.
+        const trialEnds = document.getElementById('edit-trial-ends').value || null;
+        update.trialEnds = trialEnds;
+        if (trialEnds) update.startDate = trialEnds;
+    }
     if ((await upsertSubscription(update)).error) return false;
     document.getElementById('detail-category-name').textContent =
         categories.find(c => c.id === update.category)?.name || 'Unlisted';
@@ -2611,6 +2622,26 @@ const customDaysGroup = document.getElementById('custom-days-group');
 
 document.getElementById('add-start-date').value = todayISO();
 
+document.getElementById('add-is-trial').addEventListener('change', e => {
+    const trial = e.target.checked;
+    document.getElementById('add-trial-group').style.display = trial ? 'block' : 'none';
+    document.getElementById('add-start-group').style.display = trial ? 'none' : 'block';
+    document.getElementById('add-price-label').textContent = trial ? 'Price after the trial (₹)' : 'Price (₹)';
+    if (trial && !document.getElementById('add-trial-ends').value) {
+        const inAWeek = new Date();
+        inAWeek.setDate(inAWeek.getDate() + 7);
+        document.getElementById('add-trial-ends').value = getLocalDateKey(inAWeek);
+    }
+});
+
+function resetTrialFields() {
+    document.getElementById('add-is-trial').checked = false;
+    document.getElementById('add-trial-ends').value = '';
+    document.getElementById('add-trial-group').style.display = 'none';
+    document.getElementById('add-start-group').style.display = 'block';
+    document.getElementById('add-price-label').textContent = 'Price (₹)';
+}
+
 cycleSelect.addEventListener('change', e => {
     const show = e.target.value === 'Custom';
     customDaysGroup.style.display = show ? 'block' : 'none';
@@ -2625,9 +2656,16 @@ addForm.addEventListener('submit', async e => {
     const name = document.getElementById('add-name').value.trim();
     let cycle = document.getElementById('add-cycle').value;
     const price = document.getElementById('add-price').value;
-    const startDate = document.getElementById('add-start-date').value;
+    const isTrial = document.getElementById('add-is-trial').checked;
+    const trialEnds = isTrial ? document.getElementById('add-trial-ends').value : null;
+    // A trial's first charge is the day it ends, so billing starts then.
+    const startDate = isTrial ? trialEnds : document.getElementById('add-start-date').value;
     const customDays = document.getElementById('add-custom-days').value;
     if (!name || !price) return;
+    if (isTrial && (!trialEnds || trialEnds <= todayISO())) {
+        showToast('Pick a trial end date after today');
+        return;
+    }
     if (cycle === 'Custom') {
         if (!customDays || parseInt(customDays) <= 0) return;
         cycle = parseInt(customDays);
@@ -2654,12 +2692,14 @@ addForm.addEventListener('submit', async e => {
                     reminder: 'none',
                     category: 'unlisted',
                     paused: false,
+                    trialEnds,
                 };
                 if ((await upsertSubscription(newSub)).error) return;
                 subscriptions.push(newSub);
                 await autoLogRenewals();
                 haptic('success');
                 addForm.reset();
+                resetTrialFields();
                 document.getElementById('add-start-date').value = todayISO();
                 customDaysGroup.style.display = 'none';
                 closeAddSheet();
@@ -2691,12 +2731,14 @@ addForm.addEventListener('submit', async e => {
             reminder: 'none',
             category: 'unlisted',
             paused: false,
+            trialEnds,
         };
         if ((await upsertSubscription(newSub)).error) return;
         subscriptions.push(newSub);
         await autoLogRenewals();
         haptic('success');
         addForm.reset();
+        resetTrialFields();
         document.getElementById('add-start-date').value = todayISO();
         customDaysGroup.style.display = 'none';
         closeAddSheet();
@@ -3110,6 +3152,11 @@ async function renderApp() {
                 badge.style.cssText = 'font-size:0.65rem;background:var(--surface-high);color:var(--on-surface-variant);padding:2px 8px;border-radius:99px;font-family:var(--font-body);margin-left:6px;';
                 badge.textContent = 'Paused';
                 titleEl.appendChild(badge);
+            } else if (isInTrial(sub)) {
+                const badge = document.createElement('span');
+                badge.className = 'trial-badge';
+                badge.textContent = `Trial · ends ${parseDateValue(sub.trialEnds).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`;
+                titleEl.appendChild(badge);
             }
             const subtitleEl = document.createElement('div'); subtitleEl.className = 'list-subtitle'; subtitleEl.textContent = formatCycle(sub.cycle);
             info.appendChild(titleEl); info.appendChild(subtitleEl);
@@ -3351,6 +3398,20 @@ function renderInsights() {
             });
         }
     });
+
+    const endingTrials = activeSubs
+        .filter(sub => isInTrial(sub))
+        .map(sub => ({ sub, days: Math.round((parseDateValue(sub.trialEnds) - todayMidnight) / msDay) }))
+        .filter(t => t.days <= 3)
+        .sort((a, b) => a.days - b.days);
+    if (endingTrials.length) {
+        const { sub, days } = endingTrials[0];
+        candidates.push({
+            score: 900,
+            title: 'Free Trial Ending',
+            text: `${sub.name}'s trial ends ${days <= 1 ? 'tomorrow' : `in ${days} days`}, then it's ${sym}${fmt(sub.price)} ${formatCycle(sub.cycle).toLowerCase()}. Cancel before then if you're not using it.`,
+        });
+    }
 
     const increases = recentIncreases(priceChanges, new Map(subscriptions.map(s => [s.id, s])), now);
     if (increases.length) {
