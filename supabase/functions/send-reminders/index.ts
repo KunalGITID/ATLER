@@ -35,7 +35,7 @@ Deno.serve(async req => {
 
     const [{ data: profiles }, { data: subs }] = await Promise.all([
         sb.from('profiles').select('user_id, timezone').in('user_id', userIds),
-        sb.from('subscriptions').select('*').in('user_id', userIds).eq('paused', false).neq('reminder', 'none'),
+        sb.from('subscriptions').select('*').in('user_id', userIds).eq('paused', false).or('reminder.neq.none,trial_ends.not.is.null'),
     ]);
     const tzOf = new Map((profiles ?? []).map(p => [p.user_id, p.timezone || 'Asia/Kolkata']));
 
@@ -48,7 +48,7 @@ Deno.serve(async req => {
 
         const mine = (subs ?? []).filter(s => s.user_id === userId).map(s => ({
             id: s.id, name: s.name, price: s.price, cycle: s.cycle, reminder: s.reminder, paused: s.paused,
-            startDate: s.start_date, dateAdded: s.date_added,
+            startDate: s.start_date, dateAdded: s.date_added, trialEnds: s.trial_ends,
         }));
         for (const reminder of dueReminders(mine, parseDateValue(date))) {
             due++;
