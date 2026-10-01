@@ -1,7 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { today as todayDay, type Cycle } from '../core/dates.ts';
 import { formatRupees, parseRupees } from '../core/money.ts';
-import type { Plan } from '../core/model.ts';
+import type { Category, Plan } from '../core/model.ts';
+import { resolveCategory } from '../data/actions.ts';
+import { setPlanCategory } from '../data/categoryActions.ts';
+import { CategoryPicker, NEW_CATEGORY } from '../ui/CategoryPicker.tsx';
 import type { AtlerDB } from '../data/db.ts';
 import { editPlan } from '../data/planActions.ts';
 import { Button } from '../ui/Button.tsx';
@@ -9,18 +12,23 @@ import { Field } from '../ui/Field.tsx';
 import { Sheet } from '../ui/Sheet.tsx';
 import { CYCLES, cycleKey } from './cycles.ts';
 
-export function EditPlanSheet({ db, plan, open, onClose }: { db: AtlerDB; plan: Plan; open: boolean; onClose: () => void }) {
+export function EditPlanSheet({ db, plan, categories, open, onClose }: { db: AtlerDB; plan: Plan; categories: Category[]; open: boolean; onClose: () => void }) {
   const [name, setName] = useState(plan.name);
   const [amount, setAmount] = useState(String(plan.price / 100));
   const [cycle, setCycle] = useState(cycleKey(plan.cycle));
   const [error, setError] = useState('');
+  const [category, setCategory] = useState(plan.categoryId ?? '');
+  const [newCategory, setNewCategory] = useState('');
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     const price = parseRupees(amount);
     if (!name.trim()) return setError('It needs a name.');
     if (price === null || price <= 0) return setError('Enter an amount like 199 or 199.50.');
+    if (category === NEW_CATEGORY && !newCategory.trim()) return setError('Name the new category.');
     await editPlan(db, plan, { name, price, cycle: CYCLES[cycle]!.cycle as Cycle }, todayDay());
+    const categoryId = await resolveCategory(db, category, newCategory);
+    if (categoryId !== plan.categoryId) await setPlanCategory(db, plan.id, categoryId);
     onClose();
   }
 
@@ -38,6 +46,7 @@ export function EditPlanSheet({ db, plan, open, onClose }: { db: AtlerDB; plan: 
             {Object.entries(CYCLES).map(([key, c]) => <option key={key} value={key}>{c.label}</option>)}
           </select>
         </div>
+        <CategoryPicker categories={categories} value={category} onChange={setCategory} newName={newCategory} onNewName={setNewCategory} />
         {error && <p role="alert" className="text-sm font-semibold text-danger">{error}</p>}
         <Button kind="primary" type="submit">SAVE</Button>
       </form>

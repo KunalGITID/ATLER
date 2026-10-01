@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { describeCycle, today as todayDay, type Day } from '../core/dates.ts';
 import { formatRupees } from '../core/money.ts';
-import type { Plan, PlanEvent } from '../core/model.ts';
+import type { Category, Plan, PlanEvent } from '../core/model.ts';
 import { planView } from '../core/plan.ts';
 import type { AtlerDB } from '../data/db.ts';
 import { deletePlan, setStatus } from '../data/planActions.ts';
@@ -15,7 +15,7 @@ import { ConfirmSheet, EditPlanSheet } from './PlanSheets.tsx';
 const fmtDay = (d: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 const perLabel = (p: Plan) => (p.cycle.unit === 'month' && p.cycle.every === 1 ? '/MO' : p.cycle.unit === 'year' && p.cycle.every === 1 ? '/YR' : '');
 
-export function PlanDetails({ db, plan, events }: { db: AtlerDB; plan: Plan; events: PlanEvent[] }) {
+export function PlanDetails({ db, plan, events, categories }: { db: AtlerDB; plan: Plan; events: PlanEvent[]; categories: Category[] }) {
   const today = todayDay();
   const v = planView(plan, events, today);
   const [sheet, setSheet] = useState<'edit' | 'cancel' | 'delete' | null>(null);
@@ -67,8 +67,18 @@ export function PlanDetails({ db, plan, events }: { db: AtlerDB; plan: Plan; eve
       )}
 
       <Block className="!px-4 !py-1">
-        <div className="flex justify-between border-b-2 border-ground py-3 text-sm"><span className="text-ink-2">Per year</span><span className="num font-bold">{formatRupees(v.perYear)}</span></div>
-        <div className="flex justify-between py-3 text-sm"><span className="text-ink-2">Tracked since</span><span className="font-bold">{fmtDay(plan.createdOn)}</span></div>
+        <dl aria-label="About this plan" className="text-sm">
+          {([
+            ['Per year', <span key="y" className="num">{formatRupees(v.perYear)}</span>],
+            ['Category', categories.find(c => c.id === plan.categoryId)?.name ?? 'None'],
+            ['Tracked since', fmtDay(plan.createdOn)],
+          ] as const).map(([term, value], i) => (
+            <div key={term} className={`flex justify-between py-3 ${i ? 'border-t-2 border-ground' : ''}`}>
+              <dt className="text-ink-2">{term}</dt>
+              <dd className="m-0 font-bold">{value}</dd>
+            </div>
+          ))}
+        </dl>
       </Block>
 
       <div className="mt-2 grid grid-cols-2 gap-2.5">
@@ -84,7 +94,7 @@ export function PlanDetails({ db, plan, events }: { db: AtlerDB; plan: Plan; eve
       )}
       <Button kind="danger" onClick={() => setSheet('delete')}>Delete</Button>
 
-      <EditPlanSheet key={plan.id + plan.price + plan.name} db={db} plan={plan} open={sheet === 'edit'} onClose={close} />
+      <EditPlanSheet key={plan.id + plan.price + plan.name + plan.categoryId} db={db} plan={plan} categories={categories} open={sheet === 'edit'} onClose={close} />
       <ConfirmSheet
         open={sheet === 'cancel'}
         title={`Cancelled ${plan.name}?`}

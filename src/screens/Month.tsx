@@ -1,6 +1,8 @@
 import { addDays, today as todayDay, type Day } from '../core/dates.ts';
 import { formatRupees } from '../core/money.ts';
-import type { Payment, Plan, PlanEvent } from '../core/model.ts';
+import type { Category, Payment, Plan, PlanEvent } from '../core/model.ts';
+import { budgetLines } from '../core/budgets.ts';
+import { BudgetBar } from '../ui/BudgetBar.tsx';
 import { canCompareWithLastMonth, monthRing, nextUp, plansPerMonth, priceCreep, vsLastMonth } from '../core/month.ts';
 import { renewalsBetween } from '../core/renewals.ts';
 import { Block, Kicker } from '../ui/Block.tsx';
@@ -17,8 +19,8 @@ function when(today: Day, on: Day) {
   return n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : `In ${n} days`;
 }
 
-export function Month({ plans, events, payments, onAdd }: {
-  plans: Plan[]; events: PlanEvent[]; payments: Payment[]; onAdd: () => void;
+export function Month({ plans, events, payments, categories, onAdd }: {
+  plans: Plan[]; events: PlanEvent[]; payments: Payment[]; categories: Category[]; onAdd: () => void;
 }) {
   const today = todayDay();
 
@@ -34,6 +36,7 @@ export function Month({ plans, events, payments, onAdd }: {
 
   const ring = monthRing(today, plans, events, payments);
   const compare = canCompareWithLastMonth(today, plans, payments);
+  const budgets = budgetLines(today, categories, plans, events, payments);
   const next = nextUp(today, plans, events);
   const creep = priceCreep(today, plans, events);
   // The list continues after the "Next up" tile, so nothing is shown twice.
@@ -99,6 +102,13 @@ export function Month({ plans, events, payments, onAdd }: {
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {budgets.length > 0 && (
+        <section aria-labelledby="budgets" className="rounded-tile bg-block px-4 pt-3 pb-1">
+          <h2 id="budgets" className="text-[11px] font-extrabold tracking-[0.1em] text-ink-2 uppercase">Budgets this month</h2>
+          <ul>{budgets.map((b, i) => <li key={b.category.id} className={i ? 'border-t-2 border-ground' : ''}><BudgetBar line={b} /></li>)}</ul>
         </section>
       )}
     </div>

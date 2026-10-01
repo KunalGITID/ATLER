@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { parseDay, today as todayDay } from '../core/dates.ts';
 import { parseRupees } from '../core/money.ts';
-import { addPayment, addPlan } from '../data/actions.ts';
+import { addPayment, addPlan, resolveCategory } from '../data/actions.ts';
+import type { Category } from '../core/model.ts';
+import { CategoryPicker, NEW_CATEGORY } from '../ui/CategoryPicker.tsx';
 import type { AtlerDB } from '../data/db.ts';
 import { Button } from '../ui/Button.tsx';
 import { Field } from '../ui/Field.tsx';
@@ -12,7 +14,7 @@ import { CYCLES } from './cycles.ts';
 type Kind = 'plan' | 'expense';
 
 
-export function AddSheet({ db, open, onClose }: { db: AtlerDB; open: boolean; onClose: () => void }) {
+export function AddSheet({ db, categories, open, onClose }: { db: AtlerDB; categories: Category[]; open: boolean; onClose: () => void }) {
   const today = todayDay();
   const [kind, setKind] = useState<Kind>('plan');
   const [name, setName] = useState('');
@@ -20,9 +22,11 @@ export function AddSheet({ db, open, onClose }: { db: AtlerDB; open: boolean; on
   const [cycleKey, setCycleKey] = useState('monthly');
   const [date, setDate] = useState<string>(today);
   const [error, setError] = useState('');
+  const [category, setCategory] = useState('');
+  const [newCategory, setNewCategory] = useState('');
 
   function reset() {
-    setName(''); setAmount(''); setCycleKey('monthly'); setDate(todayDay()); setError('');
+    setName(''); setAmount(''); setCycleKey('monthly'); setDate(todayDay()); setError(''); setCategory(''); setNewCategory('');
   }
 
   async function submit(e: FormEvent) {
@@ -32,8 +36,10 @@ export function AddSheet({ db, open, onClose }: { db: AtlerDB; open: boolean; on
     if (!name.trim()) return setError(kind === 'plan' ? 'What is it called?' : 'What was it for?');
     if (price === null || price <= 0) return setError('Enter an amount like 199 or 199.50.');
     if (!day) return setError('Pick a date.');
-    if (kind === 'plan') await addPlan(db, { name, price, cycle: CYCLES[cycleKey]!.cycle, lastCharged: day, today });
-    else await addPayment(db, { name, amount: price, on: day });
+    if (category === NEW_CATEGORY && !newCategory.trim()) return setError('Name the new category.');
+    const categoryId = await resolveCategory(db, category, newCategory);
+    if (kind === 'plan') await addPlan(db, { name, price, cycle: CYCLES[cycleKey]!.cycle, lastCharged: day, today, categoryId });
+    else await addPayment(db, { name, amount: price, on: day, categoryId });
     reset();
     onClose();
   }
@@ -59,6 +65,7 @@ export function AddSheet({ db, open, onClose }: { db: AtlerDB; open: boolean; on
         )}
         <Field label={kind === 'plan' ? 'Last charged on' : 'Date'} type="date" value={date} onChange={e => setDate(e.target.value)} />
         {kind === 'plan' && <p className="-mt-1 text-xs text-ink-2">Every renewal is counted from this date. Use a future date if it hasn't started yet.</p>}
+        <CategoryPicker categories={categories} value={category} onChange={setCategory} newName={newCategory} onNewName={setNewCategory} />
         {error && <p role="alert" className="text-sm font-semibold text-danger">{error}</p>}
         <Button kind="primary" type="submit">{kind === 'plan' ? 'ADD PLAN' : 'ADD EXPENSE'}</Button>
       </form>

@@ -5,6 +5,8 @@ import { supabase } from '../data/supabase.ts';
 import { Block, Kicker } from '../ui/Block.tsx';
 import { Button } from '../ui/Button.tsx';
 import { ConfirmSheet } from './PlanSheets.tsx';
+import { Categories } from './Categories.tsx';
+import type { Category } from '../core/model.ts';
 
 async function exportBackup(db: AtlerDB) {
   const [plans, events, payments, categories] = await Promise.all([db.plans.toArray(), db.events.toArray(), db.payments.toArray(), db.categories.toArray()]);
@@ -18,7 +20,7 @@ async function exportBackup(db: AtlerDB) {
   URL.revokeObjectURL(url);
 }
 
-export function You({ db, session }: { db: AtlerDB; session: Session }) {
+export function You({ db, session, categories }: { db: AtlerDB; session: Session; categories: Category[] }) {
   const [erasing, setErasing] = useState(false);
   const name = (session.user.user_metadata?.name as string | undefined) ?? null;
   return (
@@ -28,6 +30,8 @@ export function You({ db, session }: { db: AtlerDB; session: Session }) {
         {name && <div className="mt-1 font-display text-2xl font-bold">{name}</div>}
         <div className="mt-0.5 truncate text-[15px] text-ink-2">{session.user.email}</div>
       </Block>
+
+      <Categories db={db} categories={categories} />
 
       <Block className="flex flex-col gap-2.5 !p-4">
         <Kicker className="text-ink-2">Your data</Kicker>

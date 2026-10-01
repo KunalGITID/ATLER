@@ -52,10 +52,10 @@ function SignedIn({ session }: { session: Session }) {
       </header>
 
       <main>
-        {route.name === 'plan' && plan ? <PlanDetails db={db} plan={plan} events={data.events.filter(e => e.planId === plan.id)} />
+        {route.name === 'plan' && plan ? <PlanDetails db={db} plan={plan} events={data.events.filter(e => e.planId === plan.id)} categories={data.categories} />
           : route.name === 'plans' ? <><h1 className="sr-only">Your plans</h1><Plans plans={data.plans} events={data.events} onAdd={() => setAdding(true)} /></>
-          : route.name === 'you' ? <><h1 className="sr-only">You</h1><You db={db} session={session} /></>
-          : <><h1 className="sr-only">Your month</h1><Month plans={data.plans} events={data.events} payments={data.payments} onAdd={() => setAdding(true)} /></>}
+          : route.name === 'you' ? <><h1 className="sr-only">You</h1><You db={db} session={session} categories={data.categories} /></>
+          : <><h1 className="sr-only">Your month</h1><Month plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} onAdd={() => setAdding(true)} /></>}
       </main>
 
       <nav aria-label="Main" className="fixed bottom-[max(20px,env(safe-area-inset-bottom))] left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-block-2 p-2">
@@ -73,7 +73,7 @@ function SignedIn({ session }: { session: Session }) {
         </button>
       </nav>
 
-      <AddSheet db={db} open={adding} onClose={() => setAdding(false)} />
+      <AddSheet db={db} categories={data.categories} open={adding} onClose={() => setAdding(false)} />
     </div>
   );
 }
