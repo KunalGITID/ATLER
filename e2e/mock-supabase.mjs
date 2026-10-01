@@ -8,7 +8,12 @@ import { createServer } from 'node:http';
 
 const PORT = Number(process.env.MOCK_PORT || 54329);
 const USER_ID = '00000000-0000-4000-8000-0000000000a1';
-const TABLES = ['profiles', 'subscriptions', 'categories', 'expenses'];
+const TABLES = ['profiles', 'subscriptions', 'categories', 'expenses', 'push_subscriptions', 'sent_reminders'];
+const PRIMARY_KEY = {
+    profiles: ['user_id'],
+    push_subscriptions: ['endpoint'],
+    sent_reminders: ['subscription_id', 'renewal_date', 'days_before'],
+};
 
 let db = Object.fromEntries(TABLES.map(t => [t, []]));
 const failNext = new Set();
@@ -20,6 +25,7 @@ function matches(row, params) {
         const value = rest.join('.');
         const cell = row[key] == null ? null : String(row[key]);
         if (op === 'eq' && cell !== value) return false;
+        if (op === 'neq' && cell === value) return false;
         if (op === 'in' && !value.replace(/^\(|\)$/g, '').split(',').map(v => v.replace(/^"|"$/g, '')).includes(cell)) return false;
         if (op === 'like') {
             const re = new RegExp('^' + value.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.') + '$');
@@ -91,9 +97,9 @@ const server = createServer((req, res) => {
         if (req.method === 'POST') {
             const rows = Array.isArray(body) ? body : [body];
             const prefer = req.headers.prefer || '';
-            const key = table === 'profiles' ? 'user_id' : 'id';
+            const key = PRIMARY_KEY[table] || ['id'];
             for (const row of rows) {
-                const hit = db[table].find(r => r[key] === row[key]);
+                const hit = db[table].find(r => key.every(k => String(r[k]) === String(row[k])));
                 if (hit && prefer.includes('ignore-duplicates')) continue;
                 if (hit && prefer.includes('merge-duplicates')) { Object.assign(hit, row); continue; }
                 if (hit) return send(409, { code: '23505', message: 'duplicate key value violates unique constraint' });
