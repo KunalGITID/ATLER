@@ -28,6 +28,8 @@ import { budgetUsage } from './lib/budgets.js';
 import { parseBankSmsList } from './lib/sms.js';
 import { savingsSummary } from './lib/savings.js';
 import { recentUnusual, unusualness } from './lib/anomalies.js';
+import { createOutbox, isNetworkError, runWrite } from './lib/outbox.js';
+import { idbStore } from './lib/store.js';
 
 // ═══════════════════════════════════════════
 // SUPABASE CONFIG
@@ -137,27 +139,56 @@ let activeSheetExpenseId = null;
 const presetCategories = ['Entertainment', 'Productivity', 'Utilities', 'Health', 'Food', 'Education'];
 const navItems = document.querySelectorAll('.nav-item');
 
-async function sbWrite(fn) {
-    try {
-        const result = await fn();
-        // Some callers run several writes together with Promise.all — surface
-        // the first failure from any of them, not just a single result.
-        const error = Array.isArray(result)
-            ? result.find(r => r?.error)?.error || null
-            : result?.error || null;
-        if (error) {
-            console.error('[Atler] Supabase write rejected:', error);
-            reportError('write', error, { code: error.code ?? null, details: error.details ?? null });
-            showToast('Could not save — ' + (error.message || 'check your connection'));
-        }
-        return { error, result };
-    } catch (err) {
-        console.error('[Atler] Supabase write exception:', err);
-        if (navigator.onLine) reportError('write', err);
-        showToast('Could not save — check your connection');
-        return { error: err, result: null };
+// ── Writes and the offline outbox ──
+// Every save goes through sbWrite as one or more plain write descriptors
+// (see lib/outbox.js). Offline, or when earlier offline writes are still
+// waiting, they're queued on the device and the app carries on as if saved;
+// the queue is replayed in order once the connection is back.
+const outbox = createOutbox({
+    store: idbStore,
+    run: w => runWrite(sb, w),
+    onDropped: (w, error) => {
+        reportError('write', error, { offlineReplay: true, table: w.table, op: w.op, code: error.code ?? null });
+        showToast(`A change made offline couldn't be saved: ${error.message || 'rejected'}`, 4000);
+    },
+});
+
+let toldQueued = false;
+async function queueWrites(writes) {
+    await outbox.add(writes);
+    if (!toldQueued) {
+        toldQueued = true;
+        showToast("You're offline. Saved on this phone; it will sync when you're back online.", 3500);
+    }
+    return { error: null, queued: true };
+}
+
+async function sbWrite(writes) {
+    const list = Array.isArray(writes) ? writes : [writes];
+    if (!navigator.onLine || outbox.size) return queueWrites(list);
+    for (let i = 0; i < list.length; i++) {
+        const { error } = await runWrite(sb, list[i]);
+        if (!error) continue;
+        if (isNetworkError(error)) return queueWrites(list.slice(i));
+        console.error('[Atler] Supabase write rejected:', error);
+        reportError('write', error, { code: error.code ?? null, details: error.details ?? null });
+        showToast('Could not save — ' + (error.message || 'check your connection'));
+        return { error };
+    }
+    return { error: null };
+}
+
+async function flushOutbox() {
+    if (!currentUser || !outbox.size || !navigator.onLine) return;
+    const { sent, remaining } = await outbox.flush();
+    if (!remaining) toldQueued = false;
+    if (sent && !remaining) {
+        showToast('Offline changes synced');
+        await loadAllData().catch(console.error);
+        await renderApp();
     }
 }
+window.addEventListener('online', () => { flushOutbox(); });
 
 function haptic(style = 'light') {
     if (!navigator.vibrate) return;
@@ -575,6 +606,8 @@ document.getElementById('reset-password-btn').addEventListener('click', async ()
 document.getElementById('signout-btn').addEventListener('click', async () => {
     isExplicitSignOut = true;
 
+    if (currentUser) await idbStore.del(`snapshot:${currentUser.id}`);
+
     // This device should stop receiving the signed-out user's reminders.
     const endpoint = await unsubscribePush().catch(() => null);
     if (endpoint) await sb.from('push_subscriptions').delete().eq('endpoint', endpoint).then(() => {}, () => {});
@@ -605,6 +638,12 @@ async function loadAllData() {
     // FORCE Supabase to validate and synchronize the token into the PostgREST client 
     // before making database calls, otherwise it sends an empty or stale token on refresh!
     const { data: authData, error: authErr } = await sb.auth.getUser();
+    if (authErr && isNetworkError(authErr)) {
+        // Offline: keep the session; the caller falls back to the saved snapshot.
+        const offline = new Error('offline');
+        offline.offline = true;
+        throw offline;
+    }
     if (authErr || !authData?.user) {
         console.error('[Atler] Token validation failed:', authErr);
         if (window.location.hash.includes('access_token=') || window.location.hash.includes('type=')) {
@@ -617,6 +656,18 @@ async function loadAllData() {
     const uid = authData.user.id;
     currentUser = authData.user;
     lastLoadError = '';
+
+    // Writes queued offline go first, so what we load already includes them.
+    await outbox.use(`outbox:${uid}`);
+    if (outbox.size) {
+        const { remaining } = await outbox.flush();
+        if (remaining) {
+            const offline = new Error('offline');
+            offline.offline = true;
+            throw offline;
+        }
+        toldQueued = false;
+    }
 
     let profRes, subsRes, catsRes, expsRes, pricesRes;
     try {
@@ -695,15 +746,17 @@ async function loadAllData() {
 
 async function saveProfile() {
     if (!currentUser) return;
-    await sbWrite(() => sb.from('profiles').upsert({
-        user_id: currentUser.id,
-        name: profile.name,
-        avatar: profile.avatar,
-        theme: profile.theme,
-        last_notified: profile.lastNotified || null,
-        currency: 'INR',
-        timezone: currentTimeZone(),
-    }));
+    await sbWrite({
+        table: 'profiles', op: 'upsert', values: {
+            user_id: currentUser.id,
+            name: profile.name,
+            avatar: profile.avatar,
+            theme: profile.theme,
+            last_notified: profile.lastNotified || null,
+            currency: 'INR',
+            timezone: currentTimeZone(),
+        },
+    });
 }
 
 function currentTimeZone() {
@@ -801,7 +854,7 @@ async function ensureUserProfile(user = currentUser) {
 
 async function upsertSubscription(sub) {
     if (!currentUser) return { error: new Error('Not signed in') };
-    return sbWrite(() => sb.from('subscriptions').upsert({
+    return sbWrite({ table: 'subscriptions', op: 'upsert', values: {
         id: sub.id,
         user_id: currentUser.id,
         name: sub.name,
@@ -815,7 +868,7 @@ async function upsertSubscription(sub) {
         reminder: sub.reminder || 'none',
         trial_ends: sub.trialEnds || null,
         cancelled_on: sub.cancelledOn || null,
-    }));
+    } });
 }
 
 function isAutoExpenseOf(exp, subId) {
@@ -829,11 +882,11 @@ function findSubForAutoExpense(expenseId) {
 async function deleteSubscription(id) {
     if (!currentUser) return false;
     const autoIds = expenses.filter(exp => isAutoExpenseOf(exp, id)).map(exp => exp.id);
-    const writes = [sb.from('subscriptions').delete().eq('id', id).eq('user_id', currentUser.id)];
+    const writes = [{ table: 'subscriptions', op: 'delete', match: { id, user_id: currentUser.id } }];
     if (autoIds.length) {
-        writes.push(sb.from('expenses').delete().in('id', autoIds).eq('user_id', currentUser.id));
+        writes.push({ table: 'expenses', op: 'delete', match: { user_id: currentUser.id }, in: ['id', autoIds] });
     }
-    const { error } = await sbWrite(() => Promise.all(writes));
+    const { error } = await sbWrite(writes);
     if (error) return false;
     expenses = expenses.filter(exp => !isAutoExpenseOf(exp, id));
     subscriptions = subscriptions.filter(s => s.id !== id);
@@ -843,26 +896,26 @@ async function deleteSubscription(id) {
 
 async function upsertCategory(cat) {
     if (!currentUser) return { error: new Error('Not signed in') };
-    return sbWrite(() => sb.from('categories').upsert({
+    return sbWrite({ table: 'categories', op: 'upsert', values: {
         id: cat.id,
         user_id: currentUser.id,
         name: cat.name,
         budget: cat.budget || null,
-    }));
+    } });
 }
 
 async function deleteCategoryFromDB(id) {
     if (!currentUser) return false;
     // Move everything out first, so a failure never leaves rows pointing at a deleted category.
-    const { error } = await sbWrite(() => Promise.all([
-        sb.from('subscriptions').update({ category: 'unlisted' }).eq('category', id).eq('user_id', currentUser.id),
-        sb.from('expenses').update({ category: 'unlisted' }).eq('category', id).eq('user_id', currentUser.id),
-    ]));
+    const { error } = await sbWrite([
+        { table: 'subscriptions', op: 'update', values: { category: 'unlisted' }, match: { category: id, user_id: currentUser.id } },
+        { table: 'expenses', op: 'update', values: { category: 'unlisted' }, match: { category: id, user_id: currentUser.id } },
+        { table: 'categories', op: 'delete', match: { id, user_id: currentUser.id } },
+    ]);
     if (error) return false;
     subscriptions.forEach(s => { if (s.category === id) s.category = 'unlisted'; });
     expenses.forEach(e => { if (e.category === id) e.category = 'unlisted'; });
-    const { error: delError } = await sbWrite(() => sb.from('categories').delete().eq('id', id).eq('user_id', currentUser.id));
-    return !delError;
+    return true;
 }
 
 window.deleteCategory = async function (id) {
@@ -875,7 +928,8 @@ window.deleteCategory = async function (id) {
 
 async function insertExpense(exp) {
     if (!currentUser) return { error: new Error('Not signed in') };
-    return sbWrite(() => sb.from('expenses').insert({
+    // Upsert, not insert: a write replayed after a dropped connection may already be saved.
+    return sbWrite({ table: 'expenses', op: 'upsert', values: {
         id: exp.id,
         user_id: currentUser.id,
         name: exp.name,
@@ -883,14 +937,14 @@ async function insertExpense(exp) {
         date: exp.date,
         type: exp.type || 'manual',
         category: exp.category || 'unlisted',
-    }));
+    } });
 }
 
 // Upsert with ignoreDuplicates so two open tabs logging the same renewal
 // don't fail on the primary key.
 async function insertExpenses(exps) {
     if (!currentUser || !exps.length) return { error: null };
-    return sbWrite(() => sb.from('expenses').upsert(
+    return sbWrite({ table: 'expenses', op: 'upsert', values:
         exps.map(exp => ({
             id: exp.id,
             user_id: currentUser.id,
@@ -900,32 +954,27 @@ async function insertExpenses(exps) {
             type: exp.type || 'manual',
             category: exp.category || 'unlisted',
         })),
-        { onConflict: 'id', ignoreDuplicates: true },
-    ));
+        options: { onConflict: 'id', ignoreDuplicates: true },
+    });
 }
 
 async function updateExpense(exp) {
     if (!currentUser) return { error: new Error('Not signed in') };
-    return sbWrite(() => sb
-        .from('expenses')
-        .update({
-            name: exp.name,
-            amount: exp.amount,
-            date: exp.date,
-            category: exp.category || 'unlisted',
-        })
-        .eq('id', exp.id)
-        .eq('user_id', currentUser.id));
+    return sbWrite({
+        table: 'expenses', op: 'update',
+        values: { name: exp.name, amount: exp.amount, date: exp.date, category: exp.category || 'unlisted' },
+        match: { id: exp.id, user_id: currentUser.id },
+    });
 }
 
 async function clearAllData() {
     if (!currentUser) return false;
     const uid = currentUser.id;
-    const { error } = await sbWrite(() => Promise.all([
-        sb.from('subscriptions').delete().eq('user_id', uid),
-        sb.from('categories').delete().eq('user_id', uid),
-        sb.from('expenses').delete().eq('user_id', uid),
-    ]));
+    const { error } = await sbWrite([
+        { table: 'subscriptions', op: 'delete', match: { user_id: uid } },
+        { table: 'categories', op: 'delete', match: { user_id: uid } },
+        { table: 'expenses', op: 'delete', match: { user_id: uid } },
+    ]);
     if (error) {
         // Some deletes may have gone through — reload so the screen matches the server.
         await loadAllData().catch(console.error);
@@ -1893,14 +1942,14 @@ async function saveSubscriptionEdit(sub, name, cycle, reminder) {
 
 async function recordPriceChange(subscriptionId, oldPrice, newPrice) {
     const change = { id: makeClientId('price'), subscriptionId, oldPrice, newPrice, changedOn: todayISO() };
-    const { error } = await sbWrite(() => sb.from('price_changes').insert({
+    const { error } = await sbWrite({ table: 'price_changes', op: 'upsert', values: {
         id: change.id,
         user_id: currentUser.id,
         subscription_id: subscriptionId,
         old_price: oldPrice,
         new_price: newPrice,
         changed_on: change.changedOn,
-    }));
+    } });
     if (!error) priceChanges.push(change);
 }
 
@@ -2080,7 +2129,8 @@ document.getElementById('delete-expense-btn').addEventListener('click', async ()
     const msg = 'Delete this expense? This will remove the manual expense from your history.';
     showConfirm(msg, async () => {
         haptic('error');
-        await sbWrite(() => sb.from('expenses').delete().eq('id', activeExpenseId).eq('user_id', currentUser.id));
+        const { error } = await sbWrite({ table: 'expenses', op: 'delete', match: { id: activeExpenseId, user_id: currentUser.id } });
+        if (error) return;
         expenses = expenses.filter(exp => exp.id !== activeExpenseId);
         activeExpenseId = null;
         showToast('Expense deleted');
@@ -2542,10 +2592,10 @@ document.getElementById('import-file-input').addEventListener('change', function
             for (const cat of (parsed.categories || [])) await upsertCategory(cat);
             await insertExpenses(parsed.expenses || []);
             for (const c of (parsed.priceChanges || [])) {
-                await sbWrite(() => sb.from('price_changes').insert({
+                await sbWrite({ table: 'price_changes', op: 'upsert', values: {
                     id: c.id, user_id: currentUser.id, subscription_id: c.subscriptionId,
                     old_price: c.oldPrice, new_price: c.newPrice, changed_on: c.changedOn,
-                }));
+                } });
             }
             if (parsed.profile) {
                 profile.name = parsed.profile.name || profile.name;
@@ -2955,7 +3005,7 @@ document.getElementById('edit-expense-delete-confirm-btn')?.addEventListener('cl
     if (!activeSheetExpenseId || !currentUser) return;
     const expenseId = activeSheetExpenseId;
     haptic('error');
-    const { error } = await sbWrite(() => sb.from('expenses').delete().eq('id', expenseId).eq('user_id', currentUser.id));
+    const { error } = await sbWrite({ table: 'expenses', op: 'delete', match: { id: expenseId, user_id: currentUser.id } });
     if (error) return;
     expenses = expenses.filter(exp => exp.id !== expenseId);
     closeAddSheet();
@@ -3210,6 +3260,11 @@ function renderExpensesView() {
 // RENDER APP
 // ═══════════════════════════════════════════
 async function renderApp() {
+    await renderAppInner();
+    saveSnapshot();
+}
+
+async function renderAppInner() {
     document.getElementById('user-display-name').textContent = profile.name;
     document.getElementById('user-avatar-img').src = profile.avatar;
 
@@ -3827,8 +3882,33 @@ async function runBootWithLoader(bootFn, minVisible = 0) {
     }
 }
 
+// The last data shown, kept on the device so Atler opens offline. It's
+// saved after every render, so changes made offline are in it too.
+const snapshotKey = () => `snapshot:${currentUser.id}`;
+const saveSnapshot = debounce(() => {
+    if (!currentUser) return;
+    idbStore.set(snapshotKey(), { profile, subscriptions, categories, expenses, priceChanges, savedAt: Date.now() });
+}, 400);
+
+async function restoreSnapshot() {
+    const snap = await idbStore.get(snapshotKey());
+    if (!snap) return false;
+    ({ profile, subscriptions, categories, expenses, priceChanges } = { priceChanges: [], ...snap });
+    applyTheme(profile.theme);
+    return true;
+}
+
 async function renderInitialSessionView() {
-    await loadAllData();
+    try {
+        await loadAllData();
+    } catch (error) {
+        if (!error.offline && !isNetworkError(error)) throw error;
+        await outbox.use(`outbox:${currentUser.id}`);
+        const restored = await restoreSnapshot();
+        lastLoadError = restored
+            ? "You're offline. Showing your data from this phone; changes sync when you're back."
+            : "You're offline and nothing is saved on this phone yet.";
+    }
     await renderApp();
     renderProfilePage();
     scheduleRenewalNotifications();
@@ -3866,8 +3946,11 @@ async function handleAuthStateChange(event, session) {
 
     if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session?.user) {
         const { data: authData, error: authError } = await sb.auth.getUser(session.access_token);
-        const verifiedUser = authData?.user;
-        if (authError || !verifiedUser || verifiedUser.id !== session.user.id) {
+        // Offline the server can't confirm the session; trust the stored one
+        // rather than signing the user out.
+        const offline = authError && isNetworkError(authError);
+        const verifiedUser = offline ? session.user : authData?.user;
+        if (!offline && (authError || !verifiedUser || verifiedUser.id !== session.user.id)) {
             console.error('[Atler] Ignoring invalid restored auth session:', authError);
             showSignedOutView('Your saved session is no longer valid. Please sign in again.');
             try {
