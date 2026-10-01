@@ -18,7 +18,8 @@ export interface Plan {
   createdOn: Day;
 }
 
-export type PaymentSource = 'manual' | 'renewal' | 'sms' | 'statement';
+// Plan renewals are not stored; they're computed (core/renewals.ts).
+export type PaymentSource = 'manual' | 'sms' | 'statement';
 
 export interface Payment {
   id: string;
@@ -27,7 +28,6 @@ export interface Payment {
   on: Day;
   categoryId: string | null;
   source: PaymentSource;
-  planId: string | null;  // set for renewals
 }
 
 export interface Category {
