@@ -25,6 +25,7 @@ import { forecastNextMonth } from './lib/forecast.js';
 import { findRecurring, readStatement } from './lib/statement.js';
 import { initErrorReporting, reportError } from './lib/errors.js';
 import { budgetUsage } from './lib/budgets.js';
+import { parseBankSmsList } from './lib/sms.js';
 
 // ═══════════════════════════════════════════
 // SUPABASE CONFIG
@@ -2791,6 +2792,51 @@ addExpenseForm.addEventListener('submit', async e => {
             submitBtn.textContent = 'Save Expense';
         }
     }
+});
+
+// ── Paste a bank SMS ──
+const categoryIdByName = name =>
+    (name && categories.find(c => c.name.toLowerCase() === name.toLowerCase())?.id) || 'unlisted';
+
+document.getElementById('sms-clipboard-btn').addEventListener('click', async () => {
+    try {
+        document.getElementById('sms-text').value = await navigator.clipboard.readText();
+    } catch {
+        showToast('Long-press the box and paste instead');
+    }
+});
+
+document.getElementById('sms-read-btn').addEventListener('click', () => {
+    const box = document.getElementById('sms-text');
+    const found = parseBankSmsList(box.value);
+    if (!found.length) {
+        showToast("That doesn't look like a debit SMS", 3000);
+        return;
+    }
+    if (found.length === 1) {
+        const [exp] = found;
+        document.getElementById('exp-name').value = exp.name;
+        document.getElementById('exp-amount').value = exp.amount;
+        document.getElementById('exp-date').value = exp.date;
+        fillCategorySelect(document.getElementById('exp-category'), categoryIdByName(exp.category));
+        document.getElementById('sms-paste').open = false;
+        box.value = '';
+        showToast('Check the details, then save');
+        return;
+    }
+    const total = found.reduce((sum, e) => sum + e.amount, 0);
+    showConfirm(`Add ${found.length} expenses totalling ${getCurrencySymbol()}${formatAmount(total)}?`, async () => {
+        const rows = found.map(e => ({
+            id: makeClientId('exp'), name: e.name, amount: e.amount, date: e.date, type: 'manual',
+            category: categoryIdByName(e.category),
+        }));
+        if ((await insertExpenses(rows)).error) return;
+        expenses.push(...rows);
+        box.value = '';
+        closeAddSheet();
+        await renderApp();
+        showToast(`${rows.length} expenses added`);
+    });
 });
 
 const sheetOverlay = document.getElementById('add-sheet-overlay');
