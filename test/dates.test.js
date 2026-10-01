@@ -8,7 +8,9 @@ import {
     getRenewalDatesUntil,
     getUnloggedRenewals,
     isWithinRange,
+    normalizeCycle,
     parseDateValue,
+    toDateKey,
 } from '../src/lib/dates.js';
 
 const keys = dates => dates.map(getLocalDateKey);
@@ -118,5 +120,33 @@ describe('isWithinRange', () => {
     it('year means the current calendar year', () => {
         expect(isWithinRange('2026-01-01', 'year', now)).toBe(true);
         expect(isWithinRange('2025-12-31', 'year', now)).toBe(false);
+    });
+});
+
+describe('import validation', () => {
+    it.each([
+        ['2026-10-01', '2026-10-01'],
+        [' 2026-10-01 ', '2026-10-01'],
+        ['2026-10-01T09:00:00Z', '2026-10-01'],
+        ['2028-02-29', '2028-02-29'],
+        ['2026-02-29', null],
+        ['2026-13-01', null],
+        ['01/10/2026', null],
+        ['', null],
+        [undefined, null],
+    ])('toDateKey(%j) -> %j', (input, expected) => {
+        expect(toDateKey(input)).toBe(expected);
+    });
+
+    it.each([
+        ['Monthly', 'Monthly'],
+        ['yearly', 'Yearly'],
+        ['30', '30'],
+        ['0', null],
+        ['-7', null],
+        ['weekly', null],
+        ['1.5', null],
+    ])('normalizeCycle(%j) -> %j', (input, expected) => {
+        expect(normalizeCycle(input)).toBe(expected);
     });
 });

@@ -12,6 +12,8 @@ import {
     isWithinRange,
     formatCycle,
     todayISO,
+    toDateKey,
+    normalizeCycle,
 } from './lib/dates.js';
 import { toCsv, parseCsvRecords } from './lib/csv.js';
 
@@ -965,6 +967,12 @@ function getSubAge(dateAdded) {
     if (years > 0) parts.push(`${years} year${years > 1 ? 's' : ''}`);
     if (months > 0) parts.push(`${months} month${months > 1 ? 's' : ''}`);
     return `You've had this for ${parts.join(' ')}`;
+}
+
+function importSummary(imported, skipped, noun) {
+    if (!imported) return `No valid ${noun} rows found` + (skipped ? ` (${skipped} skipped — dates must be YYYY-MM-DD)` : '');
+    const msg = `${imported} ${noun}${imported === 1 ? '' : 's'} imported`;
+    return skipped ? `${msg}, ${skipped} skipped` : msg;
 }
 
 function formatAmount(amount) {
@@ -2186,11 +2194,14 @@ document.getElementById('import-file-input').addEventListener('change', function
 
             if (headers.includes('price') && headers.includes('cycle')) {
                 let importedCount = 0;
+                let skippedCount = 0;
                 for (const row of records) {
                     const name = row.name || row.Name;
                     const price = parseFloat(row.price || row.Price);
-                    const cycle = row.cycle || row.Cycle || 'Monthly';
-                    if (!name || Number.isNaN(price)) continue;
+                    const cycle = normalizeCycle(row.cycle || row.Cycle || 'Monthly');
+                    const rawStart = row.startDate || row.StartDate;
+                    const startDate = rawStart ? toDateKey(rawStart) : todayISO();
+                    if (!name || Number.isNaN(price) || price < 0 || !cycle || !startDate) { skippedCount++; continue; }
                     const categoryName = (row.category || row.Category || 'Unlisted').trim();
                     let categoryId = 'unlisted';
                     if (categoryName && categoryName.toLowerCase() !== 'unlisted') {
@@ -2207,10 +2218,10 @@ document.getElementById('import-file-input').addEventListener('change', function
                     const newSub = {
                         id: makeClientId('sub'),
                         name: name.trim(),
-                        cycle: cycle.trim() || 'Monthly',
+                        cycle,
                         price: price.toFixed(2),
                         dateAdded: todayISO(),
-                        startDate: row.startDate || row.StartDate || todayISO(),
+                        startDate,
                         category: categoryId,
                         lastLoggedRenewal: null,
                         paused: String(row.paused || row.Paused || '').toLowerCase() === 'true'
@@ -2221,17 +2232,19 @@ document.getElementById('import-file-input').addEventListener('change', function
                 }
                 await renderApp();
                 renderProfilePage();
-                showToast(importedCount ? `${importedCount} subscriptions imported` : 'No valid subscription rows found');
+                showToast(importSummary(importedCount, skippedCount, 'subscription'));
                 return;
             }
 
             if (headers.includes('amount') && headers.includes('date')) {
                 let importedCount = 0;
+                let skippedCount = 0;
                 for (const row of records) {
                     const name = row.name || row.Name;
                     const amount = parseFloat(row.amount || row.Amount);
-                    const date = row.date || row.Date || todayISO();
-                    if (!name || Number.isNaN(amount)) continue;
+                    const rawDate = row.date || row.Date;
+                    const date = rawDate ? toDateKey(rawDate) : todayISO();
+                    if (!name || Number.isNaN(amount) || !date) { skippedCount++; continue; }
                     const newExpense = {
                         id: makeClientId('exp'),
                         name: name.trim(),
@@ -2245,7 +2258,7 @@ document.getElementById('import-file-input').addEventListener('change', function
                 }
                 await renderApp();
                 renderProfilePage();
-                showToast(importedCount ? `${importedCount} expenses imported` : 'No valid expense rows found');
+                showToast(importSummary(importedCount, skippedCount, 'expense'));
                 return;
             }
 

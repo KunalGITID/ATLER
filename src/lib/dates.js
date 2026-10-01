@@ -150,3 +150,22 @@ export function getUnloggedRenewals(sub, today = new Date()) {
     return getRenewalDatesUntil(anchor, sub.cycle, normalizeDateOnly(today))
         .filter(d => d >= added && (!lastLogged || d > lastLogged));
 }
+
+// Strict YYYY-MM-DD (a timestamp's date part is fine) that is a real calendar
+// day, or null. Used to vet imported rows before they reach a `date` column.
+export function toDateKey(value) {
+    const match = String(value ?? '').trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/);
+    if (!match) return null;
+    const [, y, m, d] = match.map(Number);
+    const date = new Date(y, m - 1, d);
+    if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
+    return getLocalDateKey(date);
+}
+
+// 'Monthly', 'Yearly' or a positive whole number of days, else null.
+export function normalizeCycle(value) {
+    const raw = String(value ?? '').trim();
+    const named = { monthly: 'Monthly', yearly: 'Yearly' }[raw.toLowerCase()];
+    if (named) return named;
+    return /^[1-9]\d{0,3}$/.test(raw) ? raw : null;
+}
