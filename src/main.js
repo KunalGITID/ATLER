@@ -24,6 +24,7 @@ import { priceChangeImpact, recentIncreases } from './lib/prices.js';
 import { forecastNextMonth } from './lib/forecast.js';
 import { findRecurring, readStatement } from './lib/statement.js';
 import { initErrorReporting, reportError } from './lib/errors.js';
+import { budgetUsage } from './lib/budgets.js';
 
 // ═══════════════════════════════════════════
 // SUPABASE CONFIG
@@ -677,6 +678,7 @@ async function loadAllData() {
         amount: e.amount,
         date: e.date,
         type: e.type || 'manual',
+        category: e.category || 'unlisted',
     }));
 
     await cleanupLegacyAutoDuplicates();
@@ -843,19 +845,23 @@ async function upsertCategory(cat) {
 }
 
 async function deleteCategoryFromDB(id) {
-    if (!currentUser) return;
-    await sbWrite(() => sb.from('categories').delete().eq('id', id).eq('user_id', currentUser.id));
-    const affected = subscriptions.filter(s => s.category === id);
-    for (const sub of affected) {
-        sub.category = 'unlisted';
-        await upsertSubscription(sub);
-    }
+    if (!currentUser) return false;
+    // Move everything out first, so a failure never leaves rows pointing at a deleted category.
+    const { error } = await sbWrite(() => Promise.all([
+        sb.from('subscriptions').update({ category: 'unlisted' }).eq('category', id).eq('user_id', currentUser.id),
+        sb.from('expenses').update({ category: 'unlisted' }).eq('category', id).eq('user_id', currentUser.id),
+    ]));
+    if (error) return false;
+    subscriptions.forEach(s => { if (s.category === id) s.category = 'unlisted'; });
+    expenses.forEach(e => { if (e.category === id) e.category = 'unlisted'; });
+    const { error: delError } = await sbWrite(() => sb.from('categories').delete().eq('id', id).eq('user_id', currentUser.id));
+    return !delError;
 }
 
 window.deleteCategory = async function (id) {
-    showConfirm('Delete this category? Subscriptions inside it will be moved to Unlisted so nothing gets lost.', async () => {
+    showConfirm('Delete this category? Its subscriptions and expenses move to Unlisted so nothing gets lost.', async () => {
+        if (!await deleteCategoryFromDB(id)) return;
         categories = categories.filter(c => c.id !== id);
-        await deleteCategoryFromDB(id);
         renderAnalytics();
     });
 };
@@ -869,6 +875,7 @@ async function insertExpense(exp) {
         amount: exp.amount,
         date: exp.date,
         type: exp.type || 'manual',
+        category: exp.category || 'unlisted',
     }));
 }
 
@@ -884,6 +891,7 @@ async function insertExpenses(exps) {
             amount: exp.amount,
             date: exp.date,
             type: exp.type || 'manual',
+            category: exp.category || 'unlisted',
         })),
         { onConflict: 'id', ignoreDuplicates: true },
     ));
@@ -897,6 +905,7 @@ async function updateExpense(exp) {
             name: exp.name,
             amount: exp.amount,
             date: exp.date,
+            category: exp.category || 'unlisted',
         })
         .eq('id', exp.id)
         .eq('user_id', currentUser.id));
@@ -1033,6 +1042,18 @@ function getSubAge(dateAdded) {
     if (years > 0) parts.push(`${years} year${years > 1 ? 's' : ''}`);
     if (months > 0) parts.push(`${months} month${months > 1 ? 's' : ''}`);
     return `You've had this for ${parts.join(' ')}`;
+}
+
+// Category id for a name from an imported file, creating the category if needed.
+async function categoryIdForName(rawName) {
+    const name = String(rawName || '').trim();
+    if (!name || name.toLowerCase() === 'unlisted') return 'unlisted';
+    const existing = categories.find(cat => cat.name.toLowerCase() === name.toLowerCase());
+    if (existing) return existing.id;
+    const created = { id: makeClientId('cat'), name, budget: null };
+    if ((await upsertCategory(created)).error) return 'unlisted';
+    categories.push(created);
+    return created.id;
 }
 
 function importSummary(imported, skipped, noun) {
@@ -1486,26 +1507,10 @@ function renderBudgetProgress() {
     const grid = document.getElementById('budget-progress-grid');
     if (!section || !grid) return;
 
-    const cards = categories
-        .filter(cat => cat.budget)
-        .map(cat => {
-            const spent = subscriptions
-                .filter(sub => !sub.paused && (sub.category || 'unlisted') === cat.id)
-                .reduce((sum, sub) => sum + getMonthlyCost(sub), 0);
-            const budget = parseFloat(cat.budget) || 0;
-            const remaining = budget - spent;
-            const pct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
-            const over = remaining < 0;
-            return {
-                name: cat.name,
-                spent,
-                budget,
-                remaining,
-                pct: Math.min(pct, 100),
-                over
-            };
-        })
-        .sort((a, b) => (b.over === a.over ? b.spent - a.spent : Number(b.over) - Number(a.over)));
+    const cards = budgetUsage(categories, subscriptions, expenses).map(u => ({
+        ...u,
+        pct: Math.min(u.percent, 100),
+    }));
 
     if (!cards.length) {
         section.style.display = 'none';
@@ -1519,9 +1524,10 @@ function renderBudgetProgress() {
             <div class="budget-card-head">
                 <div class="budget-card-name">${escapeHTML(card.name)}</div>
                 <div class="budget-card-state ${card.over ? 'is-over' : ''}">
-                    ${card.over ? 'Over budget' : `${Math.round((card.spent / card.budget) * 100)}% used`}
+                    ${card.over ? 'Over budget' : `${card.percent}% used`}
                 </div>
             </div>
+            <div class="budget-card-split">${getCurrencySymbol()}${formatAmount(card.recurring)} subscriptions · ${getCurrencySymbol()}${formatAmount(card.everyday)} everyday this month</div>
             <div class="budget-card-progress">
                 <div class="budget-card-progress-fill ${card.over ? 'is-over' : ''}" style="width:${Math.max(8, card.pct)}%;"></div>
             </div>
@@ -1779,6 +1785,7 @@ function viewDetails(id) {
     document.getElementById('edit-cycle').value = (sub.cycle === 'Monthly' || sub.cycle === 'Yearly') ? sub.cycle : 'Custom';
     document.getElementById('edit-price').value = sub.price;
     document.getElementById('edit-start-date').value = sub.startDate || sub.dateAdded?.split('T')[0] || todayISO();
+    fillCategorySelect(document.getElementById('edit-category'), sub.category);
     renderReminderPreference(sub.id);
 
     const isCustom = sub.cycle !== 'Monthly' && sub.cycle !== 'Yearly';
@@ -1826,9 +1833,12 @@ async function saveSubscriptionEdit(sub, name, cycle, reminder) {
         cycle,
         price: parseFloat(document.getElementById('edit-price').value).toFixed(2),
         startDate: document.getElementById('edit-start-date').value || sub.startDate,
+        category: document.getElementById('edit-category').value || sub.category || 'unlisted',
         reminder,
     };
     if ((await upsertSubscription(update)).error) return false;
+    document.getElementById('detail-category-name').textContent =
+        categories.find(c => c.id === update.category)?.name || 'Unlisted';
     const oldPrice = parseFloat(sub.price);
     const newPrice = parseFloat(update.price);
     Object.assign(sub, update);
@@ -2344,13 +2354,15 @@ document.getElementById('dm-export-exp-csv-btn').addEventListener('click', () =>
         name: exp.name,
         amount: exp.amount,
         date: exp.date,
-        type: exp.type || 'manual'
+        type: exp.type || 'manual',
+        category: categories.find(cat => cat.id === exp.category)?.name || 'Unlisted',
     }));
     const csv = toCsv(rows, [
         { key: 'name', label: 'name' },
         { key: 'amount', label: 'amount' },
         { key: 'date', label: 'date' },
-        { key: 'type', label: 'type' }
+        { key: 'type', label: 'type' },
+        { key: 'category', label: 'category' }
     ]);
     downloadTextFile(csv, `atler-expenses-${todayISO()}.csv`, 'text/csv;charset=utf-8');
     closeDataModal();
@@ -2389,19 +2401,7 @@ document.getElementById('import-file-input').addEventListener('change', function
                     const rawStart = row.startDate || row.StartDate;
                     const startDate = rawStart ? toDateKey(rawStart) : todayISO();
                     if (!name || Number.isNaN(price) || price < 0 || !cycle || !startDate) { skippedCount++; continue; }
-                    const categoryName = (row.category || row.Category || 'Unlisted').trim();
-                    let categoryId = 'unlisted';
-                    if (categoryName && categoryName.toLowerCase() !== 'unlisted') {
-                        const existingCategory = categories.find(cat => cat.name.toLowerCase() === categoryName.toLowerCase());
-                        if (existingCategory) {
-                            categoryId = existingCategory.id;
-                        } else {
-                            const newCategory = { id: makeClientId('cat'), name: categoryName, budget: null };
-                            categories.push(newCategory);
-                            await upsertCategory(newCategory);
-                            categoryId = newCategory.id;
-                        }
-                    }
+                    const categoryId = await categoryIdForName(row.category || row.Category);
                     const newSub = {
                         id: makeClientId('sub'),
                         name: name.trim(),
@@ -2437,6 +2437,7 @@ document.getElementById('import-file-input').addEventListener('change', function
                         name: name.trim(),
                         amount,
                         date,
+                        category: await categoryIdForName(row.category || row.Category),
                         type: (row.type || row.Type || 'manual').trim() || 'manual'
                     };
                     expenses.push(newExpense);
@@ -2732,7 +2733,8 @@ addExpenseForm.addEventListener('submit', async e => {
     }
 
     try {
-        const newExp = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, name, amount: parseFloat(amount), date, type: 'manual' };
+        const category = document.getElementById('exp-category').value || 'unlisted';
+        const newExp = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, name, amount: parseFloat(amount), date, type: 'manual', category };
         if ((await insertExpense(newExp)).error) return;
         expenses.push(newExp);
         haptic('success');
@@ -2773,7 +2775,8 @@ document.getElementById('sheet-edit-expense-form').addEventListener('submit', as
     submitBtn.textContent = 'Saving...';
 
     try {
-        const edited = { ...expense, name, amount: parseFloat(amount), date };
+        const category = document.getElementById('edit-sheet-exp-category').value || 'unlisted';
+        const edited = { ...expense, name, amount: parseFloat(amount), date, category };
         if ((await updateExpense(edited)).error) return;
         Object.assign(expense, edited);
         haptic('success');
@@ -2828,8 +2831,16 @@ function openEditExpenseSheet(expenseId) {
     document.getElementById('edit-sheet-exp-name').value = exp.name;
     document.getElementById('edit-sheet-exp-amount').value = exp.amount;
     document.getElementById('edit-sheet-exp-date').value = exp.date || todayISO();
+    fillCategorySelect(document.getElementById('edit-sheet-exp-category'), exp.category);
     resetEditExpenseDeleteState();
     openAddSheet('edit-expense');
+}
+
+function fillCategorySelect(select, selected = 'unlisted') {
+    if (!select) return;
+    const options = [{ id: 'unlisted', name: 'Unlisted' }, ...[...categories].sort((a, b) => a.name.localeCompare(b.name))];
+    select.innerHTML = options.map(c => `<option value="${escapeHTML(c.id)}">${escapeHTML(c.name)}</option>`).join('');
+    select.value = options.some(c => c.id === selected) ? selected : 'unlisted';
 }
 
 function openAddSheet(mode) {
@@ -2840,6 +2851,7 @@ function openAddSheet(mode) {
         expForm.style.display = 'block';
         editExpenseSheetForm.style.display = 'none';
         document.getElementById('exp-date').value = todayISO();
+        fillCategorySelect(document.getElementById('exp-category'));
     } else if (mode === 'edit-expense') {
         subForm.style.display = 'none';
         expForm.style.display = 'none';
