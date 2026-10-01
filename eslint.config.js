@@ -2,7 +2,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
-  { ignores: ['dist/', 'node_modules/'] },
+  { ignores: ['dist/', 'dist-e2e/', 'node_modules/', 'test-results/', 'playwright-report/'] },
   js.configs.recommended,
   {
     languageOptions: { globals: { ...globals.browser } },
@@ -17,7 +17,7 @@ export default [
     languageOptions: { globals: { ...globals.serviceworker, __ASSETS__: 'readonly' } },
   },
   {
-    files: ['*.config.js', 'test/**'],
+    files: ['*.config.js', 'test/**', 'e2e/**'],
     languageOptions: { globals: { ...globals.node } },
   },
 ];
