@@ -11,7 +11,9 @@ function serviceWorker() {
     apply: 'build',
     generateBundle(_, bundle) {
       const assets = Object.keys(bundle)
-        .filter(file => /\.(js|css)$/.test(file))
+        .filter(file => /\.(js|css|mjs)$/.test(file))
+        // pdf.js (~1.5 MB) is only needed for PDF statements; it's cached on first use.
+        .filter(file => !/pdf/i.test(file))
         .sort()
         .map(file => `./${file}`);
       const buildId = createHash('sha256').update(assets.join('\n')).digest('hex').slice(0, 10);
