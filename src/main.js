@@ -17,6 +17,8 @@ import {
     normalizeCycle,
 } from './lib/dates.js';
 import { toCsv, parseCsvRecords } from './lib/csv.js';
+import { dueReminders, reminderMessage } from './lib/reminders.js';
+import { getPushSubscription, pushSupported, unsubscribePush } from './lib/push.js';
 
 // ═══════════════════════════════════════════
 // SUPABASE CONFIG
@@ -119,7 +121,6 @@ let isSubmittingSubscription = false;
 let isSubmittingExpense = false;
 let isSavingExpenseEdit = false;
 let lastLoadError = '';
-let reminderPreferences = JSON.parse(localStorage.getItem('atler_reminder_prefs') || '{}');
 let activeSheetExpenseId = null;
 
 const presetCategories = ['Entertainment', 'Productivity', 'Utilities', 'Health', 'Food', 'Education'];
@@ -561,6 +562,10 @@ document.getElementById('reset-password-btn').addEventListener('click', async ()
 document.getElementById('signout-btn').addEventListener('click', async () => {
     isExplicitSignOut = true;
 
+    // This device should stop receiving the signed-out user's reminders.
+    const endpoint = await unsubscribePush().catch(() => null);
+    if (endpoint) await sb.from('push_subscriptions').delete().eq('endpoint', endpoint).then(() => {}, () => {});
+
     // Fallback: forcefully wipe local storage in case the token is corrupted and the API rejects it
     localStorage.clear();
 
@@ -672,7 +677,30 @@ async function saveProfile() {
         theme: profile.theme,
         last_notified: profile.lastNotified || null,
         currency: 'INR',
+        timezone: currentTimeZone(),
     }));
+}
+
+function currentTimeZone() {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
+    } catch {
+        return 'Asia/Kolkata';
+    }
+}
+
+// Registers this device for server-sent reminders and keeps the stored
+// time zone current. Safe to call often; does nothing without permission.
+async function syncPushSubscription() {
+    if (!currentUser) return;
+    try {
+        const push = await getPushSubscription();
+        if (!push) return;
+        await sb.from('push_subscriptions').upsert({ ...push, user_id: currentUser.id });
+        await sb.from('profiles').update({ timezone: currentTimeZone() }).eq('user_id', currentUser.id);
+    } catch (err) {
+        console.error('[Atler] Push subscription failed:', err);
+    }
 }
 
 async function ensureUserProfile(user = currentUser) {
@@ -1219,10 +1247,6 @@ function buildIconCircle(name, categoryId, fallbackColor, size = '48px') {
     return `<div class="list-icon-wrapper" style="width:${size};height:${size};background:${fallbackColor}22;color:${fallbackColor};font-size:calc(${size} * 0.45);display:flex;align-items:center;justify-content:center;border-radius:50%;flex-shrink:0;font-family:var(--font-headline);font-weight:800;">${(name || '?').charAt(0).toUpperCase()}</div>`;
 }
 
-function saveReminderPreferences() {
-    localStorage.setItem('atler_reminder_prefs', JSON.stringify(reminderPreferences));
-}
-
 function getReminderPreference(subId) {
     return subscriptions.find(sub => sub.id === subId)?.reminder || 'none';
 }
@@ -1514,7 +1538,9 @@ function renderNotificationOverview() {
     const systemCard = `
         <div class="notification-overview-card">
             <h4>${permission === 'granted' ? 'Notifications are ready' : permission === 'denied' ? 'Notifications are blocked' : permission === 'default' ? 'Notifications need permission' : 'Browser notifications unsupported'}</h4>
-            <p>Last reminder check: ${escapeHTML(lastCheckedText)}. For the most reliable delivery, open Atler at least once a day on this device.</p>
+            <p>${pushSupported()
+                ? 'Reminders arrive around 9 AM, even when Atler is closed.'
+                : `Last reminder check: ${escapeHTML(lastCheckedText)}. This browser can only remind you when Atler is open, so open it once a day.`}</p>
         </div>
     `;
 
@@ -1932,30 +1958,24 @@ async function showLocalNotification(title, options) {
     }
 }
 
+// With Web Push the server sends reminders even when the app is closed
+// (supabase/functions/send-reminders). Browsers without push fall back to
+// showing them here when the app is opened.
 async function scheduleRenewalNotifications() {
     if (!currentUser || !('Notification' in window)) return;
     localStorage.setItem('atler_last_notification_check', new Date().toISOString());
     if (Notification.permission !== 'granted') return;
+    if (pushSupported()) {
+        syncPushSubscription();
+        return;
+    }
 
     const todayStr = todayISO();
     if (profile.lastNotified === todayStr) return;
 
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const activeSubs = subscriptions.filter(s => !s.paused);
-
-    for (const sub of activeSubs) {
-        const anchor = sub.startDate || sub.dateAdded;
-        const next = getNextRenewalDate(anchor, sub.cycle);
-        const diffDays = Math.ceil((next - today) / 86400000);
-        const reminderDays = getReminderDays(sub.id);
-        if (reminderDays.includes(diffDays)) {
-            const price = formatAmount(sub.price);
-            await showLocalNotification('Atler — Renewal Reminder', {
-                body: `${sub.name} renews in ${diffDays} day${diffDays > 1 ? 's' : ''} — ${getCurrencySymbol()}${price}`,
-                icon: './apple-touch-icon.png',
-                tag: `renewal-${sub.id}-${getLocalDateKey(next)}`,
-            });
-        }
+    for (const reminder of dueReminders(subscriptions, new Date())) {
+        const { title, body, tag } = reminderMessage(reminder);
+        await showLocalNotification(title, { body, tag, icon: './apple-touch-icon.png' });
     }
 
     profile.lastNotified = todayStr;

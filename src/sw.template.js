@@ -100,3 +100,31 @@ self.addEventListener('fetch', event => {
     );
   }
 });
+
+// Renewal reminders sent by supabase/functions/send-reminders.
+self.addEventListener('push', event => {
+  let data;
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (_) {
+    data = { title: 'Atler', body: event.data ? event.data.text() : '' };
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Atler', {
+      body: data.body || '',
+      tag: data.tag,
+      icon: './apple-touch-icon.png',
+      badge: './apple-touch-icon.png',
+    })
+  );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windows => {
+      const open = windows.find(w => w.url.startsWith(self.registration.scope));
+      return open ? open.focus() : self.clients.openWindow('./');
+    })
+  );
+});
