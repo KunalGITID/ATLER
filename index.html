@@ -7,12 +7,11 @@
     <title>Atler · b42</title>
 
     <!-- PWA Manifest & iOS Support -->
-    <link rel="manifest" href="./manifest.json?v=37">
+    <link rel="manifest" href="./manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="./apple-touch-icon.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
     <meta name="theme-color" content="#0e0e0e">
 
-    <link rel="stylesheet" href="./style.css?v=37">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Atler">
@@ -201,7 +200,6 @@
         })();
     </script>
 
-    <link rel="stylesheet" href="./style.css?v=37">
   <style>
     #ls-star-container {
       position: absolute;
@@ -1242,8 +1240,7 @@
     </div>
     <div id="context-overlay" style="position:fixed;inset:0;z-index:599;display:none;"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="./script.js?v=50"></script>
+    <script type="module" src="/src/main.js"></script>
 
     <!-- Service Worker -->
     <script>

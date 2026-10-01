@@ -1,13 +1,14 @@
-const CACHE_NAME = 'atler-v31';
+// The cache id and asset list placeholders are filled in by the build (vite.config.js),
+// so every deploy gets a fresh cache without bumping versions by hand.
+const CACHE_NAME = 'atler-__BUILD_ID__';
 
 const APP_SHELL = [
   './',
   './index.html',
   './offline.html',
-  './style.css?v=37',
-  './script.js?v=50',
-  './manifest.json?v=37',
+  './manifest.json',
   './apple-touch-icon.png',
+  ...__ASSETS__,
 ];
 
 self.addEventListener('install', event => {
