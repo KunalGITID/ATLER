@@ -1,0 +1,76 @@
+/*
+ * ATLER design tokens — the only place colours, type, radii and spacing are
+ * defined. Everything (launch screen included) reads these.
+ *
+ * The purpose rule: every colour has one meaning, used the same way everywhere.
+ *   lime   = your money, totals, primary actions
+ *   coral  = a charge coming soon / needs attention
+ *   white  = where you are (selected tab, chosen option)
+ *   greys  = surfaces and secondary text only
+ */
+@import "tailwindcss";
+
+@theme {
+  /* Ground and surfaces */
+  --color-ground: #0a0a0a;
+  --color-block: #141414;      /* a dark block */
+  --color-block-2: #242424;    /* a control on a block, a selected-off pill */
+  --color-line: #0a0a0a;       /* dividers inside a block are cut-outs */
+
+  /* Text */
+  --color-ink: #f5f5f5;
+  --color-ink-2: #9a9a9a;      /* secondary: 7.0:1 on ground, 6.3:1 on block */
+  --color-on-color: #0a0a0a;   /* text on lime / coral / white */
+
+  /* Meaning */
+  --color-money: #c8f03c;      /* lime */
+  --color-soon: #f0643c;       /* coral */
+  --color-here: #f5f5f5;       /* white: selected */
+  --color-danger: #ff7a6b;
+
+  /* Type */
+  --font-display: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  /* Shape */
+  --radius-tile: 24px;
+  --radius-block: 28px;
+  --radius-control: 14px;
+  --radius-chip: 10px;
+}
+
+:root {
+  color-scheme: dark;
+  background: var(--color-ground);
+}
+
+html,
+body,
+#root {
+  min-height: 100dvh;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* Money never jiggles */
+.num {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
