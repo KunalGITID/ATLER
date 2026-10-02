@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { paise } from '../money.ts';
 import { parseDay, type Day } from '../dates.ts';
-import { cycleFromGap, findRecurring, merchantName, moneyCell, parseStatementDate, readStatement } from './statement.ts';
+import { cycleFromGap, findRecurring } from './recurring.ts';
+import { merchantName, moneyCell, parseStatementDate, readStatement } from './statement.ts';
 
 const d = (s: string) => parseDay(s) as Day;
 
@@ -24,6 +25,10 @@ describe('merchantName', () => {
     ['POS 412345XXXXXX1234 GOOGLE YOUTUBE PREM', 'YouTube Premium'],
     ['UPI/P2M/628812345/CRED CLUB/crefclub@axis/Payment', 'Cred Club'],
     ['UPI-627384910283-1234', null],
+    // bank words, not names: one person, whichever way the bank writes it
+    ['UPI/DR/951992534445/ADITYA NAIR/HDFC/adityanair@ybl', 'Aditya Nair'],
+    ['UPI/786491422055/Paid to ADITYA NAIR/adityanair@ibl', 'Aditya Nair'],
+    ['ECOM PUR/ATRIA CONVERGENCE/553311', 'Atria Convergence'],
   ])('%s -> %s', (input, expected) => expect(merchantName(input)).toBe(expected));
 });
 

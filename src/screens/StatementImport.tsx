@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { describeCycle, today as todayDay } from '../core/dates.ts';
-import { findRecurring, readStatement, type Found } from '../core/import/statement.ts';
+import type { Found } from '../core/import/recurring.ts';
+import { readStatement } from '../core/import/statement.ts';
 import { suggestCategory } from '../core/import/sms.ts';
 import { formatRupees } from '../core/money.ts';
 import type { Category, Plan } from '../core/model.ts';
@@ -28,6 +29,8 @@ export function StatementImport({ db, plans, categories }: { db: AtlerDB; plans:
     try {
       const text = isPdf(file) ? await pdfToCsv(file, pw) : await file.text();
       const debits = readStatement(text);
+      // The subscription model loads only when someone imports a statement.
+      const { findRecurring } = await import('../core/import/recurring.ts');
       const items = findRecurring(debits, todayDay(), plans.map(p => ({ id: p.id, name: p.name, price: p.price })));
       setLocked(null);
       setPassword('');

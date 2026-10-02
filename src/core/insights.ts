@@ -4,7 +4,7 @@
 import { addDays, daysBetween, endOfMonth, startOfMonth, type Day } from './dates.ts';
 import { paise, sum, type Paise } from './money.ts';
 import type { Payment, Plan, PlanEvent } from './model.ts';
-import { knownMerchant } from './import/statement.ts';
+import { knownMerchant } from './import/merchants.ts';
 import { renewalsBetween, type Renewal } from './renewals.ts';
 import { ownAmount, yourShare } from './share.ts';
 

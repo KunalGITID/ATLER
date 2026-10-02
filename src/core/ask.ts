@@ -9,7 +9,7 @@ import { incomeBetween, owedByPerson } from './money-in.ts';
 import { plansSummary } from './plans.ts';
 import { renewalsBetween } from './renewals.ts';
 import { ownAmount, planPrice } from './share.ts';
-import { knownMerchant } from './import/statement.ts';
+import { knownMerchant } from './import/merchants.ts';
 
 export interface AskData { plans: Plan[]; events: PlanEvent[]; payments: Payment[]; categories: Category[]; incomes: Income[] }
 export interface Answer { text: string; lines?: Array<{ label: string; value: string }> }
