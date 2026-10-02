@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { AtlerDB } from './db.ts';
 import { syncOnce, waitingCount } from './sync.ts';
+import { reportError } from './errors.ts';
 
 export interface SyncState {
   status: 'syncing' | 'synced' | 'offline' | 'error';
@@ -37,6 +38,7 @@ export function useSync(db: AtlerDB, userId: string): SyncState {
           await syncOnce(db, userId);
           if (alive) setState({ status: 'synced', lastSynced: Date.now(), firstDone: true, error: null });
         } catch (e) {
+          if (!isNetwork(e)) reportError('write', e, { during: 'sync' });
           if (alive) setState(s => ({ ...s, status: isNetwork(e) ? 'offline' : 'error', firstDone: true, error: isNetwork(e) ? null : String((e as Error).message ?? e) }));
         }
       })().finally(() => {

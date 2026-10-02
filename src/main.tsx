@@ -9,12 +9,17 @@ import '@fontsource/plus-jakarta-sans/800.css';
 import './styles/tokens.css';
 import './styles/launch.css';
 import { App } from './App.tsx';
+import { ErrorBoundary } from './ui/ErrorBoundary.tsx';
+import { startErrorReporting } from './data/errors.ts';
 
 window.atlerLaunch?.step(0.35, 'Loading…');
+startErrorReporting();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );
 
