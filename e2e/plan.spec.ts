@@ -40,7 +40,8 @@ test('pause and resume, then cancel keeps the plan as cancelled', async ({ page 
 
   await page.getByRole('button', { name: /I CANCELLED IT/ }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Yes, I cancelled it' }).click();
-  await expect(page.getByText(/^Cancelled /)).toBeVisible();
+  // "Cancelled 2 Oct 2026", not the (closed) sheet's "Cancelled Netflix?" title.
+  await expect(page.getByText(/^Cancelled \d/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Restart' })).toBeVisible();
 
   // Off the month: nothing coming from a cancelled plan.
