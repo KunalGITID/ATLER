@@ -3,6 +3,7 @@ import { addDays, cycleProgress, daysBetween, monthlyCost, nthDate, type Day } f
 import { paise, sum, type Paise } from './money.ts';
 import { byWhen, type Plan, type PlanEvent } from './model.ts';
 import { renewalsBetween, type Renewal } from './renewals.ts';
+import { planPrice } from './share.ts';
 
 export interface PlanView {
   history: Renewal[];        // every charge so far, oldest first (the bars)
@@ -34,14 +35,14 @@ export function planView(plan: Plan, events: readonly PlanEvent[], today: Day): 
   let saved = paise(0);
   if (plan.status === 'cancelled' && stoppedOn) {
     const wouldHave = renewalsBetween({ ...plan, status: 'active' }, events.filter(e => e.planId !== plan.id), addDays(stoppedOn, 1), today);
-    saved = sum(wouldHave.map(() => plan.price));
+    saved = sum(wouldHave.map(() => planPrice(plan)));
   }
 
   return {
     history,
     paidSoFar: sum(history.map(r => r.amount)),
-    currentPrice: plan.price,
-    perYear: paise(monthlyCost(plan.price, plan.cycle) * 12),
+    currentPrice: planPrice(plan),
+    perYear: paise(monthlyCost(planPrice(plan), plan.cycle) * 12),
     countdown,
     stoppedOn,
     saved,

@@ -7,6 +7,7 @@ import { addDays, dayOfMonth, daysInMonth, endOfMonth, monthlyCost, startOfMonth
 import { paise, sum, type Paise } from './money.ts';
 import type { Payment, Plan, PlanEvent } from './model.ts';
 import { renewalsBetween, type Renewal } from './renewals.ts';
+import { ownAmount, planPrice, yourShare } from './share.ts';
 
 export interface RingMarker extends Renewal {
   status: 'paid' | 'coming';
@@ -39,7 +40,7 @@ export function monthRing(today: Day, plans: readonly Plan[], events: readonly P
     at: (dayOfMonth(r.on) - 1) / days,
   }));
   const paid = markers.filter(m => m.status === 'paid').map(m => m.amount);
-  const logged = paymentsIn(payments, first, today).map(p => p.amount);
+  const logged = paymentsIn(payments, first, today).map(ownAmount);
   return {
     today,
     days,
@@ -54,7 +55,7 @@ export function monthRing(today: Day, plans: readonly Plan[], events: readonly P
 export function monthTotal(anyDayInMonth: Day, plans: readonly Plan[], events: readonly PlanEvent[], payments: readonly Payment[]): Paise {
   const first = startOfMonth(anyDayInMonth);
   const last = endOfMonth(anyDayInMonth);
-  return sum([...renewalsIn(plans, events, first, last).map(r => r.amount), ...paymentsIn(payments, first, last).map(p => p.amount)]);
+  return sum([...renewalsIn(plans, events, first, last).map(r => r.amount), ...paymentsIn(payments, first, last).map(ownAmount)]);
 }
 
 // This month as it's heading (spent + still to come) against all of last month.
@@ -78,7 +79,7 @@ export function priceCreep(today: Day, plans: readonly Plan[], events: readonly 
     .map(e => {
       const plan = plans.find(p => p.id === e.planId);
       if (!plan || plan.status === 'cancelled' || plan.status === 'paused') return null;
-      const perYear = paise((monthlyCost(e.to, plan.cycle) - monthlyCost(e.from, plan.cycle)) * 12);
+      const perYear = paise((monthlyCost(yourShare(plan, e.to), plan.cycle) - monthlyCost(yourShare(plan, e.from), plan.cycle)) * 12);
       return { plan, from: e.from, to: e.to, perYear };
     })
     .filter(<T,>(x: T | null): x is T => x !== null)
@@ -101,5 +102,5 @@ export function canCompareWithLastMonth(today: Day, plans: readonly Plan[], paym
 
 // The steady monthly cost of every plan still billing.
 export function plansPerMonth(plans: readonly Plan[]): Paise {
-  return sum(plans.filter(p => p.status === 'active' || p.status === 'trial').map(p => monthlyCost(p.price, p.cycle)));
+  return sum(plans.filter(p => p.status === 'active' || p.status === 'trial').map(p => monthlyCost(planPrice(p), p.cycle)));
 }

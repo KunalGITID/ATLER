@@ -4,6 +4,7 @@ import { makeDay, type Day } from './dates.ts';
 import { paise, sum, type Paise } from './money.ts';
 import type { Category, Payment, Plan, PlanEvent } from './model.ts';
 import { renewalsBetween } from './renewals.ts';
+import { ownAmount } from './share.ts';
 
 export interface YearMonth { month: Day; total: Paise | null } // null = not happened / not tracked yet
 export interface YearLine { name: string; amount: Paise; planId?: string; categoryId?: string | null }
@@ -56,7 +57,7 @@ export function yearReview(year: number, today: Day, plans: readonly Plan[], eve
     perCat.set(k, line);
   };
   for (const r of renewals) addTo(planCat.get(r.planId) ?? null, r.amount);
-  for (const p of spent) addTo(p.categoryId, p.amount);
+  for (const p of spent) addTo(p.categoryId, ownAmount(p));
 
   const names = new Map(plans.map(p => [p.id, p.name]));
   const inYear = events.filter(e => e.on >= first && e.on <= last && names.has(e.planId));
@@ -66,7 +67,7 @@ export function yearReview(year: number, today: Day, plans: readonly Plan[], eve
     year,
     total: sum([...renewals.map(r => r.amount), ...spent.map(p => p.amount)]),
     plansTotal: sum(renewals.map(r => r.amount)),
-    everydayTotal: sum(spent.map(p => p.amount)),
+    everydayTotal: sum(spent.map(ownAmount)),
     months,
     busiest,
     topPlans: [...perPlan.values()].sort(byAmount).slice(0, 5),

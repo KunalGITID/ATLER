@@ -5,6 +5,7 @@ import { addDays, daysBetween, endOfMonth, startOfMonth, type Day } from './date
 import { paise, sum, type Paise } from './money.ts';
 import type { Payment, Plan, PlanEvent } from './model.ts';
 import { renewalsBetween, type Renewal } from './renewals.ts';
+import { ownAmount, yourShare } from './share.ts';
 
 const nextMonthStart = (d: Day) => addDays(endOfMonth(d), 1);
 
@@ -29,7 +30,7 @@ export function everydayByMonth(payments: readonly Payment[], today: Day, maxMon
   let monthStart = startOfMonth(addDays(startOfMonth(today), -1));
   for (let i = 0; i < maxMonths && monthStart >= first; i++) {
     const end = endOfMonth(monthStart);
-    totals.unshift(sum(payments.filter(p => p.on >= monthStart && p.on <= end).map(p => p.amount)));
+    totals.unshift(sum(payments.filter(p => p.on >= monthStart && p.on <= end).map(ownAmount)));
     monthStart = startOfMonth(addDays(monthStart, -1));
   }
   return totals;
@@ -114,12 +115,13 @@ export function keptByCancelling(plans: readonly Plan[], events: readonly PlanEv
     const cancelled = mine.filter(e => e.kind === 'cancelled').map(e => e.on).sort().at(-1);
     if (!cancelled) continue;
     const would = renewalsBetween({ ...plan, status: 'active' }, [], addDays(cancelled, 1), today);
-    const amount = sum(would.map(() => plan.price));
+    const price = yourShare(plan, plan.price);
+    const amount = sum(would.map(() => price));
     kept += amount;
     items.push({ plan, kept: amount });
-    perYear += plan.cycle.unit === 'year' ? plan.price / plan.cycle.every
-      : plan.cycle.unit === 'month' ? (plan.price * 12) / plan.cycle.every
-      : (plan.price * 365.25) / plan.cycle.every;
+    perYear += plan.cycle.unit === 'year' ? price / plan.cycle.every
+      : plan.cycle.unit === 'month' ? (price * 12) / plan.cycle.every
+      : (price * 365.25) / plan.cycle.every;
   }
   if (!items.length) return null;
   return { kept: paise(kept), perYear: paise(Math.round(perYear)), items: items.sort((a, b) => b.kept - a.kept) };

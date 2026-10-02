@@ -4,6 +4,7 @@
 import { datesUntil, type Day } from './dates.ts';
 import type { Paise } from './money.ts';
 import { byWhen, type Plan, type PlanEvent } from './model.ts';
+import { yourShare } from './share.ts';
 
 export interface Renewal {
   planId: string;
@@ -45,7 +46,8 @@ export function renewalsBetween(plan: Plan, events: readonly PlanEvent[], from: 
   const anchor = plan.trialEnds && plan.status === 'trial' ? plan.trialEnds : plan.anchor;
   const spans = stoppedSpans(plan.id, events);
   const stopped = (d: Day) => spans.some(([start, end]) => d > start && (end === null || d < end));
-  return datesUntil(anchor, plan.cycle, to)
+  const last = plan.endsOn && plan.endsOn < to ? plan.endsOn : to;
+  return datesUntil(anchor, plan.cycle, last)
     .filter(d => d >= from && !stopped(d))
-    .map(on => ({ planId: plan.id, name: plan.name, on, amount: priceOn(plan, events, on) }));
+    .map(on => ({ planId: plan.id, name: plan.name, on, amount: yourShare(plan, priceOn(plan, events, on)) }));
 }

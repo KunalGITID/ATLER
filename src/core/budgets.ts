@@ -6,6 +6,7 @@ import { endOfMonth, startOfMonth, type Day } from './dates.ts';
 import { paise, sum, type Paise } from './money.ts';
 import type { Category, Payment, Plan, PlanEvent } from './model.ts';
 import { renewalsBetween } from './renewals.ts';
+import { ownAmount } from './share.ts';
 
 export interface BudgetLine {
   category: Category;
@@ -27,7 +28,7 @@ export function budgetLines(today: Day, categories: readonly Category[], plans: 
         .flatMap(p => renewalsBetween(p, events, first, last));
       const spent = sum([
         ...renewals.filter(r => r.on <= today).map(r => r.amount),
-        ...payments.filter(p => p.categoryId === category.id && p.on >= first && p.on <= today).map(p => p.amount),
+        ...payments.filter(p => p.categoryId === category.id && p.on >= first && p.on <= today).map(ownAmount),
       ]);
       const coming = sum(renewals.filter(r => r.on > today).map(r => r.amount));
       const left = paise(category.budget - spent - coming);
