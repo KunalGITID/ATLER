@@ -9,12 +9,13 @@ import { Button } from '../ui/Button.tsx';
 import { Field } from '../ui/Field.tsx';
 import { Segmented } from '../ui/Segmented.tsx';
 import { Sheet } from '../ui/Sheet.tsx';
+import { Switch } from '../ui/Switch.tsx';
 import { CYCLES } from './cycles.ts';
 
 type Kind = 'plan' | 'expense';
 
 
-export function AddSheet({ db, categories, open, onClose }: { db: AtlerDB; categories: Category[]; open: boolean; onClose: () => void }) {
+export function AddSheet({ db, categories, open, onClose, onTrialAdded }: { db: AtlerDB; categories: Category[]; open: boolean; onClose: () => void; onTrialAdded?: () => void }) {
   const today = todayDay();
   const [kind, setKind] = useState<Kind>('plan');
   const [name, setName] = useState('');
@@ -24,9 +25,11 @@ export function AddSheet({ db, categories, open, onClose }: { db: AtlerDB; categ
   const [error, setError] = useState('');
   const [category, setCategory] = useState('');
   const [newCategory, setNewCategory] = useState('');
+  const [trial, setTrial] = useState(false);
+  const [trialEnds, setTrialEnds] = useState('');
 
   function reset() {
-    setName(''); setAmount(''); setCycleKey('monthly'); setDate(todayDay()); setError(''); setCategory(''); setNewCategory('');
+    setName(''); setAmount(''); setCycleKey('monthly'); setDate(todayDay()); setError(''); setCategory(''); setNewCategory(''); setTrial(false); setTrialEnds('');
   }
 
   async function submit(e: FormEvent) {
@@ -35,11 +38,14 @@ export function AddSheet({ db, categories, open, onClose }: { db: AtlerDB; categ
     const day = parseDay(date);
     if (!name.trim()) return setError(kind === 'plan' ? 'What is it called?' : 'What was it for?');
     if (price === null || price <= 0) return setError('Enter an amount like 199 or 199.50.');
-    if (!day) return setError('Pick a date.');
+    if (!day && !(kind === 'plan' && trial)) return setError('Pick a date.');
+    const ends = kind === 'plan' && trial ? parseDay(trialEnds) : null;
+    if (kind === 'plan' && trial && (!ends || ends <= today)) return setError('Pick the day the trial ends (after today).');
     if (category === NEW_CATEGORY && !newCategory.trim()) return setError('Name the new category.');
     const categoryId = await resolveCategory(db, category, newCategory);
-    if (kind === 'plan') await addPlan(db, { name, price, cycle: CYCLES[cycleKey]!.cycle, lastCharged: day, today, categoryId });
-    else await addPayment(db, { name, amount: price, on: day, categoryId });
+    if (kind === 'plan') await addPlan(db, { name, price, cycle: CYCLES[cycleKey]!.cycle, lastCharged: ends ?? day!, today, categoryId, trialEnds: ends });
+    else await addPayment(db, { name, amount: price, on: day!, categoryId });
+    if (ends) onTrialAdded?.(); // a trial's reminder needs notifications: ask while the tap is fresh
     reset();
     onClose();
   }
@@ -54,7 +60,8 @@ export function AddSheet({ db, categories, open, onClose }: { db: AtlerDB; categ
           options={[{ value: 'plan', label: 'Plan' }, { value: 'expense', label: 'Expense' }]}
         />
         <Field label={kind === 'plan' ? 'Name' : 'What for'} placeholder={kind === 'plan' ? 'Netflix' : 'Groceries'} value={name} onChange={e => setName(e.target.value)} autoComplete="off" />
-        <Field label="Amount (₹)" inputMode="decimal" placeholder="199" value={amount} onChange={e => setAmount(e.target.value)} />
+        {kind === 'plan' && <Switch label="Free trial" hint="Nothing is charged until it ends" checked={trial} onChange={setTrial} />}
+        <Field label={kind === 'plan' && trial ? 'Price after the trial (₹)' : 'Amount (₹)'} inputMode="decimal" placeholder="199" value={amount} onChange={e => setAmount(e.target.value)} />
         {kind === 'plan' && (
           <div className="flex flex-col gap-1.5">
             <label htmlFor="cycle" className="text-xs font-bold tracking-[0.06em] uppercase text-ink-2">Billed</label>
@@ -63,8 +70,17 @@ export function AddSheet({ db, categories, open, onClose }: { db: AtlerDB; categ
             </select>
           </div>
         )}
-        <Field label={kind === 'plan' ? 'Last charged on' : 'Date'} type="date" value={date} onChange={e => setDate(e.target.value)} />
-        {kind === 'plan' && <p className="-mt-1 text-xs text-ink-2">Every renewal is counted from this date. Use a future date if it hasn't started yet.</p>}
+        {kind === 'plan' && trial ? (
+          <>
+            <Field label="Trial ends on" type="date" value={trialEnds} onChange={e => setTrialEnds(e.target.value)} />
+            <p className="-mt-1 text-xs text-ink-2">You'll get a reminder 3 days and 1 day before it turns into a charge.</p>
+          </>
+        ) : (
+          <>
+            <Field label={kind === 'plan' ? 'Last charged on' : 'Date'} type="date" value={date} onChange={e => setDate(e.target.value)} />
+            {kind === 'plan' && <p className="-mt-1 text-xs text-ink-2">Every renewal is counted from this date. Use a future date if it hasn't started yet.</p>}
+          </>
+        )}
         <CategoryPicker categories={categories} value={category} onChange={setCategory} newName={newCategory} onNewName={setNewCategory} />
         {error && <p role="alert" className="text-sm font-semibold text-danger">{error}</p>}
         <Button kind="primary" type="submit">{kind === 'plan' ? 'ADD PLAN' : 'ADD EXPENSE'}</Button>

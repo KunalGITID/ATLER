@@ -4,9 +4,8 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { Category, Payment, Plan, PlanEvent } from '../core/model.ts';
 
-// updatedAt: when this row was last edited (on any device), for last-edit-wins.
-// dirty: edited on this phone and not yet sent. deleted: a tombstone.
-export type Stored<T> = T & { updatedAt: number; deleted?: 1; dirty?: 1 };
+import type { Stored } from './stored.ts';
+export type { Stored } from './stored.ts';
 
 export interface Meta { key: string; value: number }
 

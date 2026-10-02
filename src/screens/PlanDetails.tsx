@@ -4,7 +4,10 @@ import { formatRupees } from '../core/money.ts';
 import type { Category, Plan, PlanEvent } from '../core/model.ts';
 import { planView } from '../core/plan.ts';
 import type { AtlerDB } from '../data/db.ts';
-import { deletePlan, setStatus } from '../data/planActions.ts';
+import { deletePlan, setRemind, setStatus } from '../data/planActions.ts';
+import type { PushState } from '../data/push.ts';
+import { Segmented } from '../ui/Segmented.tsx';
+import type { Remind } from '../core/model.ts';
 import { goBack } from '../route.ts';
 import { Block, Kicker } from '../ui/Block.tsx';
 import { Button } from '../ui/Button.tsx';
@@ -15,7 +18,9 @@ import { ConfirmSheet, EditPlanSheet } from './PlanSheets.tsx';
 const fmtDay = (d: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 const perLabel = (p: Plan) => (p.cycle.unit === 'month' && p.cycle.every === 1 ? '/MO' : p.cycle.unit === 'year' && p.cycle.every === 1 ? '/YR' : '');
 
-export function PlanDetails({ db, plan, events, categories }: { db: AtlerDB; plan: Plan; events: PlanEvent[]; categories: Category[] }) {
+export function PlanDetails({ db, plan, events, categories, push, onEnablePush }: {
+  db: AtlerDB; plan: Plan; events: PlanEvent[]; categories: Category[]; push: PushState; onEnablePush: () => void;
+}) {
   const today = todayDay();
   const v = planView(plan, events, today);
   const [sheet, setSheet] = useState<'edit' | 'cancel' | 'delete' | null>(null);
@@ -38,12 +43,13 @@ export function PlanDetails({ db, plan, events, categories }: { db: AtlerDB; pla
           <div className={`mt-2 text-sm font-bold ${v.soon ? '' : 'text-ink-2'}`}>
             {plan.status === 'paused' && v.stoppedOn ? `Paused since ${fmtDay(v.stoppedOn)}`
               : plan.status === 'cancelled' && v.stoppedOn ? `Cancelled ${fmtDay(v.stoppedOn)}`
+              : v.trial && plan.trialEnds ? `Free trial · converts ${fmtDay(plan.trialEnds)}`
               : `${describeCycle(plan.cycle)} · next ${v.countdown ? fmtDay(v.countdown.end) : ''}`}
           </div>
         </div>
         {v.countdown && (
           <div className={v.soon ? '' : 'rounded-[22px] bg-money p-1.5'}>
-            <CountdownRing done={v.countdown.done} left={v.countdown.left} total={v.countdown.total} />
+            <CountdownRing done={v.countdown.done} left={v.countdown.left} total={v.countdown.total} trial={v.trial} />
           </div>
         )}
       </Block>
@@ -63,6 +69,27 @@ export function PlanDetails({ db, plan, events, categories }: { db: AtlerDB; pla
             <span className="num text-sm font-bold">{formatRupees(v.paidSoFar)}</span>
           </div>
           <PaymentBars history={v.history} current={plan.price} />
+        </Block>
+      )}
+
+      {(plan.status === 'active' || plan.status === 'trial') && (
+        <Block className="flex flex-col gap-3 !p-4">
+          <h2 className="text-[11px] font-extrabold tracking-[0.1em] text-ink-2 uppercase">Remind me</h2>
+          {v.trial
+            ? <p className="text-sm font-bold">3 days and 1 day before the trial turns into a charge.</p>
+            : <Segmented
+                label="Remind me before it renews"
+                value={plan.remind}
+                onChange={(r: Remind) => { void setRemind(db, plan, r); if (r !== 'off' && push === 'off') onEnablePush(); }}
+                options={[{ value: 'off', label: 'Off' }, { value: '3d', label: '3 days' }, { value: '1d', label: '1 day' }, { value: 'both', label: 'Both' }]}
+              />}
+          {(v.trial || plan.remind !== 'off') && push !== 'on' && (
+            <p role="status" className="text-xs font-bold text-soon">
+              {push === 'denied' ? 'Notifications are blocked for ATLER in this browser’s settings.'
+                : push === 'unsupported' ? 'This browser can’t show reminders. On iPhone, add ATLER to the Home Screen first.'
+                : <button type="button" onClick={onEnablePush} className="underline">Turn on notifications to get it</button>}
+            </p>
+          )}
         </Block>
       )}
 

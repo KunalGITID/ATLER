@@ -18,6 +18,8 @@ function when(today: Day, on: Day) {
   const n = Math.round((Date.parse(on) - Date.parse(today)) / 86_400_000);
   return n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : `In ${n} days`;
 }
+// A trial's first charge reads as the trial ending, so it isn't mistaken for a renewal.
+const trialEnding = (plans: Plan[], planId: string, on: Day) => plans.some(p => p.id === planId && p.status === 'trial' && p.trialEnds === on);
 
 export function Month({ plans, events, payments, categories, onAdd }: {
   plans: Plan[]; events: PlanEvent[]; payments: Payment[]; categories: Category[]; onAdd: () => void;
@@ -67,7 +69,7 @@ export function Month({ plans, events, payments, categories, onAdd }: {
             <a href={planHref(next.planId)} className="flex min-h-[112px] flex-col rounded-block bg-soon p-4 text-on-color no-underline active:opacity-80">
               <Kicker>Next up</Kicker>
               <div className="mt-auto font-display text-[26px] leading-tight font-bold">{next.name}</div>
-              <div className="text-[13px] font-extrabold">{when(today, next.on)} · {formatRupees(next.amount)}</div>
+              <div className="text-[13px] font-extrabold">{trialEnding(plans, next.planId, next.on) ? `Trial ends ${when(today, next.on).toLowerCase()}` : when(today, next.on)} · {formatRupees(next.amount)}</div>
             </a>
           )}
           {creep && (
@@ -94,7 +96,7 @@ export function Month({ plans, events, payments, categories, onAdd }: {
                   </div>
                   <div>
                     <div className="text-[15px] font-bold">{r.name}</div>
-                    <div className="text-xs text-ink-2">{when(today, r.on)}</div>
+                    <div className="text-xs text-ink-2">{trialEnding(plans, r.planId, r.on) ? `Trial ends · ${when(today, r.on)}` : when(today, r.on)}</div>
                   </div>
                 </div>
                 <div className="num text-lg font-bold">{formatRupees(r.amount)}</div>

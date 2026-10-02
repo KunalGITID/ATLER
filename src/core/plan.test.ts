@@ -36,4 +36,13 @@ describe('planView', () => {
     expect(v.saved).toBe(3 * 19900); // Jul 19, Aug 19, Sep 19 (Oct 19 is still ahead)
     expect(v.history.at(-1)!.on).toBe('2026-06-19');
   });
+
+  it('a running trial counts down to the day it converts', () => {
+    const trial = { ...netflix, status: 'trial' as const, createdOn: d('2026-10-04'), anchor: d('2026-10-25'), trialEnds: d('2026-10-25') };
+    const v = planView(trial, [], today);
+    expect(v.trial).toBe(true);
+    expect(v.countdown).toMatchObject({ start: '2026-10-04', end: '2026-10-25', total: 21, left: 7 });
+    expect(v.soon).toBe(true);
+    expect(v.history).toEqual([]); // nothing paid during the trial
+  });
 });

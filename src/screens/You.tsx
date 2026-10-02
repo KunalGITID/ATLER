@@ -8,6 +8,7 @@ import { ConfirmSheet } from './PlanSheets.tsx';
 import { Categories } from './Categories.tsx';
 import type { Category } from '../core/model.ts';
 import type { SyncState } from '../data/useSync.ts';
+import type { PushState } from '../data/push.ts';
 
 async function exportBackup(db: AtlerDB) {
   const [plans, events, payments, categories] = await Promise.all([db.plans.toArray(), db.events.toArray(), db.payments.toArray(), db.categories.toArray()]);
@@ -21,7 +22,9 @@ async function exportBackup(db: AtlerDB) {
   URL.revokeObjectURL(url);
 }
 
-export function You({ db, session, categories, sync }: { db: AtlerDB; session: Session; categories: Category[]; sync: SyncState }) {
+export function You({ db, session, categories, sync, push, onPush }: {
+  db: AtlerDB; session: Session; categories: Category[]; sync: SyncState; push: PushState; onPush: (on: boolean) => void;
+}) {
   const [erasing, setErasing] = useState(false);
   const name = (session.user.user_metadata?.name as string | undefined) ?? null;
   return (
@@ -30,6 +33,23 @@ export function You({ db, session, categories, sync }: { db: AtlerDB; session: S
         <Kicker className="text-ink-2">Signed in as</Kicker>
         {name && <div className="mt-1 font-display text-2xl font-bold">{name}</div>}
         <div className="mt-0.5 truncate text-[15px] text-ink-2">{session.user.email}</div>
+      </Block>
+
+      <Block className="flex items-center justify-between gap-3 !p-4">
+        <div>
+          <Kicker className="text-ink-2">Reminders on this phone</Kicker>
+          <div className="mt-1 text-sm font-bold">
+            {push === 'on' ? 'On · around 9 AM, before each charge you chose'
+              : push === 'denied' ? 'Blocked in this browser’s settings'
+              : push === 'unsupported' ? 'Not available here. On iPhone, add ATLER to the Home Screen.'
+              : 'Off'}
+          </div>
+        </div>
+        {(push === 'on' || push === 'off') && (
+          <Button kind={push === 'on' ? 'quiet' : 'primary'} className={push === 'on' ? '' : '!h-11 !rounded-control !text-sm'} onClick={() => onPush(push !== 'on')}>
+            {push === 'on' ? 'Turn off' : 'TURN ON'}
+          </Button>
+        )}
       </Block>
 
       <Categories db={db} categories={categories} />

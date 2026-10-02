@@ -14,7 +14,10 @@ const short = (d: Day, today: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateStr
 function Row({ row, first, today }: { row: PlanRow; first: boolean; today: Day }) {
   const { plan } = row;
   const billing = plan.status === 'active' || plan.status === 'trial';
-  const status = plan.status === 'paused' ? 'Paused' : plan.status === 'cancelled' ? 'Cancelled' : row.next ? `Next ${short(row.next, today)}` : '';
+  const trialRunning = plan.status === 'trial' && plan.trialEnds !== null && plan.trialEnds > today;
+  const status = plan.status === 'paused' ? 'Paused' : plan.status === 'cancelled' ? 'Cancelled'
+    : trialRunning ? `Trial · ends ${short(plan.trialEnds!, today)}`
+    : row.next ? `Next ${short(row.next, today)}` : '';
   return (
     <li className={first ? '' : 'border-t-2 border-ground'}>
       <a href={planHref(plan.id)} className="block py-3 text-ink no-underline active:opacity-70">

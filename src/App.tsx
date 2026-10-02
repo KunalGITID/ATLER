@@ -11,6 +11,7 @@ import { Plans } from './screens/Plans.tsx';
 import { You } from './screens/You.tsx';
 import { useRoute } from './route.ts';
 import { useSync } from './data/useSync.ts';
+import { usePush } from './data/usePush.ts';
 
 export function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -34,6 +35,7 @@ function SignedIn({ session }: { session: Session }) {
   const db = useMemo(() => dbFor(session.user.id), [session.user.id]);
   const data = useLiveQuery(() => readAll(db), [db]);
   const sync = useSync(db, session.user.id);
+  const push = usePush(session.user.id);
   const [adding, setAdding] = useState(false);
   const [gaveUp, setGaveUp] = useState(false);
   const route = useRoute();
@@ -68,9 +70,9 @@ function SignedIn({ session }: { session: Session }) {
       </header>
 
       <main>
-        {route.name === 'plan' && plan ? <PlanDetails db={db} plan={plan} events={data.events.filter(e => e.planId === plan.id)} categories={data.categories} />
+        {route.name === 'plan' && plan ? <PlanDetails db={db} plan={plan} events={data.events.filter(e => e.planId === plan.id)} categories={data.categories} push={push.state} onEnablePush={push.turnOn} />
           : route.name === 'plans' ? <><h1 className="sr-only">Your plans</h1><Plans plans={data.plans} events={data.events} onAdd={() => setAdding(true)} /></>
-          : route.name === 'you' ? <><h1 className="sr-only">You</h1><You db={db} session={session} categories={data.categories} sync={sync} /></>
+          : route.name === 'you' ? <><h1 className="sr-only">You</h1><You db={db} session={session} categories={data.categories} sync={sync} push={push.state} onPush={on => void (on ? push.turnOn() : push.turnOff())} /></>
           : <><h1 className="sr-only">Your month</h1><Month plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} onAdd={() => setAdding(true)} /></>}
       </main>
 
@@ -89,7 +91,7 @@ function SignedIn({ session }: { session: Session }) {
         </button>
       </nav>
 
-      <AddSheet db={db} categories={data.categories} open={adding} onClose={() => setAdding(false)} />
+      <AddSheet db={db} categories={data.categories} open={adding} onClose={() => setAdding(false)} onTrialAdded={() => { if (push.state === 'off') void push.turnOn(); }} />
     </div>
   );
 }

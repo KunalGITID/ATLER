@@ -13,12 +13,13 @@ export interface NewPlan {
   lastCharged: Day; // the most recent charge; every renewal is counted from it
   today: Day;
   categoryId?: string | null;
+  trialEnds?: Day | null;    // a free trial: nothing is charged until this day
 }
 
 export async function addPlan(db: AtlerDB, input: NewPlan): Promise<Plan> {
   // A past date is the last charge; a future one is the first. Either way
   // every renewal is counted from it.
-  const anchor = input.lastCharged;
+  const anchor = input.trialEnds ?? input.lastCharged;
   const plan: Plan = {
     id: newId(),
     name: input.name.trim(),
@@ -26,8 +27,8 @@ export async function addPlan(db: AtlerDB, input: NewPlan): Promise<Plan> {
     cycle: input.cycle,
     anchor,
     categoryId: input.categoryId ?? null,
-    status: 'active',
-    trialEnds: null,
+    status: input.trialEnds ? 'trial' : 'active',
+    trialEnds: input.trialEnds ?? null,
     remind: 'off',
     createdOn: input.today,
   };

@@ -2,7 +2,7 @@
 // history and savings stay right without rewriting anything.
 import type { Cycle, Day } from '../core/dates.ts';
 import type { Paise } from '../core/money.ts';
-import type { Plan, PlanEvent } from '../core/model.ts';
+import type { Plan, PlanEvent, Remind } from '../core/model.ts';
 import { newId, type AtlerDB } from './db.ts';
 import { touched } from './touch.ts';
 
@@ -38,4 +38,8 @@ export async function deletePlan(db: AtlerDB, plan: Plan) {
     await db.plans.update(plan.id, { deleted: 1, ...touched() });
     await db.events.where('planId').equals(plan.id).modify({ deleted: 1, ...touched() });
   });
+}
+
+export async function setRemind(db: AtlerDB, plan: Plan, remind: Remind) {
+  await db.plans.update(plan.id, { remind, ...touched() });
 }

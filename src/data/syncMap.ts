@@ -3,7 +3,7 @@
 import type { Day } from '../core/dates.ts';
 import type { Paise } from '../core/money.ts';
 import type { Category, Payment, Plan, PlanEvent } from '../core/model.ts';
-import type { Stored } from './db.ts';
+import type { Stored } from './stored.ts';
 
 export type Remote = Record<string, unknown> & { id: string; updated_at: number; deleted: boolean; revision: number };
 

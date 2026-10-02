@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseDay, type Day } from '../core/dates.ts';
 import { paise } from '../core/money.ts';
 import type { Plan, PlanEvent } from '../core/model.ts';
-import type { Stored } from './db.ts';
+import type { Stored } from './stored.ts';
 import { keepLocal, tables, type Remote } from './syncMap.ts';
 
 const d = (s: string) => parseDay(s) as Day;
