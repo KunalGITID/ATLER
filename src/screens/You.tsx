@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import type { AtlerDB } from '../data/db.ts';
-import { supabase } from '../data/supabase.ts';
+import { deleteAccount, supabase } from '../data/supabase.ts';
 import { Block, Kicker } from '../ui/Block.tsx';
 import { Button } from '../ui/Button.tsx';
 import { ConfirmSheet } from './PlanSheets.tsx';
@@ -33,6 +33,8 @@ export function You({ db, session, categories, plans, events, payments, sync, pu
   sync: SyncState; push: PushState; onPush: (on: boolean) => void;
 }) {
   const [erasing, setErasing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const name = (session.user.user_metadata?.name as string | undefined) ?? null;
   return (
     <div className="flex flex-col gap-2.5">
@@ -77,6 +79,8 @@ export function You({ db, session, categories, plans, events, payments, sync, pu
 
       <Button kind="quiet" className="!h-14 !rounded-[20px]" onClick={() => supabase.auth.signOut()}>Sign out</Button>
       <Button kind="danger" onClick={() => setErasing(true)}>Erase ATLER data on this phone</Button>
+      <Button kind="danger" onClick={() => setDeleting(true)}>Delete my account</Button>
+      {deleteError && <p role="alert" className="text-center text-sm font-semibold text-danger">{deleteError}</p>}
       <p className="px-2 text-center text-xs text-ink-2">ATLER v2 · {__APP_VERSION__}</p>
 
       <ConfirmSheet
@@ -88,6 +92,25 @@ export function You({ db, session, categories, plans, events, payments, sync, pu
         confirm="Erase it all"
         onConfirm={async () => { await db.delete(); location.hash = '#/'; location.reload(); }}
         onClose={() => setErasing(false)}
+      />
+      <ConfirmSheet
+        open={deleting}
+        title="Delete your account?"
+        body="Your login, every plan, its history, your expenses and categories are deleted from ATLER for good, on every device. Download a backup first if you might want them."
+        confirm="Delete my account for good"
+        onConfirm={async () => {
+          setDeleting(false);
+          try {
+            await deleteAccount();
+            await db.delete();
+            await supabase.auth.signOut({ scope: 'local' });
+            location.hash = '#/';
+            location.reload();
+          } catch (e) {
+            setDeleteError((e as Error).message);
+          }
+        }}
+        onClose={() => setDeleting(false)}
       />
     </div>
   );

@@ -86,3 +86,12 @@ test('plans and spending export as CSV', async ({ page }) => {
   await page.getByRole('button', { name: 'Spending as CSV' }).click();
   expect(readFileSync(await (await spending).path(), 'utf8')).toContain(`${daysFromToday(0)},Netflix,199.00,,Renewal`);
 });
+
+test('delete my account removes everything and signs out', async ({ page, request }) => {
+  await addPlan(page, { name: 'Netflix', amount: '199', lastCharged: daysFromToday(-3) });
+  await tab(page, 'You');
+  await page.getByRole('button', { name: 'Delete my account' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete my account for good' }).click();
+  await expect(page.getByRole('button', { name: 'SIGN IN →' })).toBeVisible();
+  expect((await (await request.get('http://127.0.0.1:54329/__account')).json()).deleted).toBe(true);
+});

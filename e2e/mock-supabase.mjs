@@ -21,6 +21,7 @@ const PRIMARY_KEY = {
 
 let db = Object.fromEntries(TABLES.map(t => [t, []]));
 let offline = false;
+let accountDeleted = false;
 const failNext = new Set();
 
 function matchesOne(row, key, raw) {
@@ -92,7 +93,7 @@ const server = createServer((req, res) => {
             res.end(data === undefined ? '' : JSON.stringify(data));
         };
 
-        if (url.pathname === '/__reset') { db = Object.fromEntries(TABLES.map(t => [t, []])); failNext.clear(); revision = 0; offline = false; return send(204); }
+        if (url.pathname === '/__reset') { db = Object.fromEntries(TABLES.map(t => [t, []])); failNext.clear(); revision = 0; offline = false; accountDeleted = false; return send(204); }
         if (url.pathname === '/__offline') { offline = url.searchParams.get('on') === '1'; return send(204); }
         if (url.pathname === '/__seed') {
             for (const [t, rows] of Object.entries(body)) db[t].push(...rows.map(r => ({ user_id: USER_ID, ...r })));
@@ -101,6 +102,12 @@ const server = createServer((req, res) => {
         if (url.pathname === '/__fail') { failNext.add(url.searchParams.get('table')); return send(204); }
         if (url.pathname === '/__db') return send(200, db);
 
+        if (url.pathname === '/functions/v1/delete-account') {
+            db = Object.fromEntries(TABLES.map(t => [t, []]));
+            accountDeleted = true;
+            return send(200, { deleted: true });
+        }
+        if (url.pathname === '/__account') return send(200, { deleted: accountDeleted });
         if (url.pathname.startsWith('/auth/v1/')) {
             if (url.pathname.endsWith('/logout')) return send(204);
             if (url.pathname.endsWith('/user')) return send(200, session().user);

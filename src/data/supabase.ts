@@ -8,3 +8,10 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 export const supabase = createClient(url, anonKey, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
 });
+
+// Deletes the signed-in user and everything they stored (see the
+// delete-account Edge Function).
+export async function deleteAccount(): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('delete-account', { method: 'POST' });
+  if (error || !(data as { deleted?: boolean } | null)?.deleted) throw new Error('Could not delete the account. Try again.', { cause: error });
+}
