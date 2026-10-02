@@ -49,7 +49,7 @@ test('a paused plan moves to its own group with no share bar', async ({ page }) 
 
 test('You: backup download, then erasing this phone restores from the account', async ({ page }) => {
   await addPlan(page, { name: 'Netflix', amount: '199', lastCharged: daysFromToday(-3) });
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'You', exact: true }).click();
+  await tab(page, 'You');
   await expect(page.getByText('test@atler.mock')).toBeVisible();
 
   const download = page.waitForEvent('download');

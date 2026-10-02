@@ -42,5 +42,7 @@ export async function addExpense(page: Page, { name, amount, on, category }: { n
 }
 
 export async function tab(page: Page, name: 'Month' | 'Plans' | 'You') {
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name, exact: true }).click();
+  // You lives behind the profile photo, not in the bottom bar.
+  if (name === 'You') await page.getByRole('link', { name: /^You: / }).click();
+  else await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name, exact: true }).click();
 }

@@ -13,6 +13,7 @@ import { You } from './screens/You.tsx';
 import { useRoute } from './route.ts';
 import { useSync } from './data/useSync.ts';
 import { usePush } from './data/usePush.ts';
+import { Panel } from './ui/Sheet.tsx';
 import { ToastProvider } from './ui/Toast.tsx';
 import { Spent } from './screens/Spent.tsx';
 import { Calendar } from './screens/Calendar.tsx';
@@ -70,30 +71,35 @@ function SignedIn({ session }: { session: Session }) {
   if (!data || !ready) return null;
 
   const who = (session.user.user_metadata?.name as string | undefined) || session.user.email || 'You';
+  // Panels float over the home screen; closing one goes home without
+  // leaving a history entry to come back to.
+  const closePanel = () => location.replace(`${location.pathname}${location.search}#/`);
   const plan = route.name === 'plan' ? data.plans.find(p => p.id === route.id) : undefined;
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col px-4 pt-[max(16px,env(safe-area-inset-top))] pb-32">
       <header className="flex items-center justify-between px-1 pt-2 pb-3">
         <div className="font-display text-xl leading-none font-bold tracking-[0.08em]">ATLER</div>
-        <a href="#/you" aria-label={`You: ${who}`} className="flex size-[38px] items-center justify-center rounded-xl bg-block-2 font-extrabold text-ink no-underline">
+        <a href="#/you" aria-label={`You: ${who}`} aria-current={route.name === 'you' ? 'page' : undefined}
+          className={`flex size-[38px] items-center justify-center rounded-xl font-extrabold no-underline ${route.name === 'you' ? 'bg-here text-on-color' : 'bg-block-2 text-ink'}`}>
           {who.charAt(0).toUpperCase()}
         </a>
       </header>
 
       <main>
         {route.name === 'plan' && plan ? <PlanDetails db={db} plan={plan} events={data.events.filter(e => e.planId === plan.id)} categories={data.categories} push={push.state} onEnablePush={push.turnOn} />
-          : route.name === 'spent' ? <><h1 className="sr-only">What you spent</h1><Spent db={db} month={monthOf(route.month, todayDay())} plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} /></>
-          : route.name === 'year' ? <><h1 className="sr-only">Year in review</h1><Year year={Number(route.year ?? todayDay().slice(0, 4))} plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} /></>
-          : route.name === 'calendar' ? <><h1 className="sr-only">Calendar</h1><Calendar month={monthOf(route.month, todayDay())} plans={data.plans} events={data.events} payments={data.payments} /></>
           : route.name === 'plans' ? <><h1 className="sr-only">Your plans</h1><Plans plans={data.plans} events={data.events} onAdd={() => setAdding(true)} /></>
           : route.name === 'you' ? <><h1 className="sr-only">You</h1><You db={db} session={session} categories={data.categories} plans={data.plans} events={data.events} payments={data.payments} sync={sync} push={push.state} onPush={on => void (on ? push.turnOn() : push.turnOff())} /></>
           : <><h1 className="sr-only">Your month</h1><Month plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} onAdd={() => setAdding(true)} /></>}
       </main>
 
+      {route.name === 'spent' && <Panel title="What I spent" onClose={closePanel}><Spent db={db} month={monthOf(route.month, todayDay())} plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} /></Panel>}
+      {route.name === 'calendar' && <Panel title="Calendar" onClose={closePanel}><Calendar month={monthOf(route.month, todayDay())} plans={data.plans} events={data.events} payments={data.payments} /></Panel>}
+      {route.name === 'year' && <Panel title="Year in review" onClose={closePanel}><Year year={Number(route.year ?? todayDay().slice(0, 4))} plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} /></Panel>}
+
       <nav aria-label="Main" className="fixed bottom-[max(20px,env(safe-area-inset-bottom))] left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-block-2 p-2">
-        {([['#/', 'month', 'Month'], ['#/plans', 'plans', 'Plans'], ['#/you', 'you', 'You']] as const).map(([href, name, label]) => {
-          const here = route.name === name;
+        {([['#/', 'month', 'Month'], ['#/plans', 'plans', 'Plans']] as const).map(([href, name, label]) => {
+          const here = route.name === name || (name === 'month' && ['spent', 'calendar', 'year'].includes(route.name));
           return (
             <a key={name} href={href} aria-current={here ? 'page' : undefined}
               className={`flex h-11 items-center rounded-full px-4 text-[13px] no-underline ${here ? 'bg-here font-extrabold text-on-color' : 'font-bold text-ink'}`}>

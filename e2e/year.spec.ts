@@ -7,14 +7,15 @@ test('year in review totals the year and ranks where it went', async ({ page, re
   await addPlan(page, { name: 'Netflix', amount: '199', lastCharged: daysFromToday(0) });
   await addExpense(page, { name: 'Headphones', amount: '2999', on: daysFromToday(0) });
   await page.getByRole('link', { name: 'What I spent ›' }).click();
-  await page.getByRole('link', { name: 'Year in review ›' }).click();
+  await page.getByRole('dialog', { name: 'What I spent' }).getByRole('link', { name: 'Year in review ›' }).click();
   const year = daysFromToday(0).slice(0, 4);
-  await expect(page.getByText(`${year} so far`)).toBeVisible();
-  await expect(page.getByText('₹3,198', { exact: true })).toBeVisible();
-  await expect(page.getByText('₹199 on plans · ₹2,999 everyday')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Netflix' })).toHaveAttribute('href', /#\/plan\//);
-  await expect(page.getByText('Biggest single expense')).toBeVisible();
+  const panel = page.getByRole('dialog', { name: 'Year in review' });
+  await expect(panel.getByText(`${year} so far`)).toBeVisible();
+  await expect(panel.getByText('₹3,198', { exact: true })).toBeVisible();
+  await expect(panel.getByText('₹199 on plans · ₹2,999 everyday')).toBeVisible();
+  await expect(panel.getByRole('link', { name: 'Netflix' })).toHaveAttribute('href', /#\/plan\//);
+  await expect(panel.getByText('Biggest single expense')).toBeVisible();
   // Nothing tracked before this year, and no future years to page into.
-  await expect(page.getByRole('link', { name: /Previous year/ })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /Next year/ })).toHaveCount(0);
+  await expect(panel.getByRole('link', { name: /Previous year/ })).toHaveCount(0);
+  await expect(panel.getByRole('link', { name: /Next year/ })).toHaveCount(0);
 });
