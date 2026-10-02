@@ -56,7 +56,6 @@ export function Month({ db, plans, events, payments, categories, incomes = [], o
   const forecast = forecastNextMonth(plans, events, payments, today);
   const unusual = recentUnusual(payments, today)[0] ?? null;
   const kept = keptByCancelling(plans, events, today);
-  const categoryName = (id: string | null) => categories.find(c => c.id === id)?.name;
   const next = nextUp(today, plans, events);
   const creep = priceCreep(today, plans, events);
   const dues = billsToPay(plans, events, today);
@@ -236,7 +235,7 @@ export function Month({ db, plans, events, payments, categories, incomes = [], o
           <Kicker>Unusual spend</Kicker>
           <div className="mt-1 font-display text-2xl leading-tight font-bold">{unusual.payment.name} · {formatRupees(unusual.payment.amount)}</div>
           <div className="text-[13px] font-bold">
-            {unusual.times.toFixed(1)}× your usual {categoryName(unusual.payment.categoryId) ?? unusual.payment.name} spend of {formatRupees(unusual.median)}
+            {unusual.times.toFixed(1)}× your usual spend at {unusual.payment.name} of {formatRupees(unusual.median)}
           </div>
         </Block>
       )}

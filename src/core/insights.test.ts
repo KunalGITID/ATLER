@@ -41,28 +41,37 @@ describe('forecast', () => {
 });
 
 describe('unusual spending', () => {
-  const food = (on: string, r: number) => pay(on, r, { categoryId: 'food' });
-  const usual = [food('2026-09-01', 180), food('2026-09-03', 250), food('2026-09-05', 220), food('2026-09-07', 300), food('2026-09-09', 260), food('2026-09-11', 210)];
+  const swiggy = (on: string, r: number, name = 'Swiggy') => pay(on, r, { categoryId: 'food', name });
+  const usual = [swiggy('2026-09-01', 180), swiggy('2026-09-03', 250), swiggy('2026-09-05', 220), swiggy('2026-09-07', 300), swiggy('2026-09-09', 260), swiggy('2026-09-11', 210)];
 
-  it('flags a spend far above the usual for its category', () => {
-    const u = unusualness(food('2026-10-14', 1400), usual)!;
+  it('flags a spend far above the usual at the same place', () => {
+    const u = unusualness(swiggy('2026-10-14', 1400, 'SWIGGY*BLR 8823'), usual)!;
     expect(u.compared).toBe(6);
     expect(u.median).toBe(23500);
     expect(u.times).toBeCloseTo(5.96, 1);
   });
 
   it('leaves normal and mildly high spends alone; needs history and ₹200', () => {
-    expect(unusualness(food('2026-10-14', 320), usual)).toBeNull();
-    expect(unusualness(food('2026-10-14', 400), usual)).toBeNull(); // above the fence but < 2x median
-    expect(unusualness(food('2026-10-14', 5000), usual.slice(0, 4))).toBeNull();
-    const tea = ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-05'].map(on => pay(on, 20, { categoryId: 'tea' }));
-    expect(unusualness(pay('2026-10-14', 150, { categoryId: 'tea' }), tea)).toBeNull();
+    expect(unusualness(swiggy('2026-10-14', 320), usual)).toBeNull();
+    expect(unusualness(swiggy('2026-10-14', 400), usual)).toBeNull(); // above the fence but < 2x median
+    expect(unusualness(swiggy('2026-10-14', 5000), usual.slice(0, 4))).toBeNull();
+    const tea = ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-05'].map(on => pay(on, 20, { name: 'Tea' }));
+    expect(unusualness(pay('2026-10-14', 150, { name: 'Tea' }), tea)).toBeNull();
   });
 
-  it('uncategorised expenses compare with the same name; only the last week is shown', () => {
+  it('a big shop is not unusual because its category is mostly small ones', () => {
+    const groceries = (on: string, r: number, name: string) => pay(on, r, { categoryId: 'groceries', name });
+    const corner = ['01', '02', '03', '04', '05', '06', '07', '08'].map(d => groceries(`2026-09-${d}`, 150, 'Anna Stores'));
+    const dmart = [1300, 1500, 1400, 1450, 1350].map((r, i) => groceries(`2026-09-1${i}`, r, 'DMart'));
+    expect(unusualness(groceries('2026-10-14', 1450, 'DMart'), [...corner, ...dmart])).toBeNull();
+    expect(unusualness(groceries('2026-10-14', 1450, 'New Shop'), [...corner, ...dmart])).toBeNull(); // nothing to judge by
+    expect(unusualness(groceries('2026-10-14', 6000, 'DMart'), [...corner, ...dmart])!.compared).toBe(5);
+  });
+
+  it('names match loosely; only the last week is shown', () => {
     const cabs = [90, 120, 100, 110, 95].map((r, i) => pay(`2026-09-0${i + 1}`, r, { name: 'Uber' }));
     expect(unusualness(pay('2026-10-14', 650, { name: ' uber ' }), [...cabs, pay('2026-09-20', 50000, { name: 'Croma' })])!.compared).toBe(5);
-    const list = recentUnusual([...usual, food('2026-09-20', 2000), food('2026-10-12', 1500)], today);
+    const list = recentUnusual([...usual, swiggy('2026-09-20', 2000), swiggy('2026-10-12', 1500)], today);
     expect(list.map(u => u.payment.on)).toEqual(['2026-10-12']);
   });
 });
