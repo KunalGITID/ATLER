@@ -8,7 +8,11 @@ import { createServer } from 'node:http';
 
 const PORT = Number(process.env.MOCK_PORT || 54329);
 const USER_ID = '00000000-0000-4000-8000-0000000000a1';
-const TABLES = ['profiles', 'subscriptions', 'categories', 'expenses', 'push_subscriptions', 'sent_reminders', 'price_changes', 'error_log'];
+const TABLES = ['profiles', 'subscriptions', 'categories', 'expenses', 'push_subscriptions', 'sent_reminders', 'price_changes', 'error_log',
+    // v2 synced tables: the mock mirrors the real trigger (revision + last edit wins)
+    'plans', 'plan_events', 'payments', 'spend_categories'];
+const SYNCED = new Set(['plans', 'plan_events', 'payments', 'spend_categories']);
+let revision = 0;
 const PRIMARY_KEY = {
     profiles: ['user_id'],
     push_subscriptions: ['endpoint'],
@@ -16,6 +20,7 @@ const PRIMARY_KEY = {
 };
 
 let db = Object.fromEntries(TABLES.map(t => [t, []]));
+let offline = false;
 const failNext = new Set();
 
 function matchesOne(row, key, raw) {
@@ -45,6 +50,7 @@ function matches(row, params) {
         const cell = row[key] == null ? null : String(row[key]);
         if (op === 'eq' && cell !== value) return false;
         if (op === 'neq' && cell === value) return false;
+        if (op === 'gt' && !(Number(cell) > Number(value))) return false;
         if (op === 'in' && !value.replace(/^\(|\)$/g, '').split(',').map(v => v.replace(/^"|"$/g, '')).includes(cell)) return false;
         if (op === 'like') {
             const re = new RegExp('^' + value.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.') + '$');
@@ -86,7 +92,8 @@ const server = createServer((req, res) => {
             res.end(data === undefined ? '' : JSON.stringify(data));
         };
 
-        if (url.pathname === '/__reset') { db = Object.fromEntries(TABLES.map(t => [t, []])); failNext.clear(); return send(204); }
+        if (url.pathname === '/__reset') { db = Object.fromEntries(TABLES.map(t => [t, []])); failNext.clear(); revision = 0; offline = false; return send(204); }
+        if (url.pathname === '/__offline') { offline = url.searchParams.get('on') === '1'; return send(204); }
         if (url.pathname === '/__seed') {
             for (const [t, rows] of Object.entries(body)) db[t].push(...rows.map(r => ({ user_id: USER_ID, ...r })));
             return send(204);
@@ -100,6 +107,7 @@ const server = createServer((req, res) => {
             return send(200, session(body?.email));
         }
 
+        if (offline && url.pathname.startsWith('/rest/')) { req.socket.destroy(); return; }
         const table = url.pathname.replace(/^\/rest\/v1\//, '');
         if (!TABLES.includes(table)) return send(404, { message: `relation "${table}" does not exist` });
         const single = (req.headers.accept || '').includes('vnd.pgrst.object');
@@ -109,7 +117,14 @@ const server = createServer((req, res) => {
         }
 
         if (req.method === 'GET') {
-            const rows = db[table].filter(r => matches(r, url.searchParams));
+            let rows = db[table].filter(r => matches(r, url.searchParams));
+            const order = url.searchParams.get('order');
+            if (order) {
+                const [col, dir] = order.split('.');
+                rows = [...rows].sort((a, b) => (Number(a[col]) - Number(b[col])) * (dir === 'desc' ? -1 : 1));
+            }
+            const limit = Number(url.searchParams.get('limit'));
+            if (limit) rows = rows.slice(0, limit);
             if (single) return rows.length === 1 ? send(200, rows[0]) : send(406, { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' });
             return send(200, rows);
         }
@@ -119,6 +134,13 @@ const server = createServer((req, res) => {
             const key = PRIMARY_KEY[table] || ['id'];
             for (const row of rows) {
                 const hit = db[table].find(r => key.every(k => String(r[k]) === String(row[k])));
+                if (SYNCED.has(table)) {
+                    const stored = { user_id: USER_ID, ...row };
+                    if (hit && Number(row.updated_at) < Number(hit.updated_at)) continue; // older edit loses
+                    stored.revision = ++revision;
+                    if (hit) Object.assign(hit, stored); else db[table].push(stored);
+                    continue;
+                }
                 if (hit && prefer.includes('ignore-duplicates')) continue;
                 if (hit && prefer.includes('merge-duplicates')) { Object.assign(hit, row); continue; }
                 if (hit) return send(409, { code: '23505', message: 'duplicate key value violates unique constraint' });

@@ -4,13 +4,18 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { Category, Payment, Plan, PlanEvent } from '../core/model.ts';
 
-export type Stored<T> = T & { updatedAt: number; deleted?: 1 };
+// updatedAt: when this row was last edited (on any device), for last-edit-wins.
+// dirty: edited on this phone and not yet sent. deleted: a tombstone.
+export type Stored<T> = T & { updatedAt: number; deleted?: 1; dirty?: 1 };
+
+export interface Meta { key: string; value: number }
 
 export class AtlerDB extends Dexie {
   plans!: EntityTable<Stored<Plan>, 'id'>;
   payments!: EntityTable<Stored<Payment>, 'id'>;
   categories!: EntityTable<Stored<Category>, 'id'>;
   events!: EntityTable<Stored<PlanEvent>, 'id'>;
+  meta!: EntityTable<Meta, 'key'>;
 
   constructor(userId: string) {
     super(`atler-${userId}`);
@@ -19,6 +24,13 @@ export class AtlerDB extends Dexie {
       payments: 'id, on, updatedAt',
       categories: 'id, updatedAt',
       events: 'id, planId, on, updatedAt',
+    });
+    this.version(2).stores({
+      plans: 'id, status, updatedAt, dirty',
+      payments: 'id, on, updatedAt, dirty',
+      categories: 'id, updatedAt, dirty',
+      events: 'id, planId, on, updatedAt, dirty',
+      meta: 'key',
     });
   }
 }

@@ -4,6 +4,7 @@ import type { Paise } from '../core/money.ts';
 import type { Payment, Plan } from '../core/model.ts';
 import { addCategory } from './categoryActions.ts';
 import { newId, type AtlerDB } from './db.ts';
+import { touched } from './touch.ts';
 
 export interface NewPlan {
   name: string;
@@ -30,13 +31,13 @@ export async function addPlan(db: AtlerDB, input: NewPlan): Promise<Plan> {
     remind: 'off',
     createdOn: input.today,
   };
-  await db.plans.add({ ...plan, updatedAt: Date.now() });
+  await db.plans.add({ ...plan, ...touched() });
   return plan;
 }
 
 export async function addPayment(db: AtlerDB, input: { name: string; amount: Paise; on: Day; categoryId?: string | null }): Promise<Payment> {
   const payment: Payment = { id: newId(), name: input.name.trim(), amount: input.amount, on: input.on, categoryId: input.categoryId ?? null, source: 'manual' };
-  await db.payments.add({ ...payment, updatedAt: Date.now() });
+  await db.payments.add({ ...payment, ...touched() });
   return payment;
 }
 

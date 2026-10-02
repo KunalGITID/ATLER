@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { addPlan, daysFromToday, signIn } from './helpers.ts';
+import { addPlan, daysFromToday, signIn, tab } from './helpers.ts';
 
 test.beforeEach(async ({ page, request }) => {
   await request.post('http://127.0.0.1:54329/__reset');
@@ -47,7 +47,7 @@ test('a paused plan moves to its own group with no share bar', async ({ page }) 
   await expect(paused).toContainText('if restarted');
 });
 
-test('You: backup download, then erase this phone', async ({ page }) => {
+test('You: backup download, then erasing this phone restores from the account', async ({ page }) => {
   await addPlan(page, { name: 'Netflix', amount: '199', lastCharged: daysFromToday(-3) });
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'You', exact: true }).click();
   await expect(page.getByText('test@atler.mock')).toBeVisible();
@@ -58,9 +58,13 @@ test('You: backup download, then erase this phone', async ({ page }) => {
   const backup = JSON.parse(readFileSync(file, 'utf8'));
   expect(backup.plans.map((p: { name: string; price: number }) => [p.name, p.price])).toEqual([['Netflix', 19900]]);
 
+  // Erasing only clears this phone; the synced copy comes back.
+  await expect(page.getByRole('status')).toHaveText(/^Synced/);
+  await expect(page.getByRole('status')).not.toContainText('waiting'); // nothing left unsent
   await page.getByRole('button', { name: 'Erase ATLER data on this phone' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Erase it all' }).click();
-  await expect(page.getByText('Your month is empty')).toBeVisible();
+  await tab(page, 'Month');
+  await expect(page.getByRole('link', { name: /Netflix/ }).first()).toBeVisible();
 });
 
 test('the avatar opens You; sign out returns to sign in', async ({ page }) => {

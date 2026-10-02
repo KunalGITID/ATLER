@@ -7,6 +7,7 @@ import { Button } from '../ui/Button.tsx';
 import { ConfirmSheet } from './PlanSheets.tsx';
 import { Categories } from './Categories.tsx';
 import type { Category } from '../core/model.ts';
+import type { SyncState } from '../data/useSync.ts';
 
 async function exportBackup(db: AtlerDB) {
   const [plans, events, payments, categories] = await Promise.all([db.plans.toArray(), db.events.toArray(), db.payments.toArray(), db.categories.toArray()]);
@@ -20,7 +21,7 @@ async function exportBackup(db: AtlerDB) {
   URL.revokeObjectURL(url);
 }
 
-export function You({ db, session, categories }: { db: AtlerDB; session: Session; categories: Category[] }) {
+export function You({ db, session, categories, sync }: { db: AtlerDB; session: Session; categories: Category[]; sync: SyncState }) {
   const [erasing, setErasing] = useState(false);
   const name = (session.user.user_metadata?.name as string | undefined) ?? null;
   return (
@@ -35,7 +36,8 @@ export function You({ db, session, categories }: { db: AtlerDB; session: Session
 
       <Block className="flex flex-col gap-2.5 !p-4">
         <Kicker className="text-ink-2">Your data</Kicker>
-        <p className="text-sm text-ink-2">Everything is stored on this phone. A backup is one file with all your plans, their history and your expenses.</p>
+        <SyncLine sync={sync} />
+        <p className="text-sm text-ink-2">Stored on this phone and synced to your account, so every device you sign in on shows the same month. A backup is one file with everything.</p>
         <Button kind="plain" onClick={() => exportBackup(db)}>Download a backup</Button>
       </Block>
 
@@ -46,11 +48,34 @@ export function You({ db, session, categories }: { db: AtlerDB; session: Session
       <ConfirmSheet
         open={erasing}
         title="Erase everything on this phone?"
-        body="All plans, their history and your expenses are deleted from this phone. Download a backup first if you might want them back."
+        body={sync.waiting > 0
+          ? `${sync.waiting} change${sync.waiting > 1 ? 's haven’t' : ' hasn’t'} reached your account yet and would be lost. Your synced data stays in your account and comes back when you sign in again.`
+          : 'This only clears this phone. Your synced data stays in your account and comes back when you sign in again.'}
         confirm="Erase it all"
         onConfirm={async () => { await db.delete(); location.hash = '#/'; location.reload(); }}
         onClose={() => setErasing(false)}
       />
+    </div>
+  );
+}
+
+function ago(ms: number) {
+  const s = Math.round((Date.now() - ms) / 1000);
+  return s < 45 ? 'just now' : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`;
+}
+
+// One line, one meaning: is what's on this phone also in your account?
+function SyncLine({ sync }: { sync: SyncState }) {
+  const waiting = sync.waiting > 0 ? ` · ${sync.waiting} change${sync.waiting > 1 ? 's' : ''} waiting` : '';
+  const [dot, text] =
+    sync.status === 'syncing' ? ['bg-ink-2', 'Syncing…']
+    : sync.status === 'offline' ? ['bg-soon', `Offline${waiting || ' · nothing waiting'}`]
+    : sync.status === 'error' ? ['bg-danger', `Couldn't sync${waiting}`]
+    : ['bg-money', `Synced ${sync.lastSynced ? ago(sync.lastSynced) : ''}${waiting}`];
+  return (
+    <div role="status" className="flex items-center gap-2 text-sm font-bold">
+      <span className={`size-2.5 rounded-full ${dot}`} aria-hidden="true" />
+      {text}
     </div>
   );
 }
