@@ -30,3 +30,19 @@ describe('budgetLines', () => {
     ]);
   });
 });
+
+describe('budget risk', () => {
+  const food: Category[] = [{ id: 'food', name: 'Food', budget: paise(900000) }];
+  // ₹300 a day on food for the last three months; ₹5,000 so far on the 10th.
+  const history = Array.from({ length: 92 }, (_, i) => pay(new Date(Date.UTC(2026, 6, 1 + i)).toISOString().slice(0, 10), 30000, 'food'));
+  it('projects month end from your usual daily spending', () => {
+    const [line] = budgetLines(d('2026-10-10'), food, [], [], [...history, pay('2026-10-05', 500000, 'food')]);
+    expect(line!.projected).toBe(500000 + 30000 * 21);
+    expect(line!.risk).toBe('likely');
+  });
+  it("without history, this month's pace after a few days", () => {
+    const [line] = budgetLines(d('2026-10-10'), food, [], [], [pay('2026-10-02', 100000, 'food')]);
+    expect(line!.projected).toBe(100000 + 10000 * 21);
+    expect(line!.risk).toBe('ok');
+  });
+});

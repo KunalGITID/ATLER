@@ -160,9 +160,13 @@ export interface Found {
   confidence: number;   // 0-100
   perMonth: Paise;
   alreadyTracked: boolean;
+  priceChange: { from: Paise; to: Paise; on: Day } | null; // the latest step in price
+  tracked: { id: string; price: Paise } | null;            // the plan you track it as, when its price differs
 }
 
-function scoreSeries(name: string, series: Debit[], today: Day): Omit<Found, 'alreadyTracked'> | null {
+const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(200, 0.1 * Math.max(a, b));
+
+function scoreSeries(name: string, series: Debit[], today: Day): Omit<Found, 'alreadyTracked' | 'tracked'> | null {
   if (series.length < 2) return null;
   const gaps = series.slice(1).map((t, i) => daysBetween(series[i]!.on, t.on));
   const rhythm = RHYTHMS.find(r => Math.abs(median(gaps) - r.days) <= r.match);
@@ -172,8 +176,17 @@ function scoreSeries(name: string, series: Debit[], today: Day): Omit<Found, 'al
   const regular = gaps.filter(g => Math.abs(g - rhythm.days) <= rhythm.slack).length / gaps.length;
   const amounts = series.map(t => t.amount as number);
   const typical = median(amounts);
-  const steady = amounts.filter(a => Math.abs(a - typical) <= Math.max(200, 0.1 * typical)).length / amounts.length;
+  // Steady around one price, or steady in steps (199, 199, 199, 249, 249: a
+  // price rise), allowing at most two changes.
+  const around = amounts.filter(a => Math.abs(a - typical) <= Math.max(200, 0.1 * typical)).length / amounts.length;
+  const steps = amounts.slice(1).map((a, i) => (close(a, amounts[i]!) ? 0 : 1)).reduce<number>((x, y) => x + y, 0);
+  const stepwise = steps <= 2 && amounts.length >= 4 ? 1 - steps / (amounts.length - 1) : 0;
+  const steady = Math.max(around, stepwise);
   if (regular < 0.6 || steady < 0.6) return null;
+  let priceChange: Found['priceChange'] = null;
+  for (let i = series.length - 1; i > 0; i--) {
+    if (!close(series[i]!.amount, series[i - 1]!.amount)) { priceChange = { from: series[i - 1]!.amount, to: series[i]!.amount, on: series[i]!.on }; break; }
+  }
 
   const last = series[series.length - 1]!;
   const active = daysBetween(last.on, today) <= rhythm.days * 1.5;
@@ -186,6 +199,7 @@ function scoreSeries(name: string, series: Debit[], today: Day): Omit<Found, 'al
     active,
     confidence: Math.round(100 * Math.min(1, series.length / 4) * (0.5 * regular + 0.5 * steady) * (active ? 1 : 0.6)),
     perMonth: monthlyCost(last.amount, rhythm.cycle),
+    priceChange,
   };
 }
 
@@ -198,23 +212,30 @@ function splitByAmount(txns: Debit[]): Debit[][] {
   return buckets.filter(b => b.length > 1);
 }
 
-export function findRecurring(debits: readonly Debit[], today: Day, existingNames: readonly string[] = []): Found[] {
+// `existing`: what you already track, as names or plans (with a plan, a
+// different detected price is reported so it can be updated).
+type Tracked = string | { id: string; name: string; price: Paise };
+
+export function findRecurring(debits: readonly Debit[], today: Day, existing: readonly Tracked[] = []): Found[] {
   const groups = new Map<string, Debit[]>();
   for (const d of debits) {
     const name = merchantName(d.description);
     if (!name) continue;
     groups.set(name, [...(groups.get(name) ?? []), d]);
   }
-  const tracked = existingNames.map(n => n.toLowerCase());
+  const tracked = existing.map(t => (typeof t === 'string' ? { name: t.toLowerCase(), plan: null } : { name: t.name.toLowerCase(), plan: t }));
   const found: Found[] = [];
   for (const [name, txns] of groups) {
     txns.sort((a, b) => (a.on < b.on ? -1 : a.on > b.on ? 1 : 0));
-    const isTracked = tracked.some(t => t.includes(name.toLowerCase()) || name.toLowerCase().includes(t));
+    const match = tracked.find(t => t.name.includes(name.toLowerCase()) || name.toLowerCase().includes(t.name));
     // Usually all of a merchant's charges are one plan (allowing a price
     // change). If not, try splitting by amount: two plans at one merchant.
     const whole = scoreSeries(name, txns, today);
     const results = whole ? [whole] : splitByAmount(txns).map(s => scoreSeries(name, s, today)).filter(x => x !== null);
-    for (const r of results) found.push({ ...r, alreadyTracked: isTracked });
+    for (const r of results) {
+      const plan = match?.plan;
+      found.push({ ...r, alreadyTracked: !!match, tracked: plan && r.active && !close(plan.price, r.price) ? { id: plan.id, price: plan.price } : null });
+    }
   }
   return found.sort((a, b) => b.confidence - a.confidence || b.perMonth - a.perMonth);
 }
