@@ -68,6 +68,7 @@ export function Month({ db, plans, events, payments, categories, incomes = [], o
   const idle = stillUsing(plans, events, today)[0] ?? null;
   const patterns = habits(payments, categories, today).slice(0, 2);
   const money = incomes.length ? monthMoney(today, incomes, plans, events, payments) : null;
+  const comingCount = ring.markers.filter(m => m.status === 'coming').length;
   // The list continues after the "Next up" tile, so nothing is shown twice.
   const coming = plans.flatMap(p => renewalsBetween(p, events, addDays(today, 1), addDays(today, 30)))
     .sort((a, b) => (a.on < b.on ? -1 : 1))
@@ -87,12 +88,23 @@ export function Month({ db, plans, events, payments, categories, incomes = [], o
             <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-on-color" />Paid</span>
             <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-soon ring-2 ring-on-color" />Coming</span>
           </div>
-          <a href="#/spent" className="text-[13px] font-extrabold text-on-color underline">What I spent ›</a>
-          <a href="#/calendar" className="text-[13px] font-extrabold text-on-color underline">Calendar ›</a>
-          <a href="#/money" className="text-[13px] font-extrabold text-on-color underline">Income & goals ›</a>
-          <a href="#/ask" className="text-[13px] font-extrabold text-on-color underline">Ask ›</a>
         </div>
       </Block>
+
+      {/* Where to go next, each with the number it opens onto. */}
+      <nav aria-label="More about your month" className="grid grid-cols-2 gap-2.5">
+        {([
+          ['#/spent', 'What I spent ›', `${formatRupees(ring.spent)} so far`],
+          ['#/calendar', 'Calendar ›', comingCount ? `${comingCount} charge${comingCount === 1 ? '' : 's'} still to come` : 'Nothing more this month'],
+          ['#/money', 'Income & goals ›', money ? `${formatRupees(money.left)} left` : 'Add your income'],
+          ['#/ask', 'Ask ›', 'Questions about your money'],
+        ] as const).map(([href, title, detail]) => (
+          <a key={href} href={href} className="flex min-h-[76px] flex-col justify-between rounded-tile bg-block p-3.5 text-ink no-underline active:opacity-70">
+            <span className="text-[15px] font-extrabold">{title}</span>
+            <span className="num text-xs font-bold text-ink-2">{detail}</span>
+          </a>
+        ))}
+      </nav>
 
       {money && (
         <a href="#/money" className="grid grid-cols-3 gap-2 rounded-tile bg-block p-4 text-ink no-underline active:opacity-80" aria-label={`This month: ${formatRupees(money.income)} income, ${formatRupees(money.left)} left`}>
