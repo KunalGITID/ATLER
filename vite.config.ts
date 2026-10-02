@@ -36,7 +36,11 @@ export default defineConfig({
           { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      injectManifest: { globPatterns: ['**/*.{js,css,html,png,woff2}'] },
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,png,woff2}'],
+        // pdf.js (~1.6 MB) is only for PDF statements; it's fetched when used.
+        globIgnores: ['**/pdf*.js', '**/pdf*.mjs'],
+      },
     }),
   ],
   define: { __APP_VERSION__: JSON.stringify(version) },

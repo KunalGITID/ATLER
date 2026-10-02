@@ -11,6 +11,8 @@ import { Segmented } from '../ui/Segmented.tsx';
 import { Sheet } from '../ui/Sheet.tsx';
 import { Switch } from '../ui/Switch.tsx';
 import { CYCLES } from './cycles.ts';
+import { parseBankSmsList, type SmsExpense } from '../core/import/sms.ts';
+import { formatRupees, sum } from '../core/money.ts';
 
 type Kind = 'plan' | 'expense';
 
@@ -27,9 +29,34 @@ export function AddSheet({ db, categories, open, onClose, onTrialAdded }: { db: 
   const [newCategory, setNewCategory] = useState('');
   const [trial, setTrial] = useState(false);
   const [trialEnds, setTrialEnds] = useState('');
+  const [smsOpen, setSmsOpen] = useState(false);
+  const [smsText, setSmsText] = useState('');
+  const [smsMany, setSmsMany] = useState<SmsExpense[] | null>(null);
 
   function reset() {
-    setName(''); setAmount(''); setCycleKey('monthly'); setDate(todayDay()); setError(''); setCategory(''); setNewCategory(''); setTrial(false); setTrialEnds('');
+    setName(''); setAmount(''); setCycleKey('monthly'); setDate(todayDay()); setError(''); setCategory(''); setNewCategory(''); setTrial(false); setTrialEnds(''); setSmsOpen(false); setSmsText(''); setSmsMany(null);
+  }
+
+  const categoryFor = (name: string | null) => (name && categories.find(c => c.name.toLowerCase() === name.toLowerCase())?.id) || '';
+
+  function readSms() {
+    const found = parseBankSmsList(smsText, todayDay());
+    setError('');
+    if (!found.length) return setError("That doesn't look like a debit SMS.");
+    if (found.length > 1) return setSmsMany(found);
+    const [x] = found;
+    setName(x!.name);
+    setAmount(String(x!.amount / 100));
+    setDate(x!.on);
+    setCategory(categoryFor(x!.category));
+    setSmsOpen(false);
+    setSmsText('');
+  }
+
+  async function addAllSms() {
+    for (const x of smsMany ?? []) await addPayment(db, { name: x.name, amount: x.amount, on: x.on, categoryId: categoryFor(x.category) || null });
+    reset();
+    onClose();
   }
 
   async function submit(e: FormEvent) {
@@ -59,6 +86,23 @@ export function AddSheet({ db, categories, open, onClose, onTrialAdded }: { db: 
           onChange={k => { setKind(k); setError(''); }}
           options={[{ value: 'plan', label: 'Plan' }, { value: 'expense', label: 'Expense' }]}
         />
+        {kind === 'expense' && (smsOpen ? (
+          <div className="flex flex-col gap-2 rounded-2xl bg-block p-3">
+            <label htmlFor="sms" className="text-xs font-bold tracking-[0.06em] text-ink-2 uppercase">Bank SMS</label>
+            <textarea id="sms" rows={3} value={smsText} onChange={e => { setSmsText(e.target.value); setSmsMany(null); }}
+              placeholder="Rs.250.00 debited from a/c **1234 on 01-10-26 to VPA swiggy@icici…"
+              className="rounded-xl border-2 border-block-2 bg-ground p-3 text-base text-ink outline-none focus:border-money" />
+            {smsMany ? (
+              <>
+                <ul className="text-sm">{smsMany.map((x, i) => <li key={i} className="flex justify-between py-1"><span>{x.name}</span><span className="num font-bold">{formatRupees(x.amount)}</span></li>)}</ul>
+                <Button kind="primary" onClick={addAllSms}>ADD {smsMany.length} · {formatRupees(sum(smsMany.map(x => x.amount)))}</Button>
+              </>
+            ) : <Button kind="quiet" onClick={readSms}>Read SMS</Button>}
+            <p className="text-xs text-ink-2">Read on this phone only. Paste several messages, one per line, to add them together.</p>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setSmsOpen(true)} className="self-start text-sm font-bold text-money">Paste a bank SMS instead</button>
+        ))}
         <Field label={kind === 'plan' ? 'Name' : 'What for'} placeholder={kind === 'plan' ? 'Netflix' : 'Groceries'} value={name} onChange={e => setName(e.target.value)} autoComplete="off" />
         {kind === 'plan' && <Switch label="Free trial" hint="Nothing is charged until it ends" checked={trial} onChange={setTrial} />}
         <Field label={kind === 'plan' && trial ? 'Price after the trial (₹)' : 'Amount (₹)'} inputMode="decimal" placeholder="199" value={amount} onChange={e => setAmount(e.target.value)} />

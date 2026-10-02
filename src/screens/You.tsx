@@ -6,7 +6,8 @@ import { Block, Kicker } from '../ui/Block.tsx';
 import { Button } from '../ui/Button.tsx';
 import { ConfirmSheet } from './PlanSheets.tsx';
 import { Categories } from './Categories.tsx';
-import type { Category } from '../core/model.ts';
+import { StatementImport } from './StatementImport.tsx';
+import type { Category, Plan } from '../core/model.ts';
 import type { SyncState } from '../data/useSync.ts';
 import type { PushState } from '../data/push.ts';
 
@@ -22,8 +23,8 @@ async function exportBackup(db: AtlerDB) {
   URL.revokeObjectURL(url);
 }
 
-export function You({ db, session, categories, sync, push, onPush }: {
-  db: AtlerDB; session: Session; categories: Category[]; sync: SyncState; push: PushState; onPush: (on: boolean) => void;
+export function You({ db, session, categories, plans, sync, push, onPush }: {
+  db: AtlerDB; session: Session; categories: Category[]; plans: Plan[]; sync: SyncState; push: PushState; onPush: (on: boolean) => void;
 }) {
   const [erasing, setErasing] = useState(false);
   const name = (session.user.user_metadata?.name as string | undefined) ?? null;
@@ -51,6 +52,8 @@ export function You({ db, session, categories, sync, push, onPush }: {
           </Button>
         )}
       </Block>
+
+      <StatementImport db={db} plans={plans} categories={categories} />
 
       <Categories db={db} categories={categories} />
 
