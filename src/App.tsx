@@ -6,6 +6,7 @@ import { supabase } from './data/supabase.ts';
 import { AddSheet } from './screens/AddSheet.tsx';
 import { Month } from './screens/Month.tsx';
 import { SignIn } from './screens/SignIn.tsx';
+import { NewPassword } from './screens/NewPassword.tsx';
 import { PlanDetails } from './screens/PlanDetails.tsx';
 import { Plans } from './screens/Plans.tsx';
 import { You } from './screens/You.tsx';
@@ -19,6 +20,7 @@ import { today as todayDay } from './core/dates.ts';
 
 export function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
     window.atlerLaunch?.step(0.6, 'Checking your session…');
@@ -26,10 +28,14 @@ export function App() {
       setSession(data.session);
       if (!data.session) window.atlerLaunch?.done();
     });
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
+    const { data } = supabase.auth.onAuthStateChange((event, next) => {
+      if (event === 'PASSWORD_RECOVERY') { setRecovering(true); window.atlerLaunch?.done(); }
+      setSession(next);
+    });
     return () => data.subscription.unsubscribe();
   }, []);
 
+  if (recovering) return <NewPassword onDone={() => { setRecovering(false); location.hash = '#/'; }} />;
   if (session === undefined) return null; // the launch screen is still up
   if (!session) return <SignIn />;
   return <ToastProvider><SignedIn session={session} /></ToastProvider>;

@@ -78,7 +78,7 @@ function session(email = 'test@atler.mock') {
 const server = createServer((req, res) => {
     res.setHeader('access-control-allow-origin', '*');
     res.setHeader('access-control-allow-headers', '*');
-    res.setHeader('access-control-allow-methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+    res.setHeader('access-control-allow-methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     res.setHeader('access-control-expose-headers', 'content-range');
     if (req.method === 'OPTIONS') return res.writeHead(204).end();
 
