@@ -2,6 +2,7 @@ import { addDays, today as todayDay, type Day } from '../core/dates.ts';
 import { formatRupees } from '../core/money.ts';
 import type { Category, Payment, Plan, PlanEvent } from '../core/model.ts';
 import { budgetLines } from '../core/budgets.ts';
+import { forecastNextMonth, keptByCancelling, recentUnusual } from '../core/insights.ts';
 import { BudgetBar } from '../ui/BudgetBar.tsx';
 import { canCompareWithLastMonth, monthRing, nextUp, plansPerMonth, priceCreep, vsLastMonth } from '../core/month.ts';
 import { renewalsBetween } from '../core/renewals.ts';
@@ -39,6 +40,10 @@ export function Month({ plans, events, payments, categories, onAdd }: {
   const ring = monthRing(today, plans, events, payments);
   const compare = canCompareWithLastMonth(today, plans, payments);
   const budgets = budgetLines(today, categories, plans, events, payments);
+  const forecast = forecastNextMonth(plans, events, payments, today);
+  const unusual = recentUnusual(payments, today)[0] ?? null;
+  const kept = keptByCancelling(plans, events, today);
+  const categoryName = (id: string | null) => categories.find(c => c.id === id)?.name;
   const next = nextUp(today, plans, events);
   const creep = priceCreep(today, plans, events);
   // The list continues after the "Next up" tile, so nothing is shown twice.
@@ -107,11 +112,50 @@ export function Month({ plans, events, payments, categories, onAdd }: {
         </section>
       )}
 
+      {unusual && (
+        // Coral: something to look at. Compared with your own past spending only.
+        <Block tone="soon" className="!p-4">
+          <Kicker>Unusual spend</Kicker>
+          <div className="mt-1 font-display text-2xl leading-tight font-bold">{unusual.payment.name} · {formatRupees(unusual.payment.amount)}</div>
+          <div className="text-[13px] font-bold">
+            {unusual.times.toFixed(1)}× your usual {categoryName(unusual.payment.categoryId) ?? unusual.payment.name} spend of {formatRupees(unusual.median)}
+          </div>
+        </Block>
+      )}
+
       {budgets.length > 0 && (
         <section aria-labelledby="budgets" className="rounded-tile bg-block px-4 pt-3 pb-1">
           <h2 id="budgets" className="text-[11px] font-extrabold tracking-[0.1em] text-ink-2 uppercase">Budgets this month</h2>
           <ul>{budgets.map((b, i) => <li key={b.category.id} className={i ? 'border-t-2 border-ground' : ''}><BudgetBar line={b} /></li>)}</ul>
         </section>
+      )}
+
+      {forecast && (
+        <section aria-labelledby="forecast" className="rounded-tile bg-block p-4">
+          <h2 id="forecast" className="text-[11px] font-extrabold tracking-[0.1em] text-ink-2 uppercase">
+            {new Date(`${forecast.month}T00:00:00Z`).toLocaleDateString('en-IN', { month: 'long', timeZone: 'UTC' })}, likely
+          </h2>
+          <div className="num mt-1 text-[32px] leading-tight font-bold">{formatRupees(forecast.estimate)}</div>
+          {forecast.high > forecast.low && (
+            <div className="text-sm font-bold">Probably {formatRupees(forecast.low)} – {formatRupees(forecast.high)}</div>
+          )}
+          <div className="mt-2 text-xs text-ink-2">
+            {formatRupees(forecast.fixed)} in {forecast.renewals.length} renewal{forecast.renewals.length === 1 ? '' : 's'}
+            {forecast.everyday
+              ? ` + about ${formatRupees(forecast.everyday.estimate)} everyday spending (your last ${forecast.everyday.months} month${forecast.everyday.months === 1 ? '' : 's'})`
+              : ' · log everyday expenses for a month to include them'}
+          </div>
+        </section>
+      )}
+
+      {kept && kept.kept > 0 && (
+        <Block tone="money" className="!p-4">
+          <Kicker>Kept since cancelling</Kicker>
+          <div className="num mt-1 text-[28px] leading-tight font-bold">{formatRupees(kept.kept)}</div>
+          <div className="text-[13px] font-bold">
+            {kept.items.length === 1 ? kept.items[0]!.plan.name : `${kept.items.length} plans`} · {formatRupees(kept.perYear)} a year
+          </div>
+        </Block>
       )}
     </div>
   );

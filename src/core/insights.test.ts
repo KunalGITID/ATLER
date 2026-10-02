@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'vitest';
+import { MONTHLY, YEARLY, parseDay, type Day } from './dates.ts';
+import { paise } from './money.ts';
+import type { Payment, Plan, PlanEvent } from './model.ts';
+import { everydayByMonth, forecastNextMonth, keptByCancelling, recentUnusual, unusualness } from './insights.ts';
+
+const d = (s: string) => parseDay(s) as Day;
+const today = d('2026-10-15');
+const plan = (o: Partial<Plan>): Plan => ({
+  id: o.name ?? 'p', name: 'Plan', price: paise(10000), cycle: MONTHLY, anchor: d('2026-01-10'), categoryId: null,
+  status: 'active', trialEnds: null, remind: 'off', createdOn: d('2026-01-01'), ...o,
+});
+let n = 0;
+const pay = (on: string, rupees: number, o: Partial<Payment> = {}): Payment => ({ id: `p${++n}`, name: 'x', amount: paise(rupees * 100), on: d(on), categoryId: null, source: 'manual', ...o });
+
+describe('forecast', () => {
+  it('everyday totals per complete month, quiet months as 0, none before the first expense, max six', () => {
+    expect(everydayByMonth([pay('2026-07-03', 500), pay('2026-07-20', 250), pay('2026-09-09', 1000), pay('2026-10-02', 9999)], today))
+      .toEqual([75000, 0, 100000]);
+    expect(everydayByMonth([pay('2025-01-01', 10)], today)).toHaveLength(6);
+    expect(everydayByMonth([], today)).toEqual([]);
+  });
+
+  it('renewals next month are exact; everyday is the average with the lowest..highest month as the range', () => {
+    const f = forecastNextMonth(
+      [plan({ name: 'Netflix', price: paise(19900) }), plan({ name: 'Prime', price: paise(149900), cycle: YEARLY, anchor: d('2025-11-05') }), plan({ name: 'Off', status: 'cancelled' })],
+      [{ id: 'c', planId: 'Off', on: d('2026-01-01'), at: 1, kind: 'cancelled' }],
+      [pay('2026-08-03', 2000), pay('2026-09-03', 3000)],
+      today,
+    )!;
+    expect(f.month).toBe('2026-11-01');
+    expect(f.renewals.map(r => r.name)).toEqual(['Prime', 'Netflix']);
+    expect(f.fixed).toBe(169800);
+    expect(f.everyday).toEqual({ estimate: 250000, low: 200000, high: 300000, months: 2 });
+    expect([f.low, f.estimate, f.high]).toEqual([369800, 419800, 469800]);
+  });
+
+  it('nothing to say -> null', () => {
+    expect(forecastNextMonth([], [], [], today)).toBeNull();
+  });
+});
+
+describe('unusual spending', () => {
+  const food = (on: string, r: number) => pay(on, r, { categoryId: 'food' });
+  const usual = [food('2026-09-01', 180), food('2026-09-03', 250), food('2026-09-05', 220), food('2026-09-07', 300), food('2026-09-09', 260), food('2026-09-11', 210)];
+
+  it('flags a spend far above the usual for its category', () => {
+    const u = unusualness(food('2026-10-14', 1400), usual)!;
+    expect(u.compared).toBe(6);
+    expect(u.median).toBe(23500);
+    expect(u.times).toBeCloseTo(5.96, 1);
+  });
+
+  it('leaves normal and mildly high spends alone; needs history and ₹200', () => {
+    expect(unusualness(food('2026-10-14', 320), usual)).toBeNull();
+    expect(unusualness(food('2026-10-14', 400), usual)).toBeNull(); // above the fence but < 2x median
+    expect(unusualness(food('2026-10-14', 5000), usual.slice(0, 4))).toBeNull();
+    const tea = ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-05'].map(on => pay(on, 20, { categoryId: 'tea' }));
+    expect(unusualness(pay('2026-10-14', 150, { categoryId: 'tea' }), tea)).toBeNull();
+  });
+
+  it('uncategorised expenses compare with the same name; only the last week is shown', () => {
+    const cabs = [90, 120, 100, 110, 95].map((r, i) => pay(`2026-09-0${i + 1}`, r, { name: 'Uber' }));
+    expect(unusualness(pay('2026-10-14', 650, { name: ' uber ' }), [...cabs, pay('2026-09-20', 50000, { name: 'Croma' })])!.compared).toBe(5);
+    const list = recentUnusual([...usual, food('2026-09-20', 2000), food('2026-10-12', 1500)], today);
+    expect(list.map(u => u.payment.on)).toEqual(['2026-10-12']);
+  });
+});
+
+describe('keptByCancelling', () => {
+  it('sums what cancelled plans would have charged since cancelling', () => {
+    const plans = [plan({ name: 'Hotstar', price: paise(29900), status: 'cancelled' }), plan({ name: 'Netflix' })];
+    const events: PlanEvent[] = [{ id: 'e', planId: 'Hotstar', on: d('2026-07-01'), at: 1, kind: 'cancelled' }];
+    expect(keptByCancelling(plans, events, today)).toMatchObject({ kept: 4 * 29900, perYear: 12 * 29900 }); // Jul–Oct 10th
+    expect(keptByCancelling([plan({})], [], today)).toBeNull();
+  });
+});
