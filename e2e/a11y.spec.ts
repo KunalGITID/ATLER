@@ -38,3 +38,16 @@ test('every signed-in screen is accessible', async ({ page, request }) => {
   await expect(page.getByRole('dialog')).toBeVisible();
   await noViolations(page, 'add sheet');
 });
+
+test('the unusual-spend card and its answer buttons are accessible', async ({ page, request }) => {
+  await request.post('http://127.0.0.1:54329/__reset');
+  await signIn(page);
+  for (const [i, amount] of ['180', '250', '220', '300', '260'].entries()) {
+    await addExpense(page, { name: 'Swiggy', amount, on: daysFromToday(-20 - i) });
+  }
+  await addExpense(page, { name: 'Swiggy', amount: '1600', on: daysFromToday(0) });
+  await expect(page.getByRole('button', { name: 'Not expected' })).toBeVisible();
+  await noViolations(page, 'unusual spend (dark)');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await noViolations(page, 'unusual spend (light)');
+});

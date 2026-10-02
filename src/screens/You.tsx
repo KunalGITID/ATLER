@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { alertTrackRecord } from '../core/alertFeedback.ts';
 import type { Session } from '@supabase/supabase-js';
 import type { AtlerDB } from '../data/db.ts';
 import { deleteAccount, supabase } from '../data/supabase.ts';
@@ -47,6 +49,7 @@ export function You({ db, session, categories, plans, events, payments, sync, pu
     try { await run(); } catch (e) { setPhotoError(e instanceof AvatarError ? e.message : 'Something went wrong with the photo.'); }
     setPhotoBusy(false);
   }
+  const record = alertTrackRecord(useLiveQuery(() => db.verdicts.toArray(), [db]) ?? []);
   const changePhoto = (file: File) => withPhoto(() => setAvatar(session.user, file));
   const dropPhoto = () => withPhoto(() => removeAvatar(session.user));
   return (
@@ -86,6 +89,16 @@ export function You({ db, session, categories, plans, events, payments, sync, pu
           </Button>
         )}
       </Block>
+
+      {record && (
+        <Block className="!p-4">
+          <Kicker className="text-ink-2">Unusual-spend alerts</Kicker>
+          <div className="mt-1 text-sm font-bold">
+            {record.real} of the {record.answered} you answered {record.real === 1 ? 'was' : 'were'} really unusual ({Math.round(100 * record.precision)}%).
+            {' '}Each “Expected” makes ATLER flag fewer like it.
+          </div>
+        </Block>
+      )}
 
       <StatementImport db={db} plans={plans} categories={categories} />
 
