@@ -3,6 +3,7 @@ import { readExpenses, sameExpense, type ExpenseImport as Read } from '../core/i
 import { formatRupees, sum } from '../core/money.ts';
 import type { Category, Payment } from '../core/model.ts';
 import { suggestCategoryId } from '../core/suggest.ts';
+import { usePrior } from '../data/prior.ts';
 import { addCategory } from '../data/categoryActions.ts';
 import { addPayment } from '../data/actions.ts';
 import type { AtlerDB } from '../data/db.ts';
@@ -15,6 +16,7 @@ const FORMAT = { walnut: 'Walnut export', splitwise: 'Splitwise export', stateme
 // Expenses from Walnut, Splitwise or a bank CSV, read on the phone. Anything
 // already in ATLER (same day, amount and name) is left out.
 export function ExpenseImport({ db, payments, categories }: { db: AtlerDB; payments: Payment[]; categories: Category[] }) {
+  const prior = usePrior();
   const input = useRef<HTMLInputElement>(null);
   const [read, setRead] = useState<(Read & { fresh: Read['expenses']; dupes: number }) | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -43,7 +45,7 @@ export function ExpenseImport({ db, payments, categories }: { db: AtlerDB; payme
         categoryId = (await addCategory(db, e.category)).id;
         byName.set(e.category.toLowerCase(), categoryId);
       }
-      categoryId ??= suggestCategoryId(e.name, categories, payments, []);
+      categoryId ??= suggestCategoryId(e.name, categories, payments, [], prior);
       await addPayment(db, { name: e.name, amount: e.amount, on: e.on, categoryId, source: 'import', note: e.note, tags: e.tags });
     }
     setBusy(false);

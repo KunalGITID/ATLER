@@ -38,9 +38,9 @@ export function train(examples: readonly Example[]): Model {
 
 export interface Prediction { categoryId: string; confidence: number }
 
-// The likeliest category and how sure the model is (0..1). null when none of
-// the name's words have been seen before: then it would only be guessing.
-export function predict(model: Model, name: string): Prediction | null {
+// How likely each category is (summing to 1). null when none of the name's
+// words have been seen before: then it would only be guessing.
+export function probabilities(model: Model, name: string): Map<string, number> | null {
   const words = tokens(name).filter(t => model.vocabulary.has(t));
   if (!words.length || model.classes.size === 0) return null;
   const v = model.vocabulary.size;
@@ -52,6 +52,13 @@ export function predict(model: Model, name: string): Prediction | null {
   const max = Math.max(...scores.map(s => s.log));
   const weights = scores.map(s => ({ id: s.id, w: Math.exp(s.log - max) }));
   const total = weights.reduce((a, b) => a + b.w, 0);
-  const best = weights.reduce((a, b) => (b.w > a.w ? b : a));
-  return { categoryId: best.id, confidence: best.w / total };
+  return new Map(weights.map(x => [x.id, x.w / total]));
+}
+
+// The likeliest category and how sure the model is (0..1).
+export function predict(model: Model, name: string): Prediction | null {
+  const p = probabilities(model, name);
+  if (!p) return null;
+  const [categoryId, confidence] = [...p].reduce((a, b) => (b[1] > a[1] ? b : a));
+  return { categoryId, confidence };
 }

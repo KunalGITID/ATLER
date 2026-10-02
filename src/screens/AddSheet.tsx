@@ -3,6 +3,7 @@ import { parseDay, today as todayDay } from '../core/dates.ts';
 import { addIncome, addPayment, addPlan, resolveCategory } from '../data/actions.ts';
 import type { Category, Payment, Plan } from '../core/model.ts';
 import { suggestCategoryId } from '../core/suggest.ts';
+import { usePrior } from '../data/prior.ts';
 import { CategoryPicker, NEW_CATEGORY } from '../ui/CategoryPicker.tsx';
 import type { AtlerDB } from '../data/db.ts';
 import { Button } from '../ui/Button.tsx';
@@ -20,6 +21,7 @@ type Kind = 'plan' | 'expense' | 'income';
 
 export function AddSheet({ db, categories, plans = [], payments = [], open, startAs, onClose, onTrialAdded }: { db: AtlerDB; categories: Category[]; plans?: Plan[]; payments?: Payment[]; startAs?: Kind; open: boolean; onClose: () => void; onTrialAdded?: () => void }) {
   const today = todayDay();
+  const prior = usePrior();
   const [kind, setKind] = useState<Kind>('plan');
   useEffect(() => { if (open && startAs) setKind(startAs); }, [open, startAs]);
   const [name, setName] = useState('');
@@ -52,7 +54,7 @@ export function AddSheet({ db, categories, plans = [], payments = [], open, star
   // Fill the category from what you've done before, until you pick one yourself.
   function typeName(value: string) {
     setName(value);
-    if (!categoryPicked) setCategory(suggestCategoryId(value, categories, payments, plans) ?? '');
+    if (!categoryPicked) setCategory(suggestCategoryId(value, categories, payments, plans, prior) ?? '');
   }
 
   function readSms() {
@@ -64,14 +66,14 @@ export function AddSheet({ db, categories, plans = [], payments = [], open, star
     setName(x!.name);
     setMoney(moneyValue(x!.amount));
     setDate(x!.on);
-    setCategory(categoryFor(x!.category) || suggestCategoryId(x!.name, categories, payments, plans) || '');
+    setCategory(categoryFor(x!.category) || suggestCategoryId(x!.name, categories, payments, plans, prior) || '');
     setSource('sms');
     setSmsOpen(false);
     setSmsText('');
   }
 
   async function addAllSms() {
-    for (const x of smsMany ?? []) await addPayment(db, { name: x.name, amount: x.amount, on: x.on, categoryId: categoryFor(x.category) || suggestCategoryId(x.name, categories, payments, plans), source: 'sms' });
+    for (const x of smsMany ?? []) await addPayment(db, { name: x.name, amount: x.amount, on: x.on, categoryId: categoryFor(x.category) || suggestCategoryId(x.name, categories, payments, plans, prior), source: 'sms' });
     reset();
     onClose();
   }
@@ -87,7 +89,7 @@ export function AddSheet({ db, categories, plans = [], payments = [], open, star
       if (r.name) typeName(r.name);
       if (r.amount) setMoney(moneyValue(r.amount));
       if (r.on && r.on <= todayDay()) setDate(r.on);
-      if (r.category && !categoryPicked) setCategory(categoryFor(r.category) || (r.name ? suggestCategoryId(r.name, categories, payments, plans) : null) || '');
+      if (r.category && !categoryPicked) setCategory(categoryFor(r.category) || (r.name ? suggestCategoryId(r.name, categories, payments, plans, prior) : null) || '');
       setSource('receipt');
       setScan('Filled in from the photo. Check it before adding.');
     } catch {
