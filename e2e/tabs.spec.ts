@@ -72,3 +72,17 @@ test('the avatar opens You; sign out returns to sign in', async ({ page }) => {
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page.getByRole('button', { name: 'SIGN IN →' })).toBeVisible();
 });
+
+test('plans and spending export as CSV', async ({ page }) => {
+  await addPlan(page, { name: 'Netflix', amount: '199', lastCharged: daysFromToday(0) });
+  await tab(page, 'You');
+  const plans = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Plans as CSV' }).click();
+  const plansText = readFileSync(await (await plans).path(), 'utf8');
+  expect(plansText).toContain('Name,Price (₹),Billed');
+  expect(plansText).toContain('Netflix,199.00,Monthly,active');
+
+  const spending = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Spending as CSV' }).click();
+  expect(readFileSync(await (await spending).path(), 'utf8')).toContain(`${daysFromToday(0)},Netflix,199.00,,Renewal`);
+});

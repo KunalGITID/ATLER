@@ -7,24 +7,30 @@ import { Button } from '../ui/Button.tsx';
 import { ConfirmSheet } from './PlanSheets.tsx';
 import { Categories } from './Categories.tsx';
 import { StatementImport } from './StatementImport.tsx';
-import type { Category, Plan } from '../core/model.ts';
+import type { Category, Payment, Plan, PlanEvent } from '../core/model.ts';
+import { plansCsv, spendingCsv } from '../core/exportCsv.ts';
 import type { SyncState } from '../data/useSync.ts';
 import type { PushState } from '../data/push.ts';
+
+function download(text: string, name: string, type: string) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 async function exportBackup(db: AtlerDB) {
   const [plans, events, payments, categories] = await Promise.all([db.plans.toArray(), db.events.toArray(), db.payments.toArray(), db.categories.toArray()]);
   const live = <T extends { deleted?: 1 }>(rows: T[]) => rows.filter(r => !r.deleted);
   const backup = { app: 'atler', version: 2, exportedAt: new Date().toISOString(), plans: live(plans), events: live(events), payments: live(payments), categories: live(categories) };
-  const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `atler-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  download(JSON.stringify(backup, null, 2), `atler-backup-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
 }
 
-export function You({ db, session, categories, plans, sync, push, onPush }: {
-  db: AtlerDB; session: Session; categories: Category[]; plans: Plan[]; sync: SyncState; push: PushState; onPush: (on: boolean) => void;
+export function You({ db, session, categories, plans, events, payments, sync, push, onPush }: {
+  db: AtlerDB; session: Session; categories: Category[]; plans: Plan[]; events: PlanEvent[]; payments: Payment[];
+  sync: SyncState; push: PushState; onPush: (on: boolean) => void;
 }) {
   const [erasing, setErasing] = useState(false);
   const name = (session.user.user_metadata?.name as string | undefined) ?? null;
@@ -62,6 +68,11 @@ export function You({ db, session, categories, plans, sync, push, onPush }: {
         <SyncLine sync={sync} />
         <p className="text-sm text-ink-2">Stored on this phone and synced to your account, so every device you sign in on shows the same month. A backup is one file with everything.</p>
         <Button kind="plain" onClick={() => exportBackup(db)}>Download a backup</Button>
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* \uFEFF tells Excel the file is UTF-8, so ₹ shows correctly. */}
+          <Button kind="quiet" onClick={() => download('\uFEFF' + plansCsv(plans, events, categories), `atler-plans-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8')}>Plans as CSV</Button>
+          <Button kind="quiet" onClick={() => download('\uFEFF' + spendingCsv(plans, events, payments, categories), `atler-spending-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8')}>Spending as CSV</Button>
+        </div>
       </Block>
 
       <Button kind="quiet" className="!h-14 !rounded-[20px]" onClick={() => supabase.auth.signOut()}>Sign out</Button>
