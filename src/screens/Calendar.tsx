@@ -48,12 +48,12 @@ export function Calendar({ month, plans, events, payments }: { month: Day; plans
                 aria-pressed={shown?.on === day.on}
                 aria-label={`${Number(day.on.slice(8))}${day.entries.length ? `: ${day.entries.map(e => `${e.name} ${formatRupees(e.amount)}`).join(', ')}` : ''}`}
                 onClick={() => setPicked(day)}
-                className={`flex h-14 flex-col items-center justify-start rounded-xl pt-1.5 text-sm font-bold ${!day.inMonth ? 'opacity-0' : shown?.on === day.on ? 'bg-here text-on-color' : isToday ? 'bg-money text-on-color' : day.entries.length ? 'bg-block-2' : ''}`}
+                className={`flex h-14 flex-col items-center justify-start rounded-xl pt-1.5 text-sm font-bold ${!day.inMonth ? 'opacity-0' : shown?.on === day.on ? 'bg-here text-on-color' : `${day.entries.length ? 'bg-block-2' : ''} ${isToday ? 'ring-2 ring-money ring-inset' : ''}`}`}
               >
                 {Number(day.on.slice(8))}
                 {day.inMonth && day.entries.length > 0 && (
                   <span className="mt-auto mb-1 flex items-center gap-0.5 text-[9px] font-extrabold">
-                    {hasPaid && <span className="size-1.5 rounded-full bg-current" />}
+                    {hasPaid && <span className="size-1.5 rounded-full bg-money" />}
                     {hasComing && <span className="size-1.5 rounded-full bg-soon" />}
                     {short(day.total)}
                   </span>
@@ -63,9 +63,9 @@ export function Calendar({ month, plans, events, payments }: { month: Day; plans
           })}
         </div>
         <div className="mt-3 flex justify-center gap-4 text-[11px] font-bold text-ink-2">
-          <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-ink" />Paid</span>
+          <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-money" />Paid</span>
           <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-soon" />Coming</span>
-          <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-money" />Today</span>
+          <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm ring-2 ring-money" />Today</span>
         </div>
       </Block>
 

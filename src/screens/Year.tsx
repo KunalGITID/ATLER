@@ -10,7 +10,7 @@ const short = (d: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN',
 const long = (d: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { month: 'long', timeZone: 'UTC' });
 const dayLabel = (d: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 
-function Lines({ label, lines, total }: { label: string; lines: YearLine[]; total: number }) {
+function Lines({ label, lines, total, of }: { label: string; lines: YearLine[]; total: number; of: string }) {
   return (
     <Block className="!p-4">
       <Kicker className="text-ink-2">{label}</Kicker>
@@ -21,8 +21,8 @@ function Lines({ label, lines, total }: { label: string; lines: YearLine[]; tota
               {l.planId ? <a href={planHref(l.planId)} className="font-bold text-ink">{l.name}</a> : <span className="font-bold">{l.name}</span>}
               <span className="num font-bold">{formatRupees(l.amount)}</span>
             </div>
-            {/* Share of the year: how much of the total this one line was. */}
-            <div className="mt-1.5 h-1.5 rounded-full bg-block-2" role="img" aria-label={`${Math.round((l.amount / total) * 100)}% of the year`}>
+            {/* Share: how much of the group's total this one line was. */}
+            <div className="mt-1.5 h-1.5 rounded-full bg-block-2" role="img" aria-label={`${Math.round((l.amount / total) * 100)}% of ${of}`}>
               <div className="h-full rounded-full bg-money" style={{ width: `${Math.max(2, (l.amount / total) * 100)}%` }} />
             </div>
           </li>
@@ -76,8 +76,8 @@ export function Year({ year, plans, events, payments, categories }: { year: numb
           </p>
         </Block>
 
-        {r.topPlans.length > 0 && <Lines label="Plans that cost the most" lines={r.topPlans} total={r.total} />}
-        {r.topCategories.length > 1 && <Lines label="Where it went" lines={r.topCategories} total={r.total} />}
+        {r.topPlans.length > 0 && <Lines label="Plans that cost the most" lines={r.topPlans} total={r.plansTotal} of="all plans" />}
+        {r.topCategories.length > 1 && <Lines label="Where it went" lines={r.topCategories} total={r.total} of="the year" />}
 
         {r.biggestExpense && (
           <Block className="!p-4">
