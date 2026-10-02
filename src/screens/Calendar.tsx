@@ -6,6 +6,7 @@ import type { Payment, Plan, PlanEvent } from '../core/model.ts';
 import { planHref } from '../route.ts';
 import { Block, Kicker } from '../ui/Block.tsx';
 import { useSlide } from '../ui/useSlide.ts';
+import { useSwipe } from '../ui/useSwipe.ts';
 
 const monthLabel = (d: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 const short = (n: number) => (n >= 100000 ? `₹${Math.round(n / 100000)}k` : `₹${Math.round(n / 100)}`);
@@ -18,12 +19,16 @@ export function Calendar({ month, plans, events, payments }: { month: Day; plans
   const shown = picked && picked.inMonth ? picked : null;
   const prev = startOfMonth(addDays(month, -1));
   const next = addDays(endOfMonth(month), 1);
+  const swipe = useSwipe({
+    left: () => { location.hash = `#/calendar/${next.slice(0, 7)}`; },
+    right: () => { location.hash = `#/calendar/${prev.slice(0, 7)}`; },
+  });
   const inMonth = days.filter(d => d.inMonth);
   const total = sum(inMonth.map(d => d.total));
   const coming = sum(inMonth.flatMap(d => d.entries.filter(e => !e.paid).map(e => e.amount)));
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div ref={swipe} className="flex flex-col gap-2.5">
       <Block className="!p-4">
         <div className="flex items-center justify-between">
           <a href={`#/calendar/${prev.slice(0, 7)}`} aria-label={`Previous month, ${monthLabel(prev)}`} className="flex size-10 items-center justify-center rounded-xl bg-block-2 text-ink no-underline">‹</a>

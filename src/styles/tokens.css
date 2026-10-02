@@ -50,6 +50,12 @@ body,
   min-height: 100dvh;
 }
 
+/* Only the root's value reaches the viewport: without it the browser's own
+   swipe-back gesture takes sideways swipes meant for the app. */
+html {
+  overscroll-behavior: none;
+}
+
 body {
   margin: 0;
   background: var(--color-ground);

@@ -10,7 +10,8 @@ import { NewPassword } from './screens/NewPassword.tsx';
 import { PlanDetails } from './screens/PlanDetails.tsx';
 import { Plans } from './screens/Plans.tsx';
 import { You } from './screens/You.tsx';
-import { useRoute } from './route.ts';
+import { goBack, useRoute } from './route.ts';
+import { useSwipe } from './ui/useSwipe.ts';
 import { useSync } from './data/useSync.ts';
 import { usePush } from './data/usePush.ts';
 import { Panel } from './ui/Sheet.tsx';
@@ -63,6 +64,14 @@ function SignedIn({ session }: { session: Session }) {
   }, []);
   const [gaveUp, setGaveUp] = useState(false);
   const route = useRoute();
+  // Swipe between the two tabs; a plan swipes back to where it was opened from.
+  const swipe = useSwipe({
+    left: () => { if (route.name === 'month') location.hash = '#/plans'; },
+    right: () => {
+      if (route.name === 'plans') location.hash = '#/';
+      else if (route.name === 'plan') goBack();
+    },
+  });
 
   // A phone with nothing on it yet waits for the first sync (up to 8 s), so a
   // returning user sees their month instead of an empty one.
@@ -88,7 +97,7 @@ function SignedIn({ session }: { session: Session }) {
   const plan = route.name === 'plan' ? data.plans.find(p => p.id === route.id) : undefined;
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col px-4 pt-[max(16px,env(safe-area-inset-top))] pb-32">
+    <div ref={swipe} className="mx-auto flex min-h-dvh max-w-md flex-col px-4 pt-[max(16px,env(safe-area-inset-top))] pb-32">
       <header className="flex items-center justify-between px-1 pt-2 pb-3">
         <div className="font-display text-xl leading-none font-bold tracking-[0.08em]">ATLER</div>
         <a href="#/you" aria-label={`You: ${who}`} aria-current={route.name === 'you' ? 'page' : undefined}

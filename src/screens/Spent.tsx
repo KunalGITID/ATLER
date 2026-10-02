@@ -8,6 +8,7 @@ import type { AtlerDB } from '../data/db.ts';
 import { planHref } from '../route.ts';
 import { Block, Kicker } from '../ui/Block.tsx';
 import { useSlide } from '../ui/useSlide.ts';
+import { useSwipe } from '../ui/useSwipe.ts';
 import { useToast } from '../ui/Toast.tsx';
 import { EditExpenseSheet } from './ExpenseSheet.tsx';
 
@@ -26,10 +27,14 @@ export function Spent({ db, month, plans, events, payments, categories }: {
   const s = spentInMonth(month, today, plans, events, payments);
   const prev = startOfMonth(addDays(month, -1));
   const next = addDays(endOfMonth(month), 1);
+  const swipe = useSwipe({
+    left: () => { if (next <= today) location.hash = `#/spent/${monthKey(next)}`; },
+    right: () => { location.hash = `#/spent/${monthKey(prev)}`; },
+  });
   const categoryName = (id: string | null) => categories.find(c => c.id === id)?.name;
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div ref={swipe} className="flex flex-col gap-2.5">
       <Block tone="money" className="!p-4">
         <div className="flex items-center justify-between">
           <a href={`#/spent/${monthKey(prev)}`} aria-label={`Previous month, ${monthLabel(prev)}`} className="flex size-10 items-center justify-center rounded-xl bg-on-color/10 text-on-color no-underline">‹</a>

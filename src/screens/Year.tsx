@@ -6,6 +6,7 @@ import { yearReview, type YearLine } from '../core/year.ts';
 import { planHref } from '../route.ts';
 import { Block, Kicker } from '../ui/Block.tsx';
 import { useSlide } from '../ui/useSlide.ts';
+import { useSwipe } from '../ui/useSwipe.ts';
 
 const short = (d: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { month: 'short', timeZone: 'UTC' });
 const long = (d: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { month: 'long', timeZone: 'UTC' });
@@ -41,10 +42,14 @@ export function Year({ year, plans, events, payments, categories }: { year: numb
   const max = Math.max(...r.months.map(m => m.total ?? 0), 1);
   const thisYear = Number(today.slice(0, 4));
   const firstYear = since ? Number(since.slice(0, 4)) : thisYear;
+  const swipe = useSwipe({
+    left: () => { if (year < thisYear) location.hash = `#/year/${year + 1}`; },
+    right: () => { if (year > firstYear) location.hash = `#/year/${year - 1}`; },
+  });
   const navCls = 'flex size-10 items-center justify-center rounded-xl bg-on-color/10 text-on-color no-underline';
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div ref={swipe} className="flex flex-col gap-2.5">
       <Block tone="money" className="!p-4">
         <div className="flex items-center justify-between">
           {year > firstYear ? <a href={`#/year/${year - 1}`} aria-label={`Previous year, ${year - 1}`} className={navCls}>‹</a> : <span className="size-10" aria-hidden="true" />}
