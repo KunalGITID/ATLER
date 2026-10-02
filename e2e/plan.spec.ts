@@ -58,3 +58,14 @@ test('a coral dot on the ring opens its plan', async ({ page }) => {
   await page.getByRole('group').getByRole('link', { name: /^Netflix, ₹199 on the \d+$/ }).click();
   await expect(page.getByRole('heading', { name: 'Netflix' })).toBeVisible();
 });
+
+test('a wrong billing date can be fixed, and the schedule moves with it', async ({ page }) => {
+  await page.getByRole('link', { name: /Next up Netflix/ }).click();
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const sheet = page.getByRole('dialog');
+  // Actually charged 10 days ago, not 29: the next charge is ~20 days away, not tomorrow.
+  await sheet.getByLabel('Last charged on').fill(daysFromToday(-10));
+  await expect(sheet.getByText('Every renewal moves to match, past ones included.')).toBeVisible();
+  await sheet.getByRole('button', { name: 'SAVE' }).click();
+  await expect(page.getByRole('img', { name: /^(19|20|21) of \d+ days left until the next charge$/ })).toBeVisible();
+});

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { today as todayDay, type Cycle } from '../core/dates.ts';
+import { datesUntil, parseDay, today as todayDay, type Cycle, type Day } from '../core/dates.ts';
 import { formatRupees, parseRupees } from '../core/money.ts';
 import type { Category, Plan } from '../core/model.ts';
 import { resolveCategory } from '../data/actions.ts';
@@ -18,6 +18,11 @@ export function EditPlanSheet({ db, plan, categories, open, onClose }: { db: Atl
   const [cycle, setCycle] = useState(cycleKey(plan.cycle));
   const [error, setError] = useState('');
   const [category, setCategory] = useState(plan.categoryId ?? '');
+  const trial = plan.status === 'trial' && plan.trialEnds !== null && plan.trialEnds > todayDay();
+  // The date people know: the most recent charge (or the trial's end / a
+  // first charge that's still ahead).
+  const shownDate: Day = trial ? plan.trialEnds! : plan.anchor > todayDay() ? plan.anchor : datesUntil(plan.anchor, plan.cycle, todayDay()).at(-1) ?? plan.anchor;
+  const [date, setDate] = useState<string>(shownDate);
   const [newCategory, setNewCategory] = useState('');
 
   async function submit(e: FormEvent) {
@@ -26,7 +31,10 @@ export function EditPlanSheet({ db, plan, categories, open, onClose }: { db: Atl
     if (!name.trim()) return setError('It needs a name.');
     if (price === null || price <= 0) return setError('Enter an amount like 199 or 199.50.');
     if (category === NEW_CATEGORY && !newCategory.trim()) return setError('Name the new category.');
-    await editPlan(db, plan, { name, price, cycle: CYCLES[cycle]!.cycle as Cycle }, todayDay());
+    const day = parseDay(date);
+    if (!day) return setError('Pick a date.');
+    if (trial && day <= todayDay()) return setError('A trial has to end after today.');
+    await editPlan(db, plan, { name, price, cycle: CYCLES[cycle]!.cycle as Cycle, anchor: day !== shownDate ? day : undefined }, todayDay());
     const categoryId = await resolveCategory(db, category, newCategory);
     if (categoryId !== plan.categoryId) await setPlanCategory(db, plan.id, categoryId);
     onClose();
@@ -46,6 +54,8 @@ export function EditPlanSheet({ db, plan, categories, open, onClose }: { db: Atl
             {Object.entries(CYCLES).map(([key, c]) => <option key={key} value={key}>{c.label}</option>)}
           </select>
         </div>
+        <Field label={trial ? 'Trial ends on' : 'Last charged on'} type="date" value={date} onChange={e => setDate(e.target.value)} />
+        {date !== shownDate && <p className="-mt-1 text-xs font-bold text-ink-2">Every renewal moves to match, past ones included.</p>}
         <CategoryPicker categories={categories} value={category} onChange={setCategory} newName={newCategory} onNewName={setNewCategory} />
         {error && <p role="alert" className="text-sm font-semibold text-danger">{error}</p>}
         <Button kind="primary" type="submit">SAVE</Button>

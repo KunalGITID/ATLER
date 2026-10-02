@@ -14,12 +14,15 @@ async function record(db: AtlerDB, event: NewEvent) {
   await db.events.add({ ...event, id: newId(), at: Date.now(), ...touched() } as PlanEvent & { updatedAt: number });
 }
 
-export async function editPlan(db: AtlerDB, plan: Plan, changes: { name: string; price: Paise; cycle: Cycle }, today: Day) {
+export async function editPlan(db: AtlerDB, plan: Plan, changes: { name: string; price: Paise; cycle: Cycle; anchor?: Day }, today: Day) {
   await db.transaction('rw', db.plans, db.events, async () => {
     if (changes.price !== plan.price) {
       await record(db, { planId: plan.id, on: today, kind: 'price', from: plan.price, to: changes.price });
     }
-    await db.plans.update(plan.id, { name: changes.name.trim(), price: changes.price, cycle: changes.cycle, ...touched() });
+    // A new billing date re-times every renewal (a trial's end moves with it).
+    const anchor = changes.anchor ?? plan.anchor;
+    const trialEnds = plan.status === 'trial' && changes.anchor ? changes.anchor : plan.trialEnds;
+    await db.plans.update(plan.id, { name: changes.name.trim(), price: changes.price, cycle: changes.cycle, anchor, trialEnds, ...touched() });
   });
 }
 
