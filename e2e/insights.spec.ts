@@ -26,7 +26,7 @@ test('next month: renewals only until there is everyday history, then a range', 
   await expect(forecast).toContainText('your last 2 months');
 });
 
-test('an expense far above your usual for its category is flagged', async ({ page }) => {
+test('an expense far above your usual at the same place is flagged', async ({ page }) => {
   await tab(page, 'You');
   await page.getByRole('button', { name: 'Add a category' }).click();
   await page.getByRole('dialog').getByLabel('Name').fill('Food');
@@ -37,10 +37,14 @@ test('an expense far above your usual for its category is flagged', async ({ pag
   await tab(page, 'Month');
   await expect(page.getByText('Unusual spend')).toHaveCount(0);
 
+  // A one-off somewhere else isn't judged against Swiggy.
   await addExpense(page, { name: 'Birthday dinner', amount: '1400', on: daysFromToday(0), category: 'Food' });
+  await expect(page.getByText('Unusual spend')).toHaveCount(0);
+
+  await addExpense(page, { name: 'Swiggy', amount: '1600', on: daysFromToday(0), category: 'Food' });
   const card = page.locator('text=Unusual spend').locator('..');
-  await expect(card).toContainText('Birthday dinner · ₹1,400');
-  await expect(card).toContainText('6.0× your usual Food spend of ₹235');
+  await expect(card).toContainText('Swiggy · ₹1,600');
+  await expect(card).toContainText('6.8× your usual spend at Swiggy of ₹235');
 });
 
 test('no "kept" card until cancelling has actually kept something', async ({ page }) => {

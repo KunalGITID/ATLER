@@ -4,6 +4,7 @@
 import { addDays, daysBetween, endOfMonth, startOfMonth, type Day } from './dates.ts';
 import { paise, sum, type Paise } from './money.ts';
 import type { Payment, Plan, PlanEvent } from './model.ts';
+import { knownMerchant } from './import/statement.ts';
 import { renewalsBetween, type Renewal } from './renewals.ts';
 import { ownAmount, yourShare } from './share.ts';
 
@@ -112,18 +113,24 @@ function quantile(sorted: number[], q: number) {
   return sorted[lo]! + (sorted[hi]! - sorted[lo]!) * (pos - lo);
 }
 
-const groupOf = (p: Payment) => (p.categoryId ? `c:${p.categoryId}` : `n:${p.name.trim().toLowerCase()}`);
+// "SWIGGY*BLR 8823" and "Swiggy" are the same place.
+const merchantOf = (p: Payment) => (knownMerchant(p.name) ?? p.name).trim().toLowerCase().replace(/\s+/g, ' ');
 
 export interface Unusual { payment: Payment; median: Paise; times: number; compared: number }
 
-// One expense against earlier ones in its category (or with the same name):
-// above Tukey's fence (Q3 + 1.5 IQR), at least 2x the median, ₹200 or more,
-// and with 5+ earlier expenses to judge by. Medians and the IQR aren't pulled
-// around by the very outliers we're looking for.
+// One expense against your earlier ones at the same place: above Tukey's
+// fence (Q3 + 1.5 IQR), at least 2x the median, ₹200 or more, and with 5+
+// earlier spends there to judge by. Medians and the IQR aren't pulled around
+// by the very outliers we're looking for.
+// Not against the category: a category mixes places (a ₹1,400 DMart shop next
+// to ₹150 corner-shop runs), and in the KunalGITID/atler-ml benchmark only 7%
+// of category-based alerts were real, against 16% (rising with the multiple)
+// for same-place ones.
 export function unusualness(payment: Payment, history: readonly Payment[]): Unusual | null {
   if (ownAmount(payment) < MIN_AMOUNT) return null;
+  const merchant = merchantOf(payment);
   const past = history
-    .filter(h => h.id !== payment.id && groupOf(h) === groupOf(payment) && h.on <= payment.on)
+    .filter(h => h.id !== payment.id && h.on <= payment.on && merchantOf(h) === merchant)
     .map(h => ownAmount(h) as number)
     .sort((a, b) => a - b);
   if (past.length < MIN_HISTORY) return null;
