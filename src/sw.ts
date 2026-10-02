@@ -8,7 +8,13 @@ declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Array<{ url: str
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 self.addEventListener('install', () => { void self.skipWaiting(); });
-self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
+// v1's worker kept its files in caches named atler-<build>; v2 replaces it at
+// the same sw.js, so those are dropped here.
+self.addEventListener('activate', event => event.waitUntil((async () => {
+  const keys = await caches.keys();
+  await Promise.all(keys.filter(k => k.startsWith('atler-')).map(k => caches.delete(k)));
+  await self.clients.claim();
+})()));
 
 interface PushPayload { title: string; body: string; tag?: string; planId?: string }
 
