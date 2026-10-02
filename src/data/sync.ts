@@ -7,7 +7,7 @@ import { supabase } from './supabase.ts';
 import { keepLocal, tables, type Remote } from './syncMap.ts';
 
 type Key = keyof typeof tables;
-const KEYS: Key[] = ['categories', 'plans', 'events', 'payments'];
+const KEYS: Key[] = ['categories', 'plans', 'events', 'payments', 'incomes', 'goals'];
 const PAGE = 500;
 
 type Row = { id: string; updatedAt: number; dirty?: 1 };

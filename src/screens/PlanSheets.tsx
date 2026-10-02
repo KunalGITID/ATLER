@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { datesUntil, parseDay, today as todayDay, type Cycle, type Day } from '../core/dates.ts';
-import { formatRupees, parseRupees } from '../core/money.ts';
+import { formatRupees } from '../core/money.ts';
 import type { Category, Plan } from '../core/model.ts';
 import { resolveCategory } from '../data/actions.ts';
 import { setPlanCategory } from '../data/categoryActions.ts';
@@ -11,10 +11,13 @@ import { Button } from '../ui/Button.tsx';
 import { Field } from '../ui/Field.tsx';
 import { Sheet } from '../ui/Sheet.tsx';
 import { CYCLES, cycleKey } from './cycles.ts';
+import { keepRate, MoneyInput, moneyValue, resolveMoney } from '../ui/MoneyInput.tsx';
+import { More, PlanExtras, planExtras, PlanTypeField } from './ExtraFields.tsx';
 
 export function EditPlanSheet({ db, plan, categories, open, onClose }: { db: AtlerDB; plan: Plan; categories: Category[]; open: boolean; onClose: () => void }) {
   const [name, setName] = useState(plan.name);
-  const [amount, setAmount] = useState(String(plan.price / 100));
+  const [money, setMoney] = useState(moneyValue(plan.price, plan.foreign));
+  const [extras, setExtras] = useState(planExtras(plan));
   const [cycle, setCycle] = useState(cycleKey(plan.cycle));
   const [error, setError] = useState('');
   const [category, setCategory] = useState(plan.categoryId ?? '');
@@ -27,26 +30,34 @@ export function EditPlanSheet({ db, plan, categories, open, onClose }: { db: Atl
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const price = parseRupees(amount);
+    const m = resolveMoney(money);
     if (!name.trim()) return setError('It needs a name.');
-    if (price === null || price <= 0) return setError('Enter an amount like 199 or 199.50.');
+    if (!m.ok) return setError(m.error);
+    const price = m.inr;
+    const endsOn = extras.endsOn ? parseDay(extras.endsOn) : null;
+    if (extras.endsOn && !endsOn) return setError('Pick a valid last charge date, or leave it empty.');
     if (category === NEW_CATEGORY && !newCategory.trim()) return setError('Name the new category.');
     const day = parseDay(date);
     if (!day) return setError('Pick a date.');
     if (trial && day <= todayDay()) return setError('A trial has to end after today.');
-    await editPlan(db, plan, { name, price, cycle: CYCLES[cycle]!.cycle as Cycle, anchor: day !== shownDate ? day : undefined }, todayDay());
+    keepRate(money);
+    await editPlan(db, plan, {
+      name, price, cycle: CYCLES[cycle]!.cycle as Cycle, anchor: day !== shownDate ? day : undefined,
+      kind: extras.kind, autopay: extras.autopay, endsOn, sharedBy: Math.max(1, Math.floor(Number(extras.sharedBy) || 1)), foreign: m.foreign,
+    }, todayDay());
     const categoryId = await resolveCategory(db, category, newCategory);
     if (categoryId !== plan.categoryId) await setPlanCategory(db, plan.id, categoryId);
     onClose();
   }
 
-  const priceChanged = parseRupees(amount) !== null && parseRupees(amount) !== plan.price;
+  const resolved = resolveMoney(money);
+  const priceChanged = resolved.ok && resolved.inr !== plan.price;
   return (
     <Sheet open={open} onClose={onClose} title={`Edit ${plan.name}`}>
       <form onSubmit={submit} className="flex flex-col gap-3" noValidate>
         <h2 className="font-display text-2xl font-bold">Edit {plan.name}</h2>
         <Field label="Name" value={name} onChange={e => setName(e.target.value)} autoComplete="off" />
-        <Field label="Amount (₹)" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} />
+        <MoneyInput label={u => `Amount (${u})`} value={money} onChange={setMoney} />
         {priceChanged && <p className="-mt-1 text-xs font-bold text-ink-2">Recorded as a price change from today. Past payments keep {formatRupees(plan.price)}.</p>}
         <div className="flex flex-col gap-1.5">
           <label htmlFor="edit-cycle" className="text-xs font-bold tracking-[0.06em] uppercase text-ink-2">Billed</label>
@@ -57,6 +68,10 @@ export function EditPlanSheet({ db, plan, categories, open, onClose }: { db: Atl
         <Field label={trial ? 'Trial ends on' : 'Last charged on'} type="date" value={date} onChange={e => setDate(e.target.value)} />
         {date !== shownDate && <p className="-mt-1 text-xs font-bold text-ink-2">Every renewal moves to match, past ones included.</p>}
         <CategoryPicker categories={categories} value={category} onChange={setCategory} newName={newCategory} onNewName={setNewCategory} />
+        <More open={extras.kind !== 'subscription' || !extras.autopay || !!extras.endsOn || extras.sharedBy !== '1'}>
+          <PlanTypeField value={extras} onChange={setExtras} />
+          <PlanExtras value={extras} onChange={setExtras} price={resolved.ok ? resolved.inr : null} />
+        </More>
         {error && <p role="alert" className="text-sm font-semibold text-danger">{error}</p>}
         <Button kind="primary" type="submit">SAVE</Button>
       </form>

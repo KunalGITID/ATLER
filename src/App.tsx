@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { Session } from '@supabase/supabase-js';
 import { dbFor, readAll } from './data/db.ts';
@@ -10,7 +10,8 @@ import { NewPassword } from './screens/NewPassword.tsx';
 import { PlanDetails } from './screens/PlanDetails.tsx';
 import { Plans } from './screens/Plans.tsx';
 import { You } from './screens/You.tsx';
-import { useRoute } from './route.ts';
+import { goBack, useRoute } from './route.ts';
+import { useSwipe } from './ui/useSwipe.ts';
 import { useSync } from './data/useSync.ts';
 import { usePush } from './data/usePush.ts';
 import { Panel } from './ui/Sheet.tsx';
@@ -20,6 +21,9 @@ import { ToastProvider } from './ui/Toast.tsx';
 import { Spent } from './screens/Spent.tsx';
 import { Calendar } from './screens/Calendar.tsx';
 import { Year } from './screens/Year.tsx';
+// Opened now and then: loaded when first opened.
+const MoneyPanel = lazy(() => import('./screens/MoneyPanel.tsx').then(m => ({ default: m.MoneyPanel })));
+const Ask = lazy(() => import('./screens/Ask.tsx').then(m => ({ default: m.Ask })));
 import { monthOf } from './core/spent.ts';
 import { today as todayDay } from './core/dates.ts';
 
@@ -63,6 +67,14 @@ function SignedIn({ session }: { session: Session }) {
   }, []);
   const [gaveUp, setGaveUp] = useState(false);
   const route = useRoute();
+  // Swipe between the two tabs; a plan swipes back to where it was opened from.
+  const swipe = useSwipe({
+    left: () => { if (route.name === 'month') location.hash = '#/plans'; },
+    right: () => {
+      if (route.name === 'plans') location.hash = '#/';
+      else if (route.name === 'plan') goBack();
+    },
+  });
 
   // A phone with nothing on it yet waits for the first sync (up to 8 s), so a
   // returning user sees their month instead of an empty one.
@@ -88,7 +100,7 @@ function SignedIn({ session }: { session: Session }) {
   const plan = route.name === 'plan' ? data.plans.find(p => p.id === route.id) : undefined;
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col px-4 pt-[max(16px,env(safe-area-inset-top))] pb-32">
+    <div ref={swipe} className="mx-auto flex min-h-dvh max-w-md flex-col px-4 pt-[max(16px,env(safe-area-inset-top))] pb-32">
       <header className="flex items-center justify-between px-1 pt-2 pb-3">
         <div className="font-display text-xl leading-none font-bold tracking-[0.08em]">ATLER</div>
         <a href="#/you" aria-label={`You: ${who}`} aria-current={route.name === 'you' ? 'page' : undefined}
@@ -101,16 +113,18 @@ function SignedIn({ session }: { session: Session }) {
         {route.name === 'plan' && plan ? <PlanDetails db={db} plan={plan} events={data.events.filter(e => e.planId === plan.id)} categories={data.categories} push={push.state} onEnablePush={push.turnOn} />
           : route.name === 'plans' ? <><h1 className="sr-only">Your plans</h1><Plans plans={data.plans} events={data.events} onAdd={() => setAdding(true)} /></>
           : route.name === 'you' ? <><h1 className="sr-only">You</h1><You db={db} session={session} categories={data.categories} plans={data.plans} events={data.events} payments={data.payments} sync={sync} push={push.state} onPush={on => void (on ? push.turnOn() : push.turnOff())} /></>
-          : <><h1 className="sr-only">Your month</h1><Month plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} onAdd={() => setAdding(true)} /></>}
+          : <><h1 className="sr-only">Your month</h1><Month db={db} plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} incomes={data.incomes} onAdd={() => setAdding(true)} /></>}
       </main>
 
       {route.name === 'spent' && <Panel title="What I spent" onClose={closePanel}><Spent db={db} month={monthOf(route.month, todayDay())} plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} /></Panel>}
       {route.name === 'calendar' && <Panel title="Calendar" onClose={closePanel}><Calendar month={monthOf(route.month, todayDay())} plans={data.plans} events={data.events} payments={data.payments} /></Panel>}
+      {route.name === 'money' && <Panel title="Income & goals" onClose={closePanel}><Suspense fallback={null}><MoneyPanel db={db} incomes={data.incomes} goals={data.goals} plans={data.plans} events={data.events} payments={data.payments} /></Suspense></Panel>}
+      {route.name === 'ask' && <Panel title="Ask about your money" onClose={closePanel}><Suspense fallback={null}><Ask data={data} /></Suspense></Panel>}
       {route.name === 'year' && <Panel title="Year in review" onClose={closePanel}><Year year={Number(route.year ?? todayDay().slice(0, 4))} plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} /></Panel>}
 
       <nav aria-label="Main" className="fixed bottom-[max(20px,env(safe-area-inset-bottom))] left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-block-2 p-2">
         {([['#/', 'month', 'Month'], ['#/plans', 'plans', 'Plans']] as const).map(([href, name, label]) => {
-          const here = route.name === name || (name === 'month' && ['spent', 'calendar', 'year'].includes(route.name));
+          const here = route.name === name || (name === 'month' && ['spent', 'calendar', 'year', 'money', 'ask'].includes(route.name));
           return (
             <a key={name} href={href} aria-current={here ? 'page' : undefined}
               className={`flex h-11 items-center rounded-full px-4 text-[13px] no-underline ${here ? 'bg-here font-extrabold text-on-color' : 'font-bold text-ink'}`}>

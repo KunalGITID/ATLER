@@ -1,10 +1,15 @@
 import { useState } from 'react';
-import { describeCycle, today as todayDay, type Day } from '../core/dates.ts';
+import { datesUntil, describeCycle, today as todayDay, type Day } from '../core/dates.ts';
 import { formatRupees } from '../core/money.ts';
 import type { Category, Plan, PlanEvent } from '../core/model.ts';
 import { planView } from '../core/plan.ts';
 import type { AtlerDB } from '../data/db.ts';
-import { deletePlan, restorePlan, setRemind, setStatus } from '../data/planActions.ts';
+import { deletePlan, markPaid, restorePlan, setRemind, setStatus, unmarkPaid } from '../data/planActions.ts';
+import { PLAN_KINDS } from '../core/model.ts';
+import { billsToPay } from '../core/money-in.ts';
+import { isAutopay, planKind, planPrice, sharedBy } from '../core/share.ts';
+import { formatForeign } from '../core/fx.ts';
+import { cancelHelp, STORES } from '../core/cancel.ts';
 import { useToast } from '../ui/Toast.tsx';
 import type { PushState } from '../data/push.ts';
 import { Segmented } from '../ui/Segmented.tsx';
@@ -27,6 +32,13 @@ export function PlanDetails({ db, plan, events, categories, push, onEnablePush }
   const [sheet, setSheet] = useState<'edit' | 'cancel' | null>(null);
   const toast = useToast();
   const close = () => setSheet(null);
+  const share = sharedBy(plan);
+  const kind = planKind(plan);
+  const dues = billsToPay([plan], events, today);
+  const help = cancelHelp(plan.name);
+  // An EMI or fixed term: how many charges are left.
+  const chargesLeft = plan.endsOn && (plan.status === 'active' || plan.status === 'trial')
+    ? datesUntil(plan.anchor, plan.cycle, plan.endsOn).filter(d => d > today).length : null;
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -40,8 +52,15 @@ export function PlanDetails({ db, plan, events, categories, push, onEnablePush }
         <div className="min-w-0">
           <h1 className="truncate font-display text-[32px] leading-none font-bold">{plan.name}</h1>
           <div className="num mt-2 text-[44px] leading-none font-bold">
-            {formatRupees(plan.price)}<span className="text-lg">{perLabel(plan)}</span>
+            {formatRupees(planPrice(plan))}<span className="text-lg">{perLabel(plan)}</span>
           </div>
+          {(share > 1 || plan.foreign) && (
+            <div className={`mt-1 text-xs font-bold ${v.soon ? '' : 'text-ink-2'}`}>
+              {plan.foreign ? `${formatForeign(plan.foreign)} billed (${formatRupees(plan.price)})` : ''}
+              {plan.foreign && share > 1 ? ' · ' : ''}
+              {share > 1 ? `your share of ${formatRupees(plan.price)}, split ${share} ways` : ''}
+            </div>
+          )}
           <div className={`mt-2 text-sm font-bold ${v.soon ? '' : 'text-ink-2'}`}>
             {plan.status === 'paused' && v.stoppedOn ? `Paused since ${fmtDay(v.stoppedOn)}`
               : plan.status === 'cancelled' && v.stoppedOn ? `Cancelled ${fmtDay(v.stoppedOn)}`
@@ -55,6 +74,23 @@ export function PlanDetails({ db, plan, events, categories, push, onEnablePush }
           </div>
         )}
       </Block>
+
+      {dues.length > 0 && (
+        <Block tone="soon" className="!p-4">
+          <Kicker>{dues.some(d => d.overdue) ? 'To pay · overdue' : 'To pay'}</Kicker>
+          <ul className="mt-1">
+            {dues.map(d => (
+              <li key={d.on} className="flex items-center justify-between gap-3 py-2">
+                <span className="text-sm font-bold">{fmtDay(d.on)} · {formatRupees(d.amount)}</span>
+                <button type="button" onClick={() => {
+                  void markPaid(db, plan, d.on);
+                  toast({ text: `Marked ${fmtDay(d.on)} paid`, action: { label: 'Undo', run: () => void unmarkPaid(db, plan.id, d.on) } });
+                }} className="h-9 rounded-control bg-on-color/15 px-3 text-xs font-extrabold">Mark paid</button>
+              </li>
+            ))}
+          </ul>
+        </Block>
+      )}
 
       {plan.status === 'cancelled' && v.saved > 0 && (
         <Block tone="money" className="!p-4">
@@ -70,7 +106,7 @@ export function PlanDetails({ db, plan, events, categories, push, onEnablePush }
             <Kicker className="text-ink-2">Paid so far</Kicker>
             <span className="num text-sm font-bold">{formatRupees(v.paidSoFar)}</span>
           </div>
-          <PaymentBars history={v.history} current={plan.price} />
+          <PaymentBars history={v.history} current={planPrice(plan)} />
         </Block>
       )}
 
@@ -99,6 +135,10 @@ export function PlanDetails({ db, plan, events, categories, push, onEnablePush }
         <dl aria-label="About this plan" className="text-sm">
           {([
             ['Per year', <span key="y" className="num">{formatRupees(v.perYear)}</span>],
+            ['Type', PLAN_KINDS[kind]],
+            ['Paid', isAutopay(plan) ? 'Automatically' : 'By hand'],
+            ...(share > 1 ? [['Shared by', `${share} people`] as const] : []),
+            ...(plan.endsOn ? [['Last charge', `${fmtDay(plan.endsOn)}${chargesLeft !== null ? ` · ${chargesLeft} left` : ''}`] as const] : []),
             ['Category', categories.find(c => c.id === plan.categoryId)?.name ?? 'None'],
             ['Tracked since', fmtDay(plan.createdOn)],
           ] as const).map(([term, value], i) => (
@@ -109,6 +149,18 @@ export function PlanDetails({ db, plan, events, categories, push, onEnablePush }
           ))}
         </dl>
       </Block>
+
+      {kind === 'subscription' && (plan.status === 'active' || plan.status === 'trial') && (
+        <Block className="flex flex-col gap-2 !p-4">
+          <h2 className="text-[11px] font-extrabold tracking-[0.1em] text-ink-2 uppercase">How to cancel</h2>
+          <p className="text-sm">{help.steps}</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-bold">
+            {help.url && <a href={help.url} target="_blank" rel="noopener noreferrer" className="text-money">Open {plan.name}’s account page ↗</a>}
+            {STORES.map(st => <a key={st.url} href={st.url} target="_blank" rel="noopener noreferrer" className="text-ink-2">{st.label} ↗</a>)}
+          </div>
+          <p className="text-xs text-ink-2">Then tap “I cancelled it” below so ATLER stops counting it.</p>
+        </Block>
+      )}
 
       <div className="mt-2 grid grid-cols-2 gap-2.5">
         <Button kind="plain" onClick={() => setSheet('edit')}>Edit</Button>
@@ -127,7 +179,7 @@ export function PlanDetails({ db, plan, events, categories, push, onEnablePush }
         toast({ text: `${plan.name} deleted`, action: { label: 'Undo', run: () => void restorePlan(db, plan.id) } });
       }}>Delete</Button>
 
-      <EditPlanSheet key={plan.id + plan.price + plan.name + plan.categoryId} db={db} plan={plan} categories={categories} open={sheet === 'edit'} onClose={close} />
+      <EditPlanSheet key={[plan.id, plan.price, plan.name, plan.categoryId, plan.kind, plan.autopay, plan.endsOn, plan.sharedBy, plan.foreign?.amount].join('|')} db={db} plan={plan} categories={categories} open={sheet === 'edit'} onClose={close} />
       <ConfirmSheet
         open={sheet === 'cancel'}
         title={`Cancelled ${plan.name}?`}

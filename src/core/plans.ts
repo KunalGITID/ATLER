@@ -3,6 +3,7 @@ import { addDays, monthlyCost, type Day } from './dates.ts';
 import { paise, sum, type Paise } from './money.ts';
 import type { Plan, PlanEvent } from './model.ts';
 import { renewalsBetween } from './renewals.ts';
+import { planPrice } from './share.ts';
 
 export interface PlanRow {
   plan: Plan;
@@ -21,10 +22,10 @@ export interface PlansSummary {
 
 export function plansSummary(plans: readonly Plan[], events: readonly PlanEvent[], today: Day): PlansSummary {
   const live = plans.filter(p => p.status === 'active' || p.status === 'trial');
-  const perMonth = sum(live.map(p => monthlyCost(p.price, p.cycle)));
+  const perMonth = sum(live.map(p => monthlyCost(planPrice(p), p.cycle)));
   const row = (plan: Plan): PlanRow => {
     const billing = plan.status === 'active' || plan.status === 'trial';
-    const cost = monthlyCost(plan.price, plan.cycle);
+    const cost = monthlyCost(planPrice(plan), plan.cycle);
     const next = billing ? renewalsBetween(plan, events, addDays(today, 1), addDays(today, 800))[0]?.on ?? null : null;
     return { plan, perMonth: cost, share: billing && perMonth > 0 ? cost / perMonth : 0, next };
   };

@@ -4,6 +4,7 @@ import { addDays, daysInMonth, endOfMonth, startOfMonth, type Day } from './date
 import { sum, type Paise } from './money.ts';
 import type { Payment, Plan, PlanEvent } from './model.ts';
 import { renewalsBetween } from './renewals.ts';
+import { ownAmount } from './share.ts';
 
 export interface CalendarEntry { name: string; amount: Paise; kind: 'renewal' | 'expense'; planId: string | null; paid: boolean }
 export interface CalendarDay { on: Day; inMonth: boolean; entries: CalendarEntry[]; total: Paise }
@@ -18,7 +19,7 @@ export function calendarMonth(month: Day, today: Day, plans: readonly Plan[], ev
       add(r.on, { name: r.name, amount: r.amount, kind: 'renewal', planId: p.id, paid: r.on <= today });
     }
   }
-  for (const p of payments.filter(x => x.on >= first && x.on <= last)) add(p.on, { name: p.name, amount: p.amount, kind: 'expense', planId: null, paid: true });
+  for (const p of payments.filter(x => x.on >= first && x.on <= last)) add(p.on, { name: p.name, amount: ownAmount(p), kind: 'expense', planId: null, paid: true });
 
   // Pad to whole weeks, Monday first.
   const weekday = (d: Day) => (new Date(`${d}T00:00:00Z`).getUTCDay() + 6) % 7;

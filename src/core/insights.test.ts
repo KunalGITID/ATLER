@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MONTHLY, YEARLY, parseDay, type Day } from './dates.ts';
 import { paise } from './money.ts';
 import type { Payment, Plan, PlanEvent } from './model.ts';
-import { everydayByMonth, forecastNextMonth, keptByCancelling, recentUnusual, unusualness } from './insights.ts';
+import { everydayByMonth, forecastAccuracy, forecastNextMonth, keptByCancelling, recentUnusual, seasonality, unusualness } from './insights.ts';
 
 const d = (s: string) => parseDay(s) as Day;
 const today = d('2026-10-15');
@@ -31,7 +31,7 @@ describe('forecast', () => {
     expect(f.month).toBe('2026-11-01');
     expect(f.renewals.map(r => r.name)).toEqual(['Prime', 'Netflix']);
     expect(f.fixed).toBe(169800);
-    expect(f.everyday).toEqual({ estimate: 250000, low: 200000, high: 300000, months: 2 });
+    expect(f.everyday).toEqual({ estimate: 250000, low: 200000, high: 300000, months: 2, seasonal: null });
     expect([f.low, f.estimate, f.high]).toEqual([369800, 419800, 469800]);
   });
 
@@ -73,5 +73,29 @@ describe('keptByCancelling', () => {
     const events: PlanEvent[] = [{ id: 'e', planId: 'Hotstar', on: d('2026-07-01'), at: 1, kind: 'cancelled' }];
     expect(keptByCancelling(plans, events, today)).toMatchObject({ kept: 4 * 29900, perYear: 12 * 29900 }); // Jul–Oct 10th
     expect(keptByCancelling([plan({})], [], today)).toBeNull();
+  });
+});
+
+describe('seasonality and accuracy', () => {
+  // ₹10,000 a month, except last November (Diwali) at ₹15,000.
+  const months = ['2025-05', '2025-06', '2025-07', '2025-08', '2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'];
+  const history = months.map(m => pay(`${m}-10`, m === '2025-11' ? 15000 : 10000));
+  it('a month that ran busy last year is forecast busy again', () => {
+    expect(seasonality(history, d('2026-11-01'))).toBe(1.5);
+    expect(seasonality(history, d('2026-12-01'))).toBe(0.92); // ordinary, against months that include November
+    const f = forecastNextMonth([], [], history, d('2026-10-15'))!;
+    expect(f.everyday!.seasonal).toBe(1.5);
+    expect(f.estimate).toBe(Math.round(1.5 * 1000000));
+  });
+  it('without a year of history there is no seasonal factor', () => {
+    expect(seasonality(history.slice(-4), d('2026-11-01'))).toBeNull();
+  });
+  it('last month: what the forecast said then against what happened', () => {
+    const a = forecastAccuracy([], [], [...history, pay('2026-09-20', 2000)], d('2026-10-05'))!;
+    expect(a.month).toBe('2026-09-01');
+    expect(a.forecast).toBe(1000000);
+    expect(a.actual).toBe(1200000);
+    expect(a.off).toBeCloseTo(1 / 6);
+    expect(a.within).toBe(false);
   });
 });

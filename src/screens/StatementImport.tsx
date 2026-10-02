@@ -5,6 +5,7 @@ import { suggestCategory } from '../core/import/sms.ts';
 import { formatRupees } from '../core/money.ts';
 import type { Category, Plan } from '../core/model.ts';
 import { addPlan } from '../data/actions.ts';
+import { editPlan } from '../data/planActions.ts';
 import type { AtlerDB } from '../data/db.ts';
 import { PdfPasswordError, pdfToCsv } from '../data/pdf.ts';
 import { Block, Kicker } from '../ui/Block.tsx';
@@ -27,7 +28,7 @@ export function StatementImport({ db, plans, categories }: { db: AtlerDB; plans:
     try {
       const text = isPdf(file) ? await pdfToCsv(file, pw) : await file.text();
       const debits = readStatement(text);
-      const items = findRecurring(debits, todayDay(), plans.map(p => p.name));
+      const items = findRecurring(debits, todayDay(), plans.map(p => ({ id: p.id, name: p.name, price: p.price })));
       setLocked(null);
       setPassword('');
       setMessage(null);
@@ -91,8 +92,19 @@ export function StatementImport({ db, plans, categories }: { db: AtlerDB; plans:
                       {f.alreadyTracked && <span className="ml-2 rounded-md bg-block-2 px-1.5 py-0.5 text-[11px] text-ink-2">Already tracked</span>}
                     </span>
                     <span className="block text-xs text-ink-2">{formatRupees(f.price)} · {describeCycle(f.cycle)} · last {fmtDay(f.lastCharged)} · seen {f.charges}×</span>
+                    {f.priceChange && <span className="block text-xs font-bold text-soon">Price went from {formatRupees(f.priceChange.from)} to {formatRupees(f.priceChange.to)} on {fmtDay(f.priceChange.on)}</span>}
                   </span>
                 </label>
+                {f.tracked && (
+                  <div className="-mt-1 flex items-center justify-between gap-3 px-4 pb-3 pl-12 text-xs">
+                    <span className="font-bold text-soon">You track it at {formatRupees(f.tracked.price)}; the bank now charges {formatRupees(f.price)}.</span>
+                    <button type="button" className="h-8 shrink-0 rounded-control bg-block-2 px-3 font-extrabold" onClick={async () => {
+                      const plan = plans.find(p => p.id === f.tracked!.id);
+                      if (plan) await editPlan(db, plan, { name: plan.name, price: f.price, cycle: plan.cycle }, f.priceChange?.on && f.priceChange.on <= todayDay() ? f.priceChange.on : todayDay());
+                      setFound(cur => cur && { ...cur, items: cur.items.map(x => (x === f ? { ...x, tracked: null } : x)) });
+                    }}>Update price</button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

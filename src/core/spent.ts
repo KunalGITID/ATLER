@@ -4,6 +4,7 @@ import { endOfMonth, parseDay, startOfMonth, type Day } from './dates.ts';
 import { sum, type Paise } from './money.ts';
 import type { Payment, Plan, PlanEvent } from './model.ts';
 import { renewalsBetween } from './renewals.ts';
+import { ownAmount } from './share.ts';
 
 export type SpentItem =
   | { kind: 'expense'; payment: Payment }
@@ -17,7 +18,7 @@ export function spentInMonth(month: Day, today: Day, plans: readonly Plan[], eve
   const first = startOfMonth(month);
   const last = endOfMonth(month) < today ? endOfMonth(month) : today; // only what has happened
   const items: Array<SpentItem & { on: Day; amount: Paise }> = [
-    ...payments.filter(p => p.on >= first && p.on <= last).map(p => ({ kind: 'expense' as const, payment: p, on: p.on, amount: p.amount })),
+    ...payments.filter(p => p.on >= first && p.on <= last).map(p => ({ kind: 'expense' as const, payment: p, on: p.on, amount: ownAmount(p) })),
     ...plans.flatMap(p => renewalsBetween(p, events.filter(e => e.planId === p.id), first, last))
       .map(r => ({ kind: 'renewal' as const, planId: r.planId, name: r.name, on: r.on, amount: r.amount })),
   ];

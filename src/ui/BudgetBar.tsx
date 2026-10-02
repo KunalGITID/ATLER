@@ -19,6 +19,12 @@ export function BudgetBar({ line }: { line: BudgetLine }) {
         <div className="h-full bg-soon" style={{ width: pct(line.coming) }} />
       </div>
       <div className="mt-1.5 text-xs text-ink-2">{formatRupees(line.spent)} spent · {formatRupees(line.coming)} coming · of {formatRupees(line.budget)}</div>
+      {/* Where it's heading at your usual pace: a warning before it's over, not after. */}
+      {(line.risk === 'likely' || line.risk === 'close') && (
+        <div className="mt-1 text-xs font-bold text-soon">
+          {line.risk === 'likely' ? `Heading for ${formatRupees(line.projected)} at your usual pace` : `Heading for ${formatRupees(line.projected)}, close to the limit`}
+        </div>
+      )}
     </div>
   );
 }

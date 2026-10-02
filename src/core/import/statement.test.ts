@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { paise } from '../money.ts';
 import { parseDay, type Day } from '../dates.ts';
 import { cycleFromGap, findRecurring, merchantName, moneyCell, parseStatementDate, readStatement } from './statement.ts';
 
@@ -100,5 +101,21 @@ describe('findRecurring', () => {
   it('a quarterly plan becomes a 3-month cycle', () => {
     const rows = ['Date,Narration,Withdrawal Amt.', '10/01/26,ACT FIBERNET,2400', '10/04/26,ACT FIBERNET,2400', '10/07/26,ACT FIBERNET,2400', '10/10/26,ACT FIBERNET,2400'];
     expect(findRecurring(readStatement(rows.join('\n')), d('2026-10-12'))[0]).toMatchObject({ name: 'ACT Fibernet', cycle: { unit: 'month', every: 3 }, perMonth: 80000 });
+  });
+});
+
+describe('findRecurring: price changes', () => {
+  const rows = ['Date,Narration,Withdrawal Amt.'];
+  for (const [m, price] of [['04', 199], ['05', 199], ['06', 199], ['07', 249], ['08', 249], ['09', 249]] as const) rows.push(`05/${m}/26,ACH SPOTIFYINDIA,${price}`);
+  it('one plan with a price rise, not two', () => {
+    const found = findRecurring(readStatement(rows.join('\n')), d('2026-09-20'));
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ name: 'Spotify', price: 24900, active: true, priceChange: { from: 19900, to: 24900, on: '2026-07-05' } });
+  });
+  it('says when the plan you track has the old price', () => {
+    const [f] = findRecurring(readStatement(rows.join('\n')), d('2026-09-20'), [{ id: 'sp', name: 'Spotify', price: paise(19900) }]);
+    expect(f).toMatchObject({ alreadyTracked: true, tracked: { id: 'sp', price: 19900 } });
+    const [same] = findRecurring(readStatement(rows.join('\n')), d('2026-09-20'), [{ id: 'sp', name: 'Spotify', price: paise(24900) }]);
+    expect(same!.tracked).toBeNull();
   });
 });

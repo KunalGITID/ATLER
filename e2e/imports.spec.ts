@@ -73,7 +73,7 @@ test('one pasted SMS fills the expense; several are added together', async ({ pa
   await page.getByRole('button', { name: 'Add a plan or expense' }).click();
   const sheet = page.getByRole('dialog');
   await sheet.getByRole('radio', { name: 'Expense' }).click();
-  await sheet.getByRole('button', { name: 'Paste a bank SMS instead' }).click();
+  await sheet.getByRole('button', { name: 'Paste a bank SMS' }).click();
   await sheet.getByLabel('Bank SMS').fill('Rs.250.00 debited from a/c **1234 on 01-10-26 to VPA swiggy@icici (UPI Ref No 1).');
   await sheet.getByRole('button', { name: 'Read SMS' }).click();
   await expect(sheet.getByLabel('What for')).toHaveValue('Swiggy');
@@ -83,7 +83,7 @@ test('one pasted SMS fills the expense; several are added together', async ({ pa
 
   await page.getByRole('button', { name: 'Add a plan or expense' }).click();
   await sheet.getByRole('radio', { name: 'Expense' }).click();
-  await sheet.getByRole('button', { name: 'Paste a bank SMS instead' }).click();
+  await sheet.getByRole('button', { name: 'Paste a bank SMS' }).click();
   await sheet.getByLabel('Bank SMS').fill([
     'Sent Rs.1,499.00 From HDFC Bank A/C *1234 To AMAZON PAY On 02/10/26 Ref 2',
     'Your OTP is 123456',

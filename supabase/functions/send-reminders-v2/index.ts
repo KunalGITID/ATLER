@@ -11,6 +11,8 @@ import { dueReminders, reminderText } from '../../../src/core/reminders.ts';
 import { tables, type Remote } from '../../../src/data/syncMap.ts';
 
 const SEND_FROM_HOUR = 9;
+const PAGE = 1000;
+const USERS_PER_QUERY = 100;
 
 function localNow(timeZone: string, now: Date) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
@@ -24,23 +26,47 @@ Deno.serve(async req => {
   webpush.setVapidDetails(Deno.env.get('VAPID_SUBJECT')!, Deno.env.get('VAPID_PUBLIC')!, Deno.env.get('VAPID_PRIVATE')!);
   const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-  const { data: devices, error } = await sb.from('push_subscriptions').select('*').eq('app', 2);
-  if (error) return Response.json({ error: error.message }, { status: 500 });
-  const userIds = [...new Set((devices ?? []).map(d => d.user_id as string))];
+  const devices: Array<Record<string, any>> = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb.from('push_subscriptions').select('*').eq('app', 2).order('endpoint').range(from, from + PAGE - 1);
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    devices.push(...(data ?? []));
+    if (!data || data.length < PAGE) break;
+  }
+  const userIds = [...new Set(devices.map(d => d.user_id as string))];
   if (!userIds.length) return Response.json({ users: 0, due: 0, sent: 0 });
 
-  const [{ data: planRows }, { data: eventRows }] = await Promise.all([
-    sb.from('plans').select('*').in('user_id', userIds).eq('deleted', false),
-    sb.from('plan_events').select('*').in('user_id', userIds).eq('deleted', false),
-  ]);
-  const plansOf = (u: string) => (planRows ?? []).filter(r => r.user_id === u).map(r => tables.plans.fromRemote(r as Remote) as Plan);
-  const eventsOf = (u: string) => (eventRows ?? []).filter(r => r.user_id === u).map(r => tables.events.fromRemote(r as Remote) as PlanEvent);
+  // PostgREST returns at most 1,000 rows per request, so read page by page,
+  // and a few users at a time to keep each URL short.
+  type Row = Record<string, unknown>;
+  async function readAll(table: string): Promise<Row[]> {
+    const rows: Row[] = [];
+    for (let u = 0; u < userIds.length; u += USERS_PER_QUERY) {
+      const some = userIds.slice(u, u + USERS_PER_QUERY);
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await sb.from(table).select('*').in('user_id', some).eq('deleted', false).order('id').range(from, from + PAGE - 1);
+        if (error) throw new Error(`${table}: ${error.message}`);
+        rows.push(...(data ?? []));
+        if (!data || data.length < PAGE) break;
+      }
+    }
+    return rows;
+  }
+  let planRows: Row[];
+  let eventRows: Row[];
+  try {
+    [planRows, eventRows] = await Promise.all([readAll('plans'), readAll('plan_events')]);
+  } catch (e) {
+    return Response.json({ error: (e as Error).message }, { status: 500 });
+  }
+  const plansOf = (u: string) => planRows.filter(r => r.user_id === u).map(r => tables.plans.fromRemote(r as unknown as Remote) as Plan);
+  const eventsOf = (u: string) => eventRows.filter(r => r.user_id === u).map(r => tables.events.fromRemote(r as unknown as Remote) as PlanEvent);
 
   const now = new Date();
   let due = 0;
   let sent = 0;
   for (const userId of userIds) {
-    const mine = (devices ?? []).filter(d => d.user_id === userId);
+    const mine = devices.filter(d => d.user_id === userId);
     const { day, hour } = localNow(mine[0]?.timezone || 'Asia/Kolkata', now);
     if (hour < SEND_FROM_HOUR) continue;
 

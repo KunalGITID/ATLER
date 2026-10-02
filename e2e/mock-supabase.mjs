@@ -10,8 +10,8 @@ const PORT = Number(process.env.MOCK_PORT || 54329);
 const USER_ID = '00000000-0000-4000-8000-0000000000a1';
 const TABLES = ['profiles', 'subscriptions', 'categories', 'expenses', 'push_subscriptions', 'sent_reminders', 'price_changes', 'error_log',
     // v2 synced tables: the mock mirrors the real trigger (revision + last edit wins)
-    'plans', 'plan_events', 'payments', 'spend_categories'];
-const SYNCED = new Set(['plans', 'plan_events', 'payments', 'spend_categories']);
+    'plans', 'plan_events', 'payments', 'spend_categories', 'incomes', 'goals'];
+const SYNCED = new Set(['plans', 'plan_events', 'payments', 'spend_categories', 'incomes', 'goals']);
 let revision = 0;
 const PRIMARY_KEY = {
     profiles: ['user_id'],

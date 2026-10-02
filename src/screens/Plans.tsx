@@ -5,6 +5,9 @@ import { plansSummary, type PlanRow } from '../core/plans.ts';
 import { planHref } from '../route.ts';
 import { Block, Kicker } from '../ui/Block.tsx';
 import { Button } from '../ui/Button.tsx';
+import { PLAN_KINDS } from '../core/model.ts';
+import { overlaps } from '../core/overlap.ts';
+import { isAutopay, planKind, planPrice, sharedBy } from '../core/share.ts';
 
 // "11 Oct" this year, "23 Aug 2027" otherwise, so a date is never ambiguous.
 const short = (d: Day, today: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', {
@@ -24,7 +27,10 @@ function Row({ row, first, today }: { row: PlanRow; first: boolean; today: Day }
         <div className="flex items-baseline justify-between gap-3">
           <div className="min-w-0">
             <div className="truncate text-[15px] font-bold">{plan.name}</div>
-            <div className="text-xs text-ink-2">{describeCycle(plan.cycle)} · {formatRupees(plan.price)} · {status}</div>
+            <div className="text-xs text-ink-2">
+              {planKind(plan) !== 'subscription' ? `${PLAN_KINDS[planKind(plan)]} · ` : ''}{describeCycle(plan.cycle)} · {formatRupees(planPrice(plan))}
+              {sharedBy(plan) > 1 ? ` (your share of ${formatRupees(plan.price)})` : ''}{!isAutopay(plan) ? ' · paid by hand' : ''} · {status}
+            </div>
           </div>
           {billing
             ? <div className="num shrink-0 text-lg font-bold">{formatRupees(row.perMonth)}<span className="text-xs text-ink-2">/mo</span></div>
@@ -76,6 +82,13 @@ export function Plans({ plans, events, onAdd }: { plans: Plan[]; events: PlanEve
           <div className="num mt-1 text-xl font-bold">{formatRupees(s.perYear)}</div>
         </div>
       </Block>
+      {overlaps(plans).slice(0, 2).map(o => (
+        <Block key={o.group + o.plans.map(p => p.id).join()} tone="soon" className="!p-4">
+          <Kicker>{o.group === 'bundle' ? 'Paying twice' : `Overlap · ${o.group}`}</Kicker>
+          <div className="mt-1 text-[15px] font-bold">{o.plans.map(p => p.name).join(' + ')}</div>
+          <div className="text-[13px] font-bold">{o.note} {o.group === 'bundle' ? 'The extra costs' : 'Together'} {formatRupees(o.perMonth)}/mo.</div>
+        </Block>
+      ))}
       <Group title="Billing" rows={s.billing} today={today} />
       <Group title="Paused" rows={s.paused} today={today} />
       <Group title="Cancelled" rows={s.cancelled} today={today} />

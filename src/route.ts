@@ -7,7 +7,8 @@ import { useEffect, useRef, useState } from 'react';
 //   #/you         account and data
 //   #/plan/<id>   one plan
 export type Route = { name: 'month' } | { name: 'plans' } | { name: 'you' } | { name: 'plan'; id: string }
-  | { name: 'spent'; month: string | null } | { name: 'calendar'; month: string | null } | { name: 'year'; year: string | null };
+  | { name: 'spent'; month: string | null } | { name: 'calendar'; month: string | null } | { name: 'year'; year: string | null }
+  | { name: 'money' } | { name: 'ask' };
 
 function parse(hash: string): Route {
   const m = hash.match(/^#\/plan\/([\w-]+)$/);
@@ -20,12 +21,14 @@ function parse(hash: string): Route {
   const year = hash.match(/^#\/year(?:\/(\d{4}))?$/);
   if (year) return { name: 'year', year: year[1] ?? null };
   if (hash === '#/you') return { name: 'you' };
+  if (hash === '#/money') return { name: 'money' };
+  if (hash === '#/ask') return { name: 'ask' };
   return { name: 'month' };
 }
 
 // Where each page sits, left to right / shallow to deep. Panels (null) float
 // over Month instead of replacing it.
-const DEPTH: Record<Route['name'], number | null> = { month: 0, plans: 1, plan: 2, you: 3, spent: null, calendar: null, year: null };
+const DEPTH: Record<Route['name'], number | null> = { month: 0, plans: 1, plan: 2, you: 3, spent: null, calendar: null, year: null, money: null, ask: null };
 
 export const planHref = (id: string) => `#/plan/${id}`;
 
