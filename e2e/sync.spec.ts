@@ -12,8 +12,8 @@ async function phone(browser: Browser): Promise<Page> {
 
 async function synced(page: Page) {
   await tab(page, 'You');
-  await expect(page.getByRole('status').filter({ hasText: /^Synced/ })).toBeVisible();
-  await expect(page.getByRole('status')).not.toContainText('waiting');
+  await expect(page.getByRole('status', { name: 'Sync status' }).filter({ hasText: /^Synced/ })).toBeVisible();
+  await expect(page.getByRole('status', { name: 'Sync status' })).not.toContainText('waiting');
 }
 
 test.beforeEach(async ({ request }) => {
@@ -56,7 +56,6 @@ test('edits and deletes travel both ways; the newest edit wins', async ({ browse
   await tab(a, 'Plans');
   await a.getByRole('region', { name: 'Billing' }).getByRole('link', { name: /Spotify/ }).click();
   await a.getByRole('button', { name: 'Delete', exact: true }).click();
-  await a.getByRole('dialog').getByRole('button', { name: 'Delete for good' }).click();
   await synced(a);
   await b.reload();
   await tab(b, 'Month');
@@ -68,11 +67,11 @@ test('changes made offline wait, then sync when the connection is back', async (
   await request.post(`${MOCK}/__offline?on=1`);
   await addExpense(page, { name: 'Chai', amount: '40', on: daysFromToday(0) });
   await tab(page, 'You');
-  await expect(page.getByRole('status')).toContainText('1 change waiting');
+  await expect(page.getByRole('status', { name: 'Sync status' })).toContainText('1 change waiting');
 
   await request.post(`${MOCK}/__offline?on=0`);
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
-  await expect(page.getByRole('status')).toHaveText(/^Synced/);
+  await expect(page.getByRole('status', { name: 'Sync status' })).toHaveText(/^Synced/);
   const server = await (await request.get(`${MOCK}/__db`)).json();
   expect(server.payments.map((p: { name: string; amount: number }) => [p.name, p.amount])).toEqual([['Chai', 4000]]);
 });

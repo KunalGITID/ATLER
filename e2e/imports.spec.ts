@@ -94,7 +94,7 @@ test('one pasted SMS fills the expense; several are added together', async ({ pa
   await expect(sheet).toBeHidden();
 
   await tab(page, 'You');
-  await expect(page.getByRole('status').filter({ hasText: /^Synced/ })).not.toContainText('waiting');
+  await expect(page.getByRole('status', { name: 'Sync status' }).filter({ hasText: /^Synced/ })).not.toContainText('waiting');
   const server = await (await request.get('http://127.0.0.1:54329/__db')).json();
   expect(server.payments.map((p: { name: string; amount: number }) => [p.name, p.amount]).sort()).toEqual([['Amazon Pay', 149900], ['Chai Point', 4000], ['Swiggy', 25000]]);
 });

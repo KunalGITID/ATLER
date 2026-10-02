@@ -59,8 +59,8 @@ test('You: backup download, then erasing this phone restores from the account', 
   expect(backup.plans.map((p: { name: string; price: number }) => [p.name, p.price])).toEqual([['Netflix', 19900]]);
 
   // Erasing only clears this phone; the synced copy comes back.
-  await expect(page.getByRole('status')).toHaveText(/^Synced/);
-  await expect(page.getByRole('status')).not.toContainText('waiting'); // nothing left unsent
+  await expect(page.getByRole('status', { name: 'Sync status' })).toHaveText(/^Synced/);
+  await expect(page.getByRole('status', { name: 'Sync status' })).not.toContainText('waiting'); // nothing left unsent
   await page.getByRole('button', { name: 'Erase ATLER data on this phone' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Erase it all' }).click();
   await tab(page, 'Month');

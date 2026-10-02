@@ -96,7 +96,7 @@ function SyncLine({ sync }: { sync: SyncState }) {
     : sync.status === 'error' ? ['bg-danger', `Couldn't sync${waiting}`]
     : ['bg-money', `Synced ${sync.lastSynced ? ago(sync.lastSynced) : ''}${waiting}`];
   return (
-    <div role="status" className="flex items-center gap-2 text-sm font-bold">
+    <div role="status" aria-label="Sync status" className="flex items-center gap-2 text-sm font-bold">
       <span className={`size-2.5 rounded-full ${dot}`} aria-hidden="true" />
       {text}
     </div>

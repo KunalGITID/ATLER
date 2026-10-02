@@ -12,6 +12,10 @@ import { You } from './screens/You.tsx';
 import { useRoute } from './route.ts';
 import { useSync } from './data/useSync.ts';
 import { usePush } from './data/usePush.ts';
+import { ToastProvider } from './ui/Toast.tsx';
+import { Spent } from './screens/Spent.tsx';
+import { monthOf } from './core/spent.ts';
+import { today as todayDay } from './core/dates.ts';
 
 export function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -28,7 +32,7 @@ export function App() {
 
   if (session === undefined) return null; // the launch screen is still up
   if (!session) return <SignIn />;
-  return <SignedIn session={session} />;
+  return <ToastProvider><SignedIn session={session} /></ToastProvider>;
 }
 
 function SignedIn({ session }: { session: Session }) {
@@ -71,6 +75,7 @@ function SignedIn({ session }: { session: Session }) {
 
       <main>
         {route.name === 'plan' && plan ? <PlanDetails db={db} plan={plan} events={data.events.filter(e => e.planId === plan.id)} categories={data.categories} push={push.state} onEnablePush={push.turnOn} />
+          : route.name === 'spent' ? <><h1 className="sr-only">What you spent</h1><Spent db={db} month={monthOf(route.month, todayDay())} plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} /></>
           : route.name === 'plans' ? <><h1 className="sr-only">Your plans</h1><Plans plans={data.plans} events={data.events} onAdd={() => setAdding(true)} /></>
           : route.name === 'you' ? <><h1 className="sr-only">You</h1><You db={db} session={session} categories={data.categories} plans={data.plans} sync={sync} push={push.state} onPush={on => void (on ? push.turnOn() : push.turnOff())} /></>
           : <><h1 className="sr-only">Your month</h1><Month plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} onAdd={() => setAdding(true)} /></>}

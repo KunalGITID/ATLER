@@ -4,7 +4,8 @@ import { formatRupees } from '../core/money.ts';
 import type { Category, Plan, PlanEvent } from '../core/model.ts';
 import { planView } from '../core/plan.ts';
 import type { AtlerDB } from '../data/db.ts';
-import { deletePlan, setRemind, setStatus } from '../data/planActions.ts';
+import { deletePlan, restorePlan, setRemind, setStatus } from '../data/planActions.ts';
+import { useToast } from '../ui/Toast.tsx';
 import type { PushState } from '../data/push.ts';
 import { Segmented } from '../ui/Segmented.tsx';
 import type { Remind } from '../core/model.ts';
@@ -23,7 +24,8 @@ export function PlanDetails({ db, plan, events, categories, push, onEnablePush }
 }) {
   const today = todayDay();
   const v = planView(plan, events, today);
-  const [sheet, setSheet] = useState<'edit' | 'cancel' | 'delete' | null>(null);
+  const [sheet, setSheet] = useState<'edit' | 'cancel' | null>(null);
+  const toast = useToast();
   const close = () => setSheet(null);
 
   return (
@@ -119,7 +121,11 @@ export function PlanDetails({ db, plan, events, categories, push, onEnablePush }
       {plan.status !== 'cancelled' && (
         <Button kind="primary" className="!text-base" onClick={() => setSheet('cancel')}>I CANCELLED IT · KEEP {formatRupees(v.perYear)}/YR</Button>
       )}
-      <Button kind="danger" onClick={() => setSheet('delete')}>Delete</Button>
+      <Button kind="danger" onClick={async () => {
+        await deletePlan(db, plan);
+        location.hash = '#/';
+        toast({ text: `${plan.name} deleted`, action: { label: 'Undo', run: () => void restorePlan(db, plan.id) } });
+      }}>Delete</Button>
 
       <EditPlanSheet key={plan.id + plan.price + plan.name + plan.categoryId} db={db} plan={plan} categories={categories} open={sheet === 'edit'} onClose={close} />
       <ConfirmSheet
@@ -130,14 +136,7 @@ export function PlanDetails({ db, plan, events, categories, push, onEnablePush }
         onConfirm={async () => { await setStatus(db, plan, 'cancel', today); close(); }}
         onClose={close}
       />
-      <ConfirmSheet
-        open={sheet === 'delete'}
-        title={`Delete ${plan.name}?`}
-        body="Its whole history goes too, and it stops counting in every month, past ones included. To keep the history, use “I cancelled it” instead."
-        confirm="Delete for good"
-        onConfirm={async () => { await deletePlan(db, plan); close(); location.hash = '#/'; }}
-        onClose={close}
-      />
+
     </div>
   );
 }

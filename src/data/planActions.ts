@@ -43,3 +43,10 @@ export async function deletePlan(db: AtlerDB, plan: Plan) {
 export async function setRemind(db: AtlerDB, plan: Plan, remind: Remind) {
   await db.plans.update(plan.id, { remind, ...touched() });
 }
+
+export async function restorePlan(db: AtlerDB, planId: string) {
+  await db.transaction('rw', db.plans, db.events, async () => {
+    await db.plans.where('id').equals(planId).modify(r => { delete r.deleted; Object.assign(r, touched()); });
+    await db.events.where('planId').equals(planId).modify(r => { delete r.deleted; Object.assign(r, touched()); });
+  });
+}

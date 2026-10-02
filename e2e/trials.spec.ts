@@ -50,7 +50,7 @@ test('the reminder choice is saved and synced', async ({ page, request }) => {
   await page.getByRole('radiogroup', { name: 'Remind me before it renews' }).getByRole('radio', { name: '1 day' }).click();
   await expect(page.getByRole('radio', { name: '1 day' })).toHaveAttribute('aria-checked', 'true');
   await tab(page, 'You');
-  await expect(page.getByRole('status').filter({ hasText: /^Synced/ })).not.toContainText('waiting');
+  await expect(page.getByRole('status', { name: 'Sync status' }).filter({ hasText: /^Synced/ })).not.toContainText('waiting');
   const server = await (await request.get(`${MOCK}/__db`)).json();
   expect(server.plans.map((p: { name: string; remind: string }) => [p.name, p.remind])).toEqual([['Netflix', '1d']]);
 });

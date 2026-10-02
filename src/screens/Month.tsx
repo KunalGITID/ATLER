@@ -65,6 +65,7 @@ export function Month({ plans, events, payments, categories, onAdd }: {
             <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-on-color" />Paid</span>
             <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-soon ring-2 ring-on-color" />Coming</span>
           </div>
+          <a href="#/spent" className="text-[13px] font-extrabold text-on-color underline">What I spent ›</a>
         </div>
       </Block>
 

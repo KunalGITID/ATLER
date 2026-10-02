@@ -50,3 +50,15 @@ export async function resolveCategory(db: AtlerDB, picked: string, newName: stri
   }
   return picked || null;
 }
+
+export async function updatePayment(db: AtlerDB, id: string, changes: { name: string; amount: Paise; on: Day; categoryId: string | null }) {
+  await db.payments.update(id, { ...changes, name: changes.name.trim(), ...touched() });
+}
+
+// Soft delete with undo: the tombstone syncs, and undo clears it again.
+export async function deletePayment(db: AtlerDB, id: string) {
+  await db.payments.update(id, { deleted: 1, ...touched() });
+}
+export async function restorePayment(db: AtlerDB, id: string) {
+  await db.payments.where('id').equals(id).modify(r => { delete r.deleted; Object.assign(r, touched()); });
+}

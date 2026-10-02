@@ -51,7 +51,6 @@ test('pause and resume, then cancel keeps the plan as cancelled', async ({ page 
 test('delete removes the plan everywhere', async ({ page }) => {
   await page.getByRole('link', { name: /Next up Netflix/ }).click();
   await page.getByRole('button', { name: 'Delete', exact: true }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Delete for good' }).click();
   await expect(page.getByText('Your month is empty')).toBeVisible();
 });
 
