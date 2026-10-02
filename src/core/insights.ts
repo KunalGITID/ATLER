@@ -4,6 +4,7 @@
 import { addDays, daysBetween, endOfMonth, startOfMonth, type Day } from './dates.ts';
 import { paise, sum, type Paise } from './money.ts';
 import type { Payment, Plan, PlanEvent } from './model.ts';
+import { barFor, learnBars, type Bars, type Verdict } from './alertFeedback.ts';
 import { knownMerchant } from './import/merchants.ts';
 import { renewalsBetween, type Renewal } from './renewals.ts';
 import { ownAmount, yourShare } from './share.ts';
@@ -114,19 +115,20 @@ function quantile(sorted: number[], q: number) {
 }
 
 // "SWIGGY*BLR 8823" and "Swiggy" are the same place.
-const merchantOf = (p: Payment) => (knownMerchant(p.name) ?? p.name).trim().toLowerCase().replace(/\s+/g, ' ');
+export const merchantOf = (p: Payment) => (knownMerchant(p.name) ?? p.name).trim().toLowerCase().replace(/\s+/g, ' ');
 
 export interface Unusual { payment: Payment; median: Paise; times: number; compared: number }
 
 // One expense against your earlier ones at the same place: above Tukey's
-// fence (Q3 + 1.5 IQR), at least 2x the median, ₹200 or more, and with 5+
+// fence (Q3 + 1.5 IQR), at least 2x the median (or the bar your answers have
+// set, core/alertFeedback.ts), ₹200 or more, and with 5+
 // earlier spends there to judge by. Medians and the IQR aren't pulled around
 // by the very outliers we're looking for.
 // Not against the category: a category mixes places (a ₹1,400 DMart shop next
 // to ₹150 corner-shop runs), and in the KunalGITID/atler-ml benchmark only 7%
 // of category-based alerts were real, against 16% (rising with the multiple)
 // for same-place ones.
-export function unusualness(payment: Payment, history: readonly Payment[]): Unusual | null {
+export function unusualness(payment: Payment, history: readonly Payment[], bars?: Bars): Unusual | null {
   if (ownAmount(payment) < MIN_AMOUNT) return null;
   const merchant = merchantOf(payment);
   const past = history
@@ -138,15 +140,17 @@ export function unusualness(payment: Payment, history: readonly Payment[]): Unus
   const q1 = quantile(past, 0.25);
   const q3 = quantile(past, 0.75);
   const amount = ownAmount(payment);
-  if (amount <= q3 + 1.5 * (q3 - q1) || amount < 2 * median) return null;
+  if (amount <= q3 + 1.5 * (q3 - q1) || amount < barFor(bars, merchant) * median) return null;
   return { payment, median: paise(Math.round(median)), times: amount / median, compared: past.length };
 }
 
-// Unusual expenses from the last week, most unusual first.
-export function recentUnusual(payments: readonly Payment[], today: Day, days = 7): Unusual[] {
+// Unusual expenses from the last week you haven't answered yet, most unusual first.
+export function recentUnusual(payments: readonly Payment[], today: Day, days = 7, verdicts: readonly Verdict[] = []): Unusual[] {
+  const bars = learnBars(verdicts);
+  const answered = new Set(verdicts.map(v => v.paymentId));
   return payments
-    .filter(p => daysBetween(p.on, today) >= 0 && daysBetween(p.on, today) < days)
-    .map(p => unusualness(p, payments))
+    .filter(p => daysBetween(p.on, today) >= 0 && daysBetween(p.on, today) < days && !answered.has(p.id))
+    .map(p => unusualness(p, payments, bars))
     .filter((u): u is Unusual => u !== null)
     .sort((a, b) => b.times - a.times);
 }

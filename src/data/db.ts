@@ -3,6 +3,7 @@
 // Supabase comes later and uses `updatedAt` / `deleted`.
 import Dexie, { type EntityTable } from 'dexie';
 import type { Category, Goal, Income, Payment, Plan, PlanEvent } from '../core/model.ts';
+import type { Verdict } from '../core/alertFeedback.ts';
 
 import type { Stored } from './stored.ts';
 export type { Stored } from './stored.ts';
@@ -17,6 +18,8 @@ export class AtlerDB extends Dexie {
   incomes!: EntityTable<Stored<Income>, 'id'>;
   goals!: EntityTable<Stored<Goal>, 'id'>;
   meta!: EntityTable<Meta, 'key'>;
+  // Your answers to unusual-spend alerts. On this phone only: never synced.
+  verdicts!: EntityTable<Verdict, 'paymentId'>;
 
   constructor(userId: string) {
     super(`atler-${userId}`);
@@ -37,6 +40,7 @@ export class AtlerDB extends Dexie {
       incomes: 'id, on, updatedAt, dirty',
       goals: 'id, updatedAt, dirty',
     });
+    this.version(4).stores({ verdicts: 'paymentId' });
   }
 }
 

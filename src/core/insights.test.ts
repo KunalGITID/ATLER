@@ -68,6 +68,17 @@ describe('unusual spending', () => {
     expect(unusualness(groceries('2026-10-14', 6000, 'DMart'), [...corner, ...dmart])!.compared).toBe(5);
   });
 
+  it('answered alerts go away, and your answers raise the bar', () => {
+    const big = swiggy('2026-10-12', 700);
+    const list = [...usual, big];
+    expect(recentUnusual(list, today).map(u => u.payment.id)).toEqual([big.id]);
+    const verdict = { paymentId: big.id, merchant: 'swiggy', times: 2.98, expected: true, at: 0 };
+    expect(recentUnusual(list, today, 7, [verdict])).toEqual([]);
+    // Next time, a similar jump at Swiggy isn't flagged; a much bigger one is.
+    expect(recentUnusual([...list, swiggy('2026-10-13', 800)], today, 7, [verdict])).toEqual([]);
+    expect(recentUnusual([...list, swiggy('2026-10-13', 2000)], today, 7, [verdict]).map(u => u.payment.on)).toEqual(['2026-10-13']);
+  });
+
   it('names match loosely; only the last week is shown', () => {
     const cabs = [90, 120, 100, 110, 95].map((r, i) => pay(`2026-09-0${i + 1}`, r, { name: 'Uber' }));
     expect(unusualness(pay('2026-10-14', 650, { name: ' uber ' }), [...cabs, pay('2026-09-20', 50000, { name: 'Croma' })])!.compared).toBe(5);

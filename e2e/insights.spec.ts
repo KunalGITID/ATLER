@@ -45,6 +45,17 @@ test('an expense far above your usual at the same place is flagged', async ({ pa
   const card = page.locator('text=Unusual spend').locator('..');
   await expect(card).toContainText('Swiggy · ₹1,600');
   await expect(card).toContainText('6.8× your usual spend at Swiggy of ₹235');
+
+  // Answering clears the card; Undo brings it back.
+  await card.getByRole('button', { name: 'Expected', exact: true }).click();
+  await expect(page.getByText('Unusual spend')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(card).toContainText('Swiggy · ₹1,600');
+
+  await card.getByRole('button', { name: 'Not expected' }).click();
+  await expect(page.getByText('Unusual spend')).toHaveCount(0);
+  await tab(page, 'You');
+  await expect(page.getByText('1 of the 1 you answered was really unusual (100%)')).toBeVisible();
 });
 
 test('no "kept" card until cancelling has actually kept something', async ({ page }) => {
