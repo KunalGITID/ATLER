@@ -3,6 +3,8 @@ import { parseDay, today as todayDay } from '../core/dates.ts';
 import { addIncome, addPayment, addPlan, resolveCategory } from '../data/actions.ts';
 import type { Category, Payment, Plan } from '../core/model.ts';
 import { suggestCategoryId } from '../core/suggest.ts';
+import { unusualness, type Unusual } from '../core/insights.ts';
+import { learnBars } from '../core/alertFeedback.ts';
 import { usePrior } from '../data/prior.ts';
 import { CategoryPicker, NEW_CATEGORY } from '../ui/CategoryPicker.tsx';
 import type { AtlerDB } from '../data/db.ts';
@@ -19,7 +21,7 @@ import { ExpenseExtras, expenseExtras, More, PlanExtras, planExtras, PlanTypeFie
 
 type Kind = 'plan' | 'expense' | 'income';
 
-export function AddSheet({ db, categories, plans = [], payments = [], open, startAs, onClose, onTrialAdded }: { db: AtlerDB; categories: Category[]; plans?: Plan[]; payments?: Payment[]; startAs?: Kind; open: boolean; onClose: () => void; onTrialAdded?: () => void }) {
+export function AddSheet({ db, categories, plans = [], payments = [], open, startAs, onClose, onTrialAdded, onUnusual }: { db: AtlerDB; categories: Category[]; plans?: Plan[]; payments?: Payment[]; startAs?: Kind; open: boolean; onClose: () => void; onTrialAdded?: () => void; onUnusual?: (u: Unusual) => void }) {
   const today = todayDay();
   const prior = usePrior();
   const [kind, setKind] = useState<Kind>('plan');
@@ -123,7 +125,10 @@ export function AddSheet({ db, categories, plans = [], payments = [], open, star
         kind: plan.kind, autopay: plan.autopay, endsOn, sharedBy: Math.max(1, Math.floor(Number(plan.sharedBy) || 1)), foreign: m.foreign,
       });
     } else {
-      await addPayment(db, { name, amount: m.inr, on: day!, categoryId, source, note: extras.note, tags: parseTags(extras.tags), split: splitFor(extras, m.inr), foreign: m.foreign });
+      const saved = await addPayment(db, { name, amount: m.inr, on: day!, categoryId, source, note: extras.note, tags: parseTags(extras.tags), split: splitFor(extras, m.inr), foreign: m.foreign });
+      // Unusual? Ask now, while you remember (core/alertFeedback.ts learns from it).
+      const u = unusualness(saved, [...payments, saved], learnBars(await db.verdicts.toArray()));
+      if (u) onUnusual?.(u);
     }
     if (ends) onTrialAdded?.(); // a trial's reminder needs notifications: ask while the tap is fresh
     reset();

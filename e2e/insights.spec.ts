@@ -41,7 +41,11 @@ test('an expense far above your usual at the same place is flagged', async ({ pa
   await addExpense(page, { name: 'Birthday dinner', amount: '1400', on: daysFromToday(0), category: 'Food' });
   await expect(page.getByText('Unusual spend')).toHaveCount(0);
 
+  // Adding an unusual expense asks right away; "Ask me later" leaves it on the Month card.
   await addExpense(page, { name: 'Swiggy', amount: '1600', on: daysFromToday(0), category: 'Food' });
+  const ask = page.getByRole('dialog', { name: 'Was this expected?' });
+  await expect(ask).toContainText('6.8× your usual spend at Swiggy of ₹235');
+  await ask.getByRole('button', { name: 'Ask me later' }).click();
   const card = page.locator('text=Unusual spend').locator('..');
   await expect(card).toContainText('Swiggy · ₹1,600');
   await expect(card).toContainText('6.8× your usual spend at Swiggy of ₹235');
@@ -56,6 +60,33 @@ test('an expense far above your usual at the same place is flagged', async ({ pa
   await expect(page.getByText('Unusual spend')).toHaveCount(0);
   await tab(page, 'You');
   await expect(page.getByText('1 of the 1 you answered was really unusual (100%)')).toBeVisible();
+});
+
+test('answering in the add sheet, and reviewing past jumps', async ({ page }) => {
+  for (const [i, amount] of ['180', '250', '220', '300', '260'].entries()) {
+    await addExpense(page, { name: 'Swiggy', amount, on: daysFromToday(-40 - i) });
+  }
+  await addExpense(page, { name: 'Swiggy', amount: '1500', on: daysFromToday(-20) });
+  await page.getByRole('dialog', { name: 'Was this expected?' }).getByRole('button', { name: 'Ask me later' }).click();
+  await addExpense(page, { name: 'Swiggy', amount: '1800', on: daysFromToday(-10) });
+  await page.getByRole('dialog', { name: 'Was this expected?' }).getByRole('button', { name: 'Ask me later' }).click();
+
+  // Older than a week, so they're for the review, not the live card.
+  await tab(page, 'Month');
+  await expect(page.getByText('Teach ATLER what’s unusual for you')).toBeVisible();
+  await expect(page.getByText('2 big jumps in your spending so far')).toBeVisible();
+  await page.getByRole('button', { name: 'Take a look' }).click();
+  const review = page.getByRole('dialog', { name: 'Were these expected?' });
+  await review.getByRole('button', { name: 'Expected', exact: true }).first().click();
+  await review.getByRole('button', { name: 'Not expected' }).first().click();
+  await expect(review).toContainText('All done. Thanks!');
+  await review.getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByText('Teach ATLER what’s unusual for you')).toHaveCount(0);
+
+  // Answered right after adding: no card afterwards.
+  await addExpense(page, { name: 'Swiggy', amount: '5000', on: daysFromToday(0) });
+  await page.getByRole('dialog', { name: 'Was this expected?' }).getByRole('button', { name: 'Not expected' }).click();
+  await expect(page.getByText('Unusual spend')).toHaveCount(0);
 });
 
 test('no "kept" card until cancelling has actually kept something', async ({ page }) => {

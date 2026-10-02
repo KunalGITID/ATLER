@@ -155,6 +155,23 @@ export function recentUnusual(payments: readonly Payment[], today: Day, days = 7
     .sort((a, b) => b.times - a.times);
 }
 
+// Your biggest unanswered jumps from before the last week, for a one-off
+// "teach ATLER" review while you have only a few answers. Each judged
+// against what came before it. Answering 5 of these when you start roughly
+// doubled how often alerts were real in the first months (atler-ml feedback.py).
+export const REVIEW_UNTIL = 4; // answers
+export function pastJumps(payments: readonly Payment[], today: Day, verdicts: readonly Verdict[] = [], n = 5): Unusual[] {
+  if (verdicts.length >= REVIEW_UNTIL) return [];
+  const bars = learnBars(verdicts);
+  const answered = new Set(verdicts.map(v => v.paymentId));
+  return payments
+    .filter(p => daysBetween(p.on, today) >= 7 && !answered.has(p.id))
+    .map(p => unusualness(p, payments, bars))
+    .filter((u): u is Unusual => u !== null)
+    .sort((a, b) => b.times - a.times)
+    .slice(0, n);
+}
+
 // ---------- savings ----------
 
 // Everything cancelled plans would have charged since their cancellation, and
