@@ -3,7 +3,7 @@ import { addDays, today as todayDay, type Day } from '../core/dates.ts';
 import { formatRupees } from '../core/money.ts';
 import type { Category, Income, Payment, Plan, PlanEvent } from '../core/model.ts';
 import { budgetLines } from '../core/budgets.ts';
-import { forecastAccuracy, forecastNextMonth, keptByCancelling, recentUnusual } from '../core/insights.ts';
+import { forecastAccuracy, forecastNextMonth, keptByCancelling, pastJumps, recentUnusual, type Unusual } from '../core/insights.ts';
 import { billsToPay, monthMoney } from '../core/money-in.ts';
 import { duplicatePayments, stillUsing } from '../core/overlap.ts';
 import { habits } from '../core/habits.ts';
@@ -11,7 +11,8 @@ import { monthSummary } from '../core/summary.ts';
 import { ownAmount } from '../core/share.ts';
 import type { AtlerDB } from '../data/db.ts';
 import { deletePayment, restorePayment } from '../data/actions.ts';
-import { answerAlert, unanswer } from '../data/verdicts.ts';
+import { useState } from 'react';
+import { AnswerButtons, howUnusual, ReviewSheet } from './AlertQuestions.tsx';
 import { markPaid, stillUsing as keepUsing, unmarkPaid } from '../data/planActions.ts';
 import { useToast } from '../ui/Toast.tsx';
 import { BudgetBar } from '../ui/BudgetBar.tsx';
@@ -42,6 +43,9 @@ export function Month({ db, plans, events, payments, categories, incomes = [], o
   const today = todayDay();
   const toast = useToast();
   const verdicts = useLiveQuery(() => db.verdicts.toArray(), [db]);
+  // The jumps as they were when you opened the review, so answering one
+  // (which can make another look normal) doesn't reshuffle the list.
+  const [reviewing, setReviewing] = useState<Unusual[] | null>(null);
 
   if (!plans.length && !payments.length) {
     return (
@@ -59,6 +63,7 @@ export function Month({ db, plans, events, payments, categories, incomes = [], o
   const forecast = forecastNextMonth(plans, events, payments, today);
   // Wait for your answers before judging, so an answered alert doesn't flash back.
   const unusual = verdicts ? recentUnusual(payments, today, 7, verdicts)[0] ?? null : null;
+  const jumps = verdicts ? pastJumps(payments, today, verdicts) : [];
   const kept = keptByCancelling(plans, events, today);
   const next = nextUp(today, plans, events);
   const creep = priceCreep(today, plans, events);
@@ -240,20 +245,20 @@ export function Month({ db, plans, events, payments, categories, incomes = [], o
           <Kicker>Unusual spend</Kicker>
           <div className="mt-1 font-display text-2xl leading-tight font-bold">{unusual.payment.name} · {formatRupees(unusual.payment.amount)}</div>
           <div className="text-[13px] font-bold">
-            {unusual.times.toFixed(1)}× your usual spend at {unusual.payment.name} of {formatRupees(unusual.median)}
+            {howUnusual(unusual)}
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button type="button" className="h-10 rounded-control bg-block-2 text-sm font-bold text-ink" onClick={() => {
-              void answerAlert(db, unusual, true);
-              toast({ text: `Got it. ATLER will flag fewer like this at ${unusual.payment.name}.`, action: { label: 'Undo', run: () => void unanswer(db, unusual.payment.id) } });
-            }}>Expected</button>
-            <button type="button" className="h-10 rounded-control bg-block-2 text-sm font-bold text-ink" onClick={() => {
-              void answerAlert(db, unusual, false);
-              toast({ text: 'Noted. ATLER will keep flagging jumps like this.', action: { label: 'Undo', run: () => void unanswer(db, unusual.payment.id) } });
-            }}>Not expected</button>
-          </div>
+          <AnswerButtons db={db} unusual={unusual} />
         </Block>
       )}
+
+      {jumps.length > 0 && !unusual && (
+        <Block className="!p-4">
+          <Kicker className="text-ink-2">Teach ATLER what’s unusual for you</Kicker>
+          <div className="mt-1 text-sm font-bold">{jumps.length === 1 ? 'One big jump' : `${jumps.length} big jumps`} in your spending so far. Were {jumps.length === 1 ? 'it' : 'they'} expected?</div>
+          <button type="button" className="mt-3 h-10 w-full rounded-control bg-block-2 text-sm font-bold" onClick={() => setReviewing(jumps)}>Take a look</button>
+        </Block>
+      )}
+      <ReviewSheet db={db} jumps={reviewing ?? []} open={!!reviewing} onClose={() => setReviewing(null)} />
 
       {budgets.length > 0 && (
         <section aria-labelledby="budgets" className="rounded-tile bg-block px-4 pt-3 pb-1">

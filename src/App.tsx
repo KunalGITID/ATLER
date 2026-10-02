@@ -4,6 +4,8 @@ import type { Session } from '@supabase/supabase-js';
 import { dbFor, readAll } from './data/db.ts';
 import { supabase } from './data/supabase.ts';
 import { AddSheet } from './screens/AddSheet.tsx';
+import { AskSheet } from './screens/AlertQuestions.tsx';
+import type { Unusual } from './core/insights.ts';
 import { Month } from './screens/Month.tsx';
 import { SignIn } from './screens/SignIn.tsx';
 import { NewPassword } from './screens/NewPassword.tsx';
@@ -56,6 +58,7 @@ function SignedIn({ session }: { session: Session }) {
   const sync = useSync(db, session.user.id);
   const push = usePush(session.user.id);
   const [adding, setAdding] = useState(false);
+  const [asking, setAsking] = useState<Unusual | null>(null);
   const [addAs, setAddAs] = useState<'plan' | 'expense' | undefined>(undefined);
   // Home-screen shortcuts open the app as ./?do=add-expense or ./?do=add-plan.
   useEffect(() => {
@@ -137,7 +140,8 @@ function SignedIn({ session }: { session: Session }) {
         </button>
       </nav>
 
-      <AddSheet db={db} categories={data.categories} plans={data.plans} payments={data.payments} open={adding} startAs={addAs} onClose={() => { setAdding(false); setAddAs(undefined); }} onTrialAdded={() => { if (push.state === 'off') void push.turnOn(); }} />
+      <AddSheet db={db} categories={data.categories} plans={data.plans} payments={data.payments} open={adding} startAs={addAs} onClose={() => { setAdding(false); setAddAs(undefined); }} onTrialAdded={() => { if (push.state === 'off') void push.turnOn(); }} onUnusual={setAsking} />
+      <AskSheet db={db} unusual={asking} onClose={() => setAsking(null)} />
     </div>
   );
 }

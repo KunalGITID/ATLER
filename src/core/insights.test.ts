@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MONTHLY, YEARLY, parseDay, type Day } from './dates.ts';
 import { paise } from './money.ts';
 import type { Payment, Plan, PlanEvent } from './model.ts';
-import { everydayByMonth, forecastAccuracy, forecastNextMonth, keptByCancelling, recentUnusual, seasonality, unusualness } from './insights.ts';
+import { everydayByMonth, forecastAccuracy, forecastNextMonth, keptByCancelling, pastJumps, recentUnusual, seasonality, unusualness } from './insights.ts';
 
 const d = (s: string) => parseDay(s) as Day;
 const today = d('2026-10-15');
@@ -77,6 +77,15 @@ describe('unusual spending', () => {
     // Next time, a similar jump at Swiggy isn't flagged; a much bigger one is.
     expect(recentUnusual([...list, swiggy('2026-10-13', 800)], today, 7, [verdict])).toEqual([]);
     expect(recentUnusual([...list, swiggy('2026-10-13', 2000)], today, 7, [verdict]).map(u => u.payment.on)).toEqual(['2026-10-13']);
+  });
+
+  it('past jumps to review: older than a week, biggest first, only until you have a few answers', () => {
+    const old1 = swiggy('2026-09-20', 900), old2 = swiggy('2026-09-25', 1500), recent = swiggy('2026-10-14', 2000);
+    const list = [...usual, old1, old2, recent];
+    expect(pastJumps(list, today).map(u => u.payment.id)).toEqual([old2.id, old1.id]);
+    const answer = (id: string) => ({ paymentId: id, merchant: 'swiggy', times: 3, expected: false, at: 0 });
+    expect(pastJumps(list, today, [answer(old2.id)]).map(u => u.payment.id)).toEqual([old1.id]);
+    expect(pastJumps(list, today, ['a', 'b', 'c', 'd'].map(answer))).toEqual([]);
   });
 
   it('names match loosely; only the last week is shown', () => {

@@ -46,6 +46,9 @@ test('the unusual-spend card and its answer buttons are accessible', async ({ pa
     await addExpense(page, { name: 'Swiggy', amount, on: daysFromToday(-20 - i) });
   }
   await addExpense(page, { name: 'Swiggy', amount: '1600', on: daysFromToday(0) });
+  await expect(page.getByRole('dialog', { name: 'Was this expected?' })).toBeVisible();
+  await noViolations(page, 'was this expected? (dark)');
+  await page.getByRole('button', { name: 'Ask me later' }).click();
   await expect(page.getByRole('button', { name: 'Not expected' })).toBeVisible();
   await noViolations(page, 'unusual spend (dark)');
   await page.emulateMedia({ colorScheme: 'light' });

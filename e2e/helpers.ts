@@ -31,7 +31,8 @@ export async function addPlan(page: Page, { name, amount, billed = 'Monthly', la
 
 export async function addExpense(page: Page, { name, amount, on, category }: { name: string; amount: string; on: string; category?: string }) {
   await page.getByRole('button', { name: 'Add a plan or expense' }).click();
-  const sheet = page.getByRole('dialog');
+  // By its title: an unusual expense opens "Was this expected?" right after.
+  const sheet = page.getByRole('dialog', { name: /^Add / });
   await sheet.getByRole('radio', { name: 'Expense' }).click();
   await sheet.getByLabel('What for').fill(name);
   await sheet.getByLabel('Amount (₹)').fill(amount);
