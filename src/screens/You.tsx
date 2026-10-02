@@ -9,6 +9,9 @@ import { AvatarError, avatarUrl, removeAvatar, setAvatar } from '../data/avatar.
 import { ConfirmSheet } from './PlanSheets.tsx';
 import { Categories } from './Categories.tsx';
 import { StatementImport } from './StatementImport.tsx';
+import { ExpenseImport } from './ExpenseImport.tsx';
+import { BackupButtons } from './BackupBlock.tsx';
+import { buildBackup } from '../data/backup.ts';
 import type { Category, Payment, Plan, PlanEvent } from '../core/model.ts';
 import { plansCsv, spendingCsv } from '../core/exportCsv.ts';
 import type { SyncState } from '../data/useSync.ts';
@@ -24,10 +27,7 @@ function download(text: string, name: string, type: string) {
 }
 
 async function exportBackup(db: AtlerDB) {
-  const [plans, events, payments, categories] = await Promise.all([db.plans.toArray(), db.events.toArray(), db.payments.toArray(), db.categories.toArray()]);
-  const live = <T extends { deleted?: 1 }>(rows: T[]) => rows.filter(r => !r.deleted);
-  const backup = { app: 'atler', version: 2, exportedAt: new Date().toISOString(), plans: live(plans), events: live(events), payments: live(payments), categories: live(categories) };
-  download(JSON.stringify(backup, null, 2), `atler-backup-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+  download(JSON.stringify(await buildBackup(db), null, 2), `atler-backup-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
 }
 
 export function You({ db, session, categories, plans, events, payments, sync, push, onPush }: {
@@ -89,6 +89,8 @@ export function You({ db, session, categories, plans, events, payments, sync, pu
 
       <StatementImport db={db} plans={plans} categories={categories} />
 
+      <ExpenseImport db={db} payments={payments} categories={categories} />
+
       <Categories db={db} categories={categories} />
 
       <Block className="flex flex-col gap-2.5 !p-4">
@@ -96,6 +98,7 @@ export function You({ db, session, categories, plans, events, payments, sync, pu
         <SyncLine sync={sync} />
         <p className="text-sm text-ink-2">Stored on this phone and synced to your account, so every device you sign in on shows the same month. A backup is one file with everything.</p>
         <Button kind="plain" onClick={() => exportBackup(db)}>Download a backup</Button>
+        <BackupButtons db={db} download={download} />
         <div className="grid grid-cols-2 gap-2.5">
           {/* \uFEFF tells Excel the file is UTF-8, so ₹ shows correctly. */}
           <Button kind="quiet" onClick={() => download('\uFEFF' + plansCsv(plans, events, categories), `atler-plans-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8')}>Plans as CSV</Button>

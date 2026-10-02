@@ -23,7 +23,7 @@ test('every signed-in screen is accessible', async ({ page, request }) => {
   await addPlan(page, { name: 'Netflix', amount: '199', lastCharged: daysFromToday(-10) });
   await addExpense(page, { name: 'Lunch', amount: '250', on: daysFromToday(0) });
 
-  for (const [hash, where] of [['#/', 'month'], ['#/plans', 'plans'], ['#/you', 'you'], ['#/spent', 'spent'], ['#/calendar', 'calendar'], ['#/year', 'year']] as const) {
+  for (const [hash, where] of [['#/', 'month'], ['#/plans', 'plans'], ['#/you', 'you'], ['#/spent', 'spent'], ['#/calendar', 'calendar'], ['#/year', 'year'], ['#/money', 'income & goals'], ['#/ask', 'ask']] as const) {
     await page.goto(`/${hash}`);
     await expect(page.locator('main')).toBeVisible();
     await page.waitForTimeout(300);

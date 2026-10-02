@@ -93,6 +93,9 @@ export async function updateIncome(db: AtlerDB, id: string, changes: Omit<Income
 export async function deleteIncome(db: AtlerDB, id: string) {
   await db.incomes.update(id, { deleted: 1, ...touched() });
 }
+export async function restoreIncome(db: AtlerDB, id: string) {
+  await db.incomes.where('id').equals(id).modify(r => { delete r.deleted; Object.assign(r, touched()); });
+}
 
 // ---------- goals ----------
 

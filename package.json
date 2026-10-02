@@ -21,6 +21,7 @@
     "pdfjs-dist": "^5.7.284",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "tesseract.js": "^7.0.0",
     "workbox-precaching": "^7.4.1"
   },
   "devDependencies": {

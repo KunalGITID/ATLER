@@ -1,8 +1,17 @@
 import { addDays, today as todayDay, type Day } from '../core/dates.ts';
 import { formatRupees } from '../core/money.ts';
-import type { Category, Payment, Plan, PlanEvent } from '../core/model.ts';
+import type { Category, Income, Payment, Plan, PlanEvent } from '../core/model.ts';
 import { budgetLines } from '../core/budgets.ts';
-import { forecastNextMonth, keptByCancelling, recentUnusual } from '../core/insights.ts';
+import { forecastAccuracy, forecastNextMonth, keptByCancelling, recentUnusual } from '../core/insights.ts';
+import { billsToPay, monthMoney } from '../core/money-in.ts';
+import { duplicatePayments, stillUsing } from '../core/overlap.ts';
+import { habits } from '../core/habits.ts';
+import { monthSummary } from '../core/summary.ts';
+import { ownAmount } from '../core/share.ts';
+import type { AtlerDB } from '../data/db.ts';
+import { deletePayment, restorePayment } from '../data/actions.ts';
+import { markPaid, stillUsing as keepUsing, unmarkPaid } from '../data/planActions.ts';
+import { useToast } from '../ui/Toast.tsx';
 import { BudgetBar } from '../ui/BudgetBar.tsx';
 import { canCompareWithLastMonth, monthRing, nextUp, plansPerMonth, priceCreep, vsLastMonth } from '../core/month.ts';
 import { renewalsBetween } from '../core/renewals.ts';
@@ -22,10 +31,14 @@ function when(today: Day, on: Day) {
 // A trial's first charge reads as the trial ending, so it isn't mistaken for a renewal.
 const trialEnding = (plans: Plan[], planId: string, on: Day) => plans.some(p => p.id === planId && p.status === 'trial' && p.trialEnds === on);
 
-export function Month({ plans, events, payments, categories, onAdd }: {
-  plans: Plan[]; events: PlanEvent[]; payments: Payment[]; categories: Category[]; onAdd: () => void;
+const shortDay = (d: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const monthLong = (d: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { month: 'long', timeZone: 'UTC' });
+
+export function Month({ db, plans, events, payments, categories, incomes = [], onAdd }: {
+  db: AtlerDB; plans: Plan[]; events: PlanEvent[]; payments: Payment[]; categories: Category[]; incomes?: Income[]; onAdd: () => void;
 }) {
   const today = todayDay();
+  const toast = useToast();
 
   if (!plans.length && !payments.length) {
     return (
@@ -46,6 +59,15 @@ export function Month({ plans, events, payments, categories, onAdd }: {
   const categoryName = (id: string | null) => categories.find(c => c.id === id)?.name;
   const next = nextUp(today, plans, events);
   const creep = priceCreep(today, plans, events);
+  const dues = billsToPay(plans, events, today);
+  const summary = monthSummary(today, plans, events, payments, categories);
+  const accuracy = forecastAccuracy(plans, events, payments, today);
+  const trials = plans.filter(p => p.status === 'trial' && p.trialEnds && p.trialEnds > today && p.trialEnds <= addDays(today, 7))
+    .sort((a, b) => (a.trialEnds! < b.trialEnds! ? -1 : 1));
+  const twice = duplicatePayments(payments, today)[0] ?? null;
+  const idle = stillUsing(plans, events, today)[0] ?? null;
+  const patterns = habits(payments, categories, today).slice(0, 2);
+  const money = incomes.length ? monthMoney(today, incomes, plans, events, payments) : null;
   // The list continues after the "Next up" tile, so nothing is shown twice.
   const coming = plans.flatMap(p => renewalsBetween(p, events, addDays(today, 1), addDays(today, 30)))
     .sort((a, b) => (a.on < b.on ? -1 : 1))
@@ -67,8 +89,49 @@ export function Month({ plans, events, payments, categories, onAdd }: {
           </div>
           <a href="#/spent" className="text-[13px] font-extrabold text-on-color underline">What I spent ›</a>
           <a href="#/calendar" className="text-[13px] font-extrabold text-on-color underline">Calendar ›</a>
+          <a href="#/money" className="text-[13px] font-extrabold text-on-color underline">Income & goals ›</a>
+          <a href="#/ask" className="text-[13px] font-extrabold text-on-color underline">Ask ›</a>
         </div>
       </Block>
+
+      {money && (
+        <a href="#/money" className="grid grid-cols-3 gap-2 rounded-tile bg-block p-4 text-ink no-underline active:opacity-80" aria-label={`This month: ${formatRupees(money.income)} income, ${formatRupees(money.left)} left`}>
+          <div><Kicker className="text-ink-2">Income</Kicker><div className="num text-lg font-bold">{formatRupees(money.income)}</div></div>
+          <div><Kicker className="text-ink-2">Left</Kicker><div className={`num text-lg font-bold ${money.left < 0 ? 'text-danger' : ''}`}>{formatRupees(money.left)}</div></div>
+          <div><Kicker className="text-ink-2">Saving</Kicker><div className="num text-lg font-bold">{money.savingsRate === null ? '–' : `${Math.round(money.savingsRate * 100)}%`}</div></div>
+        </a>
+      )}
+
+      {dues.length > 0 && (
+        // Coral: money you still have to send yourself.
+        <section aria-labelledby="to-pay" className="rounded-block bg-soon p-4 text-on-color">
+          <h2 id="to-pay" className="text-[11px] font-extrabold tracking-[0.1em] uppercase">{dues.some(d => d.overdue) ? 'To pay · overdue' : 'To pay'}</h2>
+          <ul className="mt-1">
+            {dues.slice(0, 5).map(d => (
+              <li key={d.plan.id + d.on} className="flex items-center justify-between gap-3 py-1.5">
+                <a href={planHref(d.plan.id)} className="min-w-0 text-on-color no-underline">
+                  <span className="block truncate text-[15px] font-bold">{d.plan.name} · {formatRupees(d.amount)}</span>
+                  <span className="text-xs font-bold">{d.overdue ? `Was due ${shortDay(d.on)}` : `Due ${when(today, d.on).toLowerCase()}`}</span>
+                </a>
+                <button type="button" onClick={() => {
+                  void markPaid(db, d.plan, d.on);
+                  toast({ text: `${d.plan.name} marked paid`, action: { label: 'Undo', run: () => void unmarkPaid(db, d.plan.id, d.on) } });
+                }} className="h-9 shrink-0 rounded-control bg-on-color/15 px-3 text-xs font-extrabold">Mark paid</button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {summary && (
+        <section aria-labelledby="last-month" className="rounded-tile bg-block p-4">
+          <h2 id="last-month" className="text-[11px] font-extrabold tracking-[0.1em] text-ink-2 uppercase">{monthLong(summary.month)} in short</h2>
+          <div className="num mt-1 text-[28px] leading-tight font-bold">{formatRupees(summary.total)}</div>
+          {summary.change !== null && <div className="text-sm font-bold">{formatRupees(summary.change, { sign: true })} on the month before</div>}
+          <ul className="mt-2 flex flex-col gap-1 text-sm">{summary.lines.map(l => <li key={l}>{l}</li>)}</ul>
+          {summary.tip && <p className="mt-2 rounded-xl bg-block-2 px-3 py-2 text-sm font-bold">Try this: {summary.tip}</p>}
+        </section>
+      )}
 
       {(next || creep) && (
         <div className={`grid gap-2.5 ${next && creep ? 'grid-cols-2' : 'grid-cols-1'}`}>
@@ -114,6 +177,47 @@ export function Month({ plans, events, payments, categories, onAdd }: {
         </section>
       )}
 
+      {trials.length > 0 && (
+        <section aria-labelledby="trials" className="rounded-tile bg-block p-4">
+          <h2 id="trials" className="text-[11px] font-extrabold tracking-[0.1em] text-ink-2 uppercase">Trials ending this week</h2>
+          <p className="mt-1 text-xs text-ink-2">Keep it or cancel before it turns into a charge.</p>
+          <ul className="mt-1">
+            {trials.map(p => (
+              <li key={p.id}>
+                <a href={planHref(p.id)} className="flex items-center justify-between py-2 text-ink no-underline">
+                  <span className="text-[15px] font-bold">{p.name}</span>
+                  <span className="text-sm font-bold text-soon">{when(today, p.trialEnds!)} · then {formatRupees(p.price)} ›</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {twice && (
+        <Block className="!p-4">
+          <Kicker className="text-ink-2">Logged twice?</Kicker>
+          <div className="mt-1 text-[15px] font-bold">{twice[0].name} · {formatRupees(ownAmount(twice[0]))} on {shortDay(twice[0].on)}, twice</div>
+          <button type="button" className="mt-2 h-10 rounded-control bg-block-2 px-4 text-sm font-bold" onClick={() => {
+            const copy = twice[1];
+            void deletePayment(db, copy.id);
+            toast({ text: 'Copy deleted', action: { label: 'Undo', run: () => void restorePayment(db, copy.id) } });
+          }}>Delete the copy</button>
+        </Block>
+      )}
+
+      {idle && (
+        <Block className="!p-4">
+          <Kicker className="text-ink-2">Still using it?</Kicker>
+          <div className="mt-1 font-display text-2xl leading-tight font-bold">{idle.plan.name}</div>
+          <div className="text-[13px] font-bold text-ink-2">{formatRupees(idle.lastSixMonths)} in the last 6 months · {formatRupees(idle.perMonth)} a month</div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" className="h-10 rounded-control bg-block-2 text-sm font-bold" onClick={() => void keepUsing(db, idle.plan, today)}>Yes, I use it</button>
+            <a href={planHref(idle.plan.id)} className="flex h-10 items-center justify-center rounded-control bg-here text-sm font-extrabold text-on-color no-underline">How to cancel</a>
+          </div>
+        </Block>
+      )}
+
       {unusual && (
         // Coral: something to look at. Compared with your own past spending only.
         <Block tone="soon" className="!p-4">
@@ -132,6 +236,14 @@ export function Month({ plans, events, payments, categories, onAdd }: {
         </section>
       )}
 
+      {patterns.map(h => (
+        <Block key={h.id} className="!p-4">
+          <Kicker className="text-ink-2">Pattern</Kicker>
+          <div className="mt-1 text-[17px] leading-tight font-bold">{h.title}</div>
+          <div className="mt-1 text-[13px] text-ink-2">{h.body}</div>
+        </Block>
+      ))}
+
       {forecast && (
         <section aria-labelledby="forecast" className="rounded-tile bg-block p-4">
           <h2 id="forecast" className="text-[11px] font-extrabold tracking-[0.1em] text-ink-2 uppercase">
@@ -146,7 +258,13 @@ export function Month({ plans, events, payments, categories, onAdd }: {
             {forecast.everyday
               ? ` + about ${formatRupees(forecast.everyday.estimate)} everyday spending (your last ${forecast.everyday.months} month${forecast.everyday.months === 1 ? '' : 's'})`
               : ' · log everyday expenses for a month to include them'}
+            {forecast.everyday?.seasonal ? ` · ${monthLong(forecast.month)} ran ${forecast.everyday.seasonal > 1 ? `${Math.round((forecast.everyday.seasonal - 1) * 100)}% busier` : `${Math.round((1 - forecast.everyday.seasonal) * 100)}% quieter`} than usual last year` : ''}
           </div>
+          {accuracy && (
+            <div className="mt-2 text-xs font-bold text-ink-2">
+              {monthLong(accuracy.month)}: forecast {formatRupees(accuracy.forecast)}, actual {formatRupees(accuracy.actual)} ({accuracy.off < 0.005 ? 'spot on' : `off by ${Math.round(accuracy.off * 100)}%`})
+            </div>
+          )}
         </section>
       )}
 

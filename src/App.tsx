@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { Session } from '@supabase/supabase-js';
 import { dbFor, readAll } from './data/db.ts';
@@ -21,6 +21,9 @@ import { ToastProvider } from './ui/Toast.tsx';
 import { Spent } from './screens/Spent.tsx';
 import { Calendar } from './screens/Calendar.tsx';
 import { Year } from './screens/Year.tsx';
+// Opened now and then: loaded when first opened.
+const MoneyPanel = lazy(() => import('./screens/MoneyPanel.tsx').then(m => ({ default: m.MoneyPanel })));
+const Ask = lazy(() => import('./screens/Ask.tsx').then(m => ({ default: m.Ask })));
 import { monthOf } from './core/spent.ts';
 import { today as todayDay } from './core/dates.ts';
 
@@ -110,16 +113,18 @@ function SignedIn({ session }: { session: Session }) {
         {route.name === 'plan' && plan ? <PlanDetails db={db} plan={plan} events={data.events.filter(e => e.planId === plan.id)} categories={data.categories} push={push.state} onEnablePush={push.turnOn} />
           : route.name === 'plans' ? <><h1 className="sr-only">Your plans</h1><Plans plans={data.plans} events={data.events} onAdd={() => setAdding(true)} /></>
           : route.name === 'you' ? <><h1 className="sr-only">You</h1><You db={db} session={session} categories={data.categories} plans={data.plans} events={data.events} payments={data.payments} sync={sync} push={push.state} onPush={on => void (on ? push.turnOn() : push.turnOff())} /></>
-          : <><h1 className="sr-only">Your month</h1><Month plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} onAdd={() => setAdding(true)} /></>}
+          : <><h1 className="sr-only">Your month</h1><Month db={db} plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} incomes={data.incomes} onAdd={() => setAdding(true)} /></>}
       </main>
 
       {route.name === 'spent' && <Panel title="What I spent" onClose={closePanel}><Spent db={db} month={monthOf(route.month, todayDay())} plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} /></Panel>}
       {route.name === 'calendar' && <Panel title="Calendar" onClose={closePanel}><Calendar month={monthOf(route.month, todayDay())} plans={data.plans} events={data.events} payments={data.payments} /></Panel>}
+      {route.name === 'money' && <Panel title="Income & goals" onClose={closePanel}><Suspense fallback={null}><MoneyPanel db={db} incomes={data.incomes} goals={data.goals} plans={data.plans} events={data.events} payments={data.payments} /></Suspense></Panel>}
+      {route.name === 'ask' && <Panel title="Ask about your money" onClose={closePanel}><Suspense fallback={null}><Ask data={data} /></Suspense></Panel>}
       {route.name === 'year' && <Panel title="Year in review" onClose={closePanel}><Year year={Number(route.year ?? todayDay().slice(0, 4))} plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} /></Panel>}
 
       <nav aria-label="Main" className="fixed bottom-[max(20px,env(safe-area-inset-bottom))] left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-block-2 p-2">
         {([['#/', 'month', 'Month'], ['#/plans', 'plans', 'Plans']] as const).map(([href, name, label]) => {
-          const here = route.name === name || (name === 'month' && ['spent', 'calendar', 'year'].includes(route.name));
+          const here = route.name === name || (name === 'month' && ['spent', 'calendar', 'year', 'money', 'ask'].includes(route.name));
           return (
             <a key={name} href={href} aria-current={here ? 'page' : undefined}
               className={`flex h-11 items-center rounded-full px-4 text-[13px] no-underline ${here ? 'bg-here font-extrabold text-on-color' : 'font-bold text-ink'}`}>
