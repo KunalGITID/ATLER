@@ -14,6 +14,8 @@ import { useRoute } from './route.ts';
 import { useSync } from './data/useSync.ts';
 import { usePush } from './data/usePush.ts';
 import { Panel } from './ui/Sheet.tsx';
+import { Avatar } from './ui/Avatar.tsx';
+import { avatarUrl } from './data/avatar.ts';
 import { ToastProvider } from './ui/Toast.tsx';
 import { Spent } from './screens/Spent.tsx';
 import { Calendar } from './screens/Calendar.tsx';
@@ -81,8 +83,8 @@ function SignedIn({ session }: { session: Session }) {
       <header className="flex items-center justify-between px-1 pt-2 pb-3">
         <div className="font-display text-xl leading-none font-bold tracking-[0.08em]">ATLER</div>
         <a href="#/you" aria-label={`You: ${who}`} aria-current={route.name === 'you' ? 'page' : undefined}
-          className={`flex size-[38px] items-center justify-center rounded-xl font-extrabold no-underline ${route.name === 'you' ? 'bg-here text-on-color' : 'bg-block-2 text-ink'}`}>
-          {who.charAt(0).toUpperCase()}
+          className={`rounded-xl no-underline ${route.name === 'you' ? 'ring-2 ring-here ring-offset-2 ring-offset-ground' : ''}`}>
+          <Avatar url={avatarUrl(session.user)} name={who} size={38} className={`rounded-xl ${route.name === 'you' ? 'bg-here text-on-color' : 'bg-block-2 text-ink'}`} />
         </a>
       </header>
 

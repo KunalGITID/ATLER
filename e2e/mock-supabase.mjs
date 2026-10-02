@@ -61,6 +61,10 @@ function matches(row, params) {
     return true;
 }
 
+// Profile changes (updateUser) and stored files (the avatars bucket).
+let userMeta = {};
+const files = new Map();
+
 function session(email = 'test@atler.mock') {
     return {
         access_token: `mock-access.${USER_ID}`,
@@ -70,7 +74,7 @@ function session(email = 'test@atler.mock') {
         expires_at: Math.floor(Date.now() / 1000) + 3600,
         user: {
             id: USER_ID, aud: 'authenticated', role: 'authenticated', email,
-            app_metadata: { provider: 'email' }, user_metadata: { name: 'Test User' },
+            app_metadata: { provider: 'email' }, user_metadata: { name: 'Test User', ...userMeta },
             created_at: new Date().toISOString(),
         },
     };
@@ -84,16 +88,18 @@ const server = createServer((req, res) => {
     if (req.method === 'OPTIONS') return res.writeHead(204).end();
 
     const url = new URL(req.url, 'http://mock');
-    let raw = '';
-    req.on('data', chunk => (raw += chunk));
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
     req.on('end', () => {
-        const body = raw ? JSON.parse(raw) : null;
+        const bytes = Buffer.concat(chunks);
+        const isJson = (req.headers['content-type'] ?? 'application/json').includes('json');
+        const body = bytes.length && isJson ? JSON.parse(bytes.toString()) : null;
         const send = (code, data) => {
             res.writeHead(code, { 'content-type': 'application/json' });
             res.end(data === undefined ? '' : JSON.stringify(data));
         };
 
-        if (url.pathname === '/__reset') { db = Object.fromEntries(TABLES.map(t => [t, []])); failNext.clear(); revision = 0; offline = false; accountDeleted = false; return send(204); }
+        if (url.pathname === '/__reset') { db = Object.fromEntries(TABLES.map(t => [t, []])); failNext.clear(); revision = 0; offline = false; accountDeleted = false; userMeta = {}; files.clear(); return send(204); }
         if (url.pathname === '/__offline') { offline = url.searchParams.get('on') === '1'; return send(204); }
         if (url.pathname === '/__seed') {
             for (const [t, rows] of Object.entries(body)) db[t].push(...rows.map(r => ({ user_id: USER_ID, ...r })));
@@ -108,9 +114,29 @@ const server = createServer((req, res) => {
             return send(200, { deleted: true });
         }
         if (url.pathname === '/__account') return send(200, { deleted: accountDeleted });
+        const publicFile = url.pathname.match(/^\/storage\/v1\/object\/public\/(.+)$/);
+        if (publicFile) {
+            const f = files.get(publicFile[1]);
+            if (!f) return send(404);
+            res.writeHead(200, { 'content-type': f.type });
+            return res.end(f.bytes);
+        }
+        if (url.pathname === '/storage/v1/object/avatars' && req.method === 'DELETE') {
+            for (const p of body?.prefixes ?? []) files.delete(`avatars/${p}`);
+            return send(200, []);
+        }
+        const upload = url.pathname.match(/^\/storage\/v1\/object\/(avatars\/.+)$/);
+        if (upload && (req.method === 'POST' || req.method === 'PUT')) {
+            files.set(upload[1], { bytes, type: req.headers['content-type'] ?? 'application/octet-stream' });
+            return send(200, { Key: upload[1] });
+        }
+        if (url.pathname === '/__files') return send(200, [...files.keys()]);
         if (url.pathname.startsWith('/auth/v1/')) {
             if (url.pathname.endsWith('/logout')) return send(204);
-            if (url.pathname.endsWith('/user')) return send(200, session().user);
+            if (url.pathname.endsWith('/user')) {
+                if (req.method === 'PUT' && body?.data) userMeta = { ...userMeta, ...body.data };
+                return send(200, session().user);
+            }
             return send(200, session(body?.email));
         }
 

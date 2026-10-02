@@ -4,6 +4,8 @@ import type { AtlerDB } from '../data/db.ts';
 import { deleteAccount, supabase } from '../data/supabase.ts';
 import { Block, Kicker } from '../ui/Block.tsx';
 import { Button } from '../ui/Button.tsx';
+import { Avatar } from '../ui/Avatar.tsx';
+import { AvatarError, avatarUrl, removeAvatar, setAvatar } from '../data/avatar.ts';
 import { ConfirmSheet } from './PlanSheets.tsx';
 import { Categories } from './Categories.tsx';
 import { StatementImport } from './StatementImport.tsx';
@@ -36,12 +38,36 @@ export function You({ db, session, categories, plans, events, payments, sync, pu
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const name = (session.user.user_metadata?.name as string | undefined) ?? null;
+  const photo = avatarUrl(session.user);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  async function withPhoto(run: () => Promise<void>) {
+    setPhotoBusy(true);
+    setPhotoError('');
+    try { await run(); } catch (e) { setPhotoError(e instanceof AvatarError ? e.message : 'Something went wrong with the photo.'); }
+    setPhotoBusy(false);
+  }
+  const changePhoto = (file: File) => withPhoto(() => setAvatar(session.user, file));
+  const dropPhoto = () => withPhoto(() => removeAvatar(session.user));
   return (
     <div className="flex flex-col gap-2.5">
       <Block className="!p-4">
-        <Kicker className="text-ink-2">Signed in as</Kicker>
-        {name && <div className="mt-1 font-display text-2xl font-bold">{name}</div>}
-        <div className="mt-0.5 truncate text-[15px] text-ink-2">{session.user.email}</div>
+        <div className="flex items-center gap-4">
+          <Avatar url={photo} name={name ?? session.user.email ?? 'You'} size={72} className="rounded-[22px] bg-block-2 text-3xl text-ink" />
+          <div className="min-w-0">
+            <Kicker className="text-ink-2">Signed in as</Kicker>
+            {name && <div className="mt-1 truncate font-display text-2xl font-bold">{name}</div>}
+            <div className="mt-0.5 truncate text-[15px] text-ink-2">{session.user.email}</div>
+          </div>
+        </div>
+        <div className="mt-3 flex gap-2.5">
+          <label className={`flex h-11 flex-1 cursor-pointer items-center justify-center rounded-control bg-block-2 text-sm font-bold ${photoBusy ? 'pointer-events-none opacity-60' : ''}`}>
+            {photoBusy ? 'Saving…' : photo ? 'Change photo' : 'Add a photo'}
+            <input type="file" accept="image/*" className="sr-only" disabled={photoBusy} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void changePhoto(f); }} />
+          </label>
+          {photo && !photoBusy && <Button kind="quiet" className="!h-11 flex-1 !rounded-control !text-sm" onClick={() => void dropPhoto()}>Remove</Button>}
+        </div>
+        {photoError && <p role="alert" className="mt-2 text-sm font-bold text-danger">{photoError}</p>}
       </Block>
 
       <Block className="flex items-center justify-between gap-3 !p-4">
