@@ -2,7 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { parseDay, today as todayDay } from '../core/dates.ts';
 import { parseRupees } from '../core/money.ts';
 import { addPayment, addPlan, resolveCategory } from '../data/actions.ts';
-import type { Category } from '../core/model.ts';
+import type { Category, Payment, Plan } from '../core/model.ts';
+import { suggestCategoryId } from '../core/suggest.ts';
 import { CategoryPicker, NEW_CATEGORY } from '../ui/CategoryPicker.tsx';
 import type { AtlerDB } from '../data/db.ts';
 import { Button } from '../ui/Button.tsx';
@@ -17,7 +18,7 @@ import { formatRupees, sum } from '../core/money.ts';
 type Kind = 'plan' | 'expense';
 
 
-export function AddSheet({ db, categories, open, onClose, onTrialAdded }: { db: AtlerDB; categories: Category[]; open: boolean; onClose: () => void; onTrialAdded?: () => void }) {
+export function AddSheet({ db, categories, plans = [], payments = [], open, onClose, onTrialAdded }: { db: AtlerDB; categories: Category[]; plans?: Plan[]; payments?: Payment[]; open: boolean; onClose: () => void; onTrialAdded?: () => void }) {
   const today = todayDay();
   const [kind, setKind] = useState<Kind>('plan');
   const [name, setName] = useState('');
@@ -27,6 +28,7 @@ export function AddSheet({ db, categories, open, onClose, onTrialAdded }: { db: 
   const [error, setError] = useState('');
   const [category, setCategory] = useState('');
   const [newCategory, setNewCategory] = useState('');
+  const [categoryPicked, setCategoryPicked] = useState(false);
   const [trial, setTrial] = useState(false);
   const [trialEnds, setTrialEnds] = useState('');
   const [smsOpen, setSmsOpen] = useState(false);
@@ -34,10 +36,16 @@ export function AddSheet({ db, categories, open, onClose, onTrialAdded }: { db: 
   const [smsMany, setSmsMany] = useState<SmsExpense[] | null>(null);
 
   function reset() {
-    setName(''); setAmount(''); setCycleKey('monthly'); setDate(todayDay()); setError(''); setCategory(''); setNewCategory(''); setTrial(false); setTrialEnds(''); setSmsOpen(false); setSmsText(''); setSmsMany(null);
+    setName(''); setAmount(''); setCycleKey('monthly'); setDate(todayDay()); setError(''); setCategory(''); setCategoryPicked(false); setNewCategory(''); setTrial(false); setTrialEnds(''); setSmsOpen(false); setSmsText(''); setSmsMany(null);
   }
 
   const categoryFor = (name: string | null) => (name && categories.find(c => c.name.toLowerCase() === name.toLowerCase())?.id) || '';
+
+  // Fill the category from what you've done before, until you pick one yourself.
+  function typeName(value: string) {
+    setName(value);
+    if (!categoryPicked) setCategory(suggestCategoryId(value, categories, payments, plans) ?? '');
+  }
 
   function readSms() {
     const found = parseBankSmsList(smsText, todayDay());
@@ -103,7 +111,7 @@ export function AddSheet({ db, categories, open, onClose, onTrialAdded }: { db: 
         ) : (
           <button type="button" onClick={() => setSmsOpen(true)} className="self-start text-sm font-bold text-money">Paste a bank SMS instead</button>
         ))}
-        <Field label={kind === 'plan' ? 'Name' : 'What for'} placeholder={kind === 'plan' ? 'Netflix' : 'Groceries'} value={name} onChange={e => setName(e.target.value)} autoComplete="off" />
+        <Field label={kind === 'plan' ? 'Name' : 'What for'} placeholder={kind === 'plan' ? 'Netflix' : 'Groceries'} value={name} onChange={e => typeName(e.target.value)} autoComplete="off" />
         {kind === 'plan' && <Switch label="Free trial" hint="Nothing is charged until it ends" checked={trial} onChange={setTrial} />}
         <Field label={kind === 'plan' && trial ? 'Price after the trial (₹)' : 'Amount (₹)'} inputMode="decimal" placeholder="199" value={amount} onChange={e => setAmount(e.target.value)} />
         {kind === 'plan' && (
@@ -125,7 +133,7 @@ export function AddSheet({ db, categories, open, onClose, onTrialAdded }: { db: 
             {kind === 'plan' && <p className="-mt-1 text-xs text-ink-2">Every renewal is counted from this date. Use a future date if it hasn't started yet.</p>}
           </>
         )}
-        <CategoryPicker categories={categories} value={category} onChange={setCategory} newName={newCategory} onNewName={setNewCategory} />
+        <CategoryPicker categories={categories} value={category} onChange={v => { setCategory(v); setCategoryPicked(true); }} newName={newCategory} onNewName={setNewCategory} />
         {error && <p role="alert" className="text-sm font-semibold text-danger">{error}</p>}
         <Button kind="primary" type="submit">{kind === 'plan' ? 'ADD PLAN' : 'ADD EXPENSE'}</Button>
       </form>

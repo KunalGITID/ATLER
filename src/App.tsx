@@ -104,7 +104,7 @@ function SignedIn({ session }: { session: Session }) {
         </button>
       </nav>
 
-      <AddSheet db={db} categories={data.categories} open={adding} onClose={() => setAdding(false)} onTrialAdded={() => { if (push.state === 'off') void push.turnOn(); }} />
+      <AddSheet db={db} categories={data.categories} plans={data.plans} payments={data.payments} open={adding} onClose={() => setAdding(false)} onTrialAdded={() => { if (push.state === 'off') void push.turnOn(); }} />
     </div>
   );
 }

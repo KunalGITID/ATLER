@@ -57,3 +57,26 @@ test('deleting a category keeps its plans, uncategorised', async ({ page }) => {
   await page.getByRole('region', { name: 'Billing' }).getByRole('link', { name: /Netflix/ }).click();
   await expect(page.locator('dl[aria-label="About this plan"] > div').filter({ hasText: 'Category' })).toContainText('None');
 });
+
+test('typing a name suggests the category you used for it before', async ({ page }) => {
+  await newCategory(page, 'Food');
+  await newCategory(page, 'Treats');
+  // A keyword hint, because a "Food" category exists.
+  await page.getByRole('button', { name: 'Add a plan or expense' }).click();
+  let sheet = page.getByRole('dialog');
+  await sheet.getByRole('radio', { name: 'Expense' }).click();
+  await sheet.getByLabel('What for').fill('Swiggy');
+  await expect(sheet.getByLabel('Category')).toHaveValue(/.+/);
+  await expect(sheet.getByLabel('Category').locator('option:checked')).toHaveText('Food');
+  // You overrule it; next time your choice is remembered.
+  await sheet.getByLabel('Category').selectOption({ label: 'Treats' });
+  await sheet.getByLabel('Amount (₹)').fill('250');
+  await sheet.getByRole('button', { name: 'ADD EXPENSE' }).click();
+  await expect(sheet).toBeHidden();
+
+  await page.getByRole('button', { name: 'Add a plan or expense' }).click();
+  sheet = page.getByRole('dialog');
+  await sheet.getByRole('radio', { name: 'Expense' }).click();
+  await sheet.getByLabel('What for').fill('swiggy');
+  await expect(sheet.getByLabel('Category').locator('option:checked')).toHaveText('Treats');
+});
