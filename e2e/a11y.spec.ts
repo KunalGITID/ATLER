@@ -4,6 +4,7 @@ import { addExpense, addPlan, daysFromToday, signIn } from './helpers.ts';
 
 // Every screen, with real content on it, must have no WCAG 2.x A/AA violations.
 async function noViolations(page: Page, where: string) {
+  await expect(page.locator('#launch')).toHaveCount(0); // not mid-fade
   const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
   expect(violations.map(v => `${where}: ${v.id} — ${v.help} (${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')})`)).toEqual([]);
 }
