@@ -2,7 +2,7 @@
 // Naive Bayes over the words of a name (plus its cleaned merchant name), so
 // "SWIGGY*BLR 8823" lands where you put your other Swiggy orders even though
 // the name never matched exactly. Nothing leaves the phone.
-import { knownMerchant } from './import/statement.ts';
+import { knownMerchant } from './import/merchants.ts';
 
 export interface Example { name: string; categoryId: string }
 

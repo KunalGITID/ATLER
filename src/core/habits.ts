@@ -3,7 +3,7 @@
 import { addDays, dayOfMonth, endOfMonth, startOfMonth, type Day } from './dates.ts';
 import { formatRupees, sum, type Paise } from './money.ts';
 import type { Category, Payment } from './model.ts';
-import { knownMerchant } from './import/statement.ts';
+import { knownMerchant } from './import/merchants.ts';
 import { ownAmount } from './share.ts';
 
 export interface Habit { id: string; title: string; body: string }
