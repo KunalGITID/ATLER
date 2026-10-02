@@ -16,6 +16,7 @@ import { usePush } from './data/usePush.ts';
 import { ToastProvider } from './ui/Toast.tsx';
 import { Spent } from './screens/Spent.tsx';
 import { Calendar } from './screens/Calendar.tsx';
+import { Year } from './screens/Year.tsx';
 import { monthOf } from './core/spent.ts';
 import { today as todayDay } from './core/dates.ts';
 
@@ -83,6 +84,7 @@ function SignedIn({ session }: { session: Session }) {
       <main>
         {route.name === 'plan' && plan ? <PlanDetails db={db} plan={plan} events={data.events.filter(e => e.planId === plan.id)} categories={data.categories} push={push.state} onEnablePush={push.turnOn} />
           : route.name === 'spent' ? <><h1 className="sr-only">What you spent</h1><Spent db={db} month={monthOf(route.month, todayDay())} plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} /></>
+          : route.name === 'year' ? <><h1 className="sr-only">Year in review</h1><Year year={Number(route.year ?? todayDay().slice(0, 4))} plans={data.plans} events={data.events} payments={data.payments} categories={data.categories} /></>
           : route.name === 'calendar' ? <><h1 className="sr-only">Calendar</h1><Calendar month={monthOf(route.month, todayDay())} plans={data.plans} events={data.events} payments={data.payments} /></>
           : route.name === 'plans' ? <><h1 className="sr-only">Your plans</h1><Plans plans={data.plans} events={data.events} onAdd={() => setAdding(true)} /></>
           : route.name === 'you' ? <><h1 className="sr-only">You</h1><You db={db} session={session} categories={data.categories} plans={data.plans} events={data.events} payments={data.payments} sync={sync} push={push.state} onPush={on => void (on ? push.turnOn() : push.turnOff())} /></>

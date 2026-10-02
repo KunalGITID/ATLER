@@ -37,6 +37,7 @@ export function Spent({ db, month, plans, events, payments, categories }: {
             : <span className="size-10" aria-hidden="true" />}
         </div>
         <div className="num mt-2 text-center text-[40px] leading-none font-bold">{formatRupees(s.total)}</div>
+        <div className="mt-2 text-center"><a href={`#/year/${month.slice(0, 4)}`} className="text-[13px] font-extrabold text-on-color underline">Year in review ›</a></div>
       </Block>
 
       {!s.days.length && <Block><p className="text-sm text-ink-2">Nothing was spent in {monthLabel(month)}.</p></Block>}
