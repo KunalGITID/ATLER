@@ -95,3 +95,13 @@ test('delete my account removes everything and signs out', async ({ page, reques
   await expect(page.getByRole('button', { name: 'SIGN IN →' })).toBeVisible();
   expect((await (await request.get('http://127.0.0.1:54329/__account')).json()).deleted).toBe(true);
 });
+
+test('home-screen shortcuts open the add sheet ready for an expense or a plan', async ({ page }) => {
+  await page.goto('/?do=add-expense');
+  const sheet = page.getByRole('dialog');
+  await expect(sheet.getByRole('radio', { name: 'Expense' })).toBeChecked();
+  await expect(page).toHaveURL(/\/(#\/)?$/); // the action isn't left in the address to re-run on reload
+  await page.keyboard.press('Escape');
+  await page.goto('/?do=add-plan');
+  await expect(page.getByRole('dialog').getByRole('radio', { name: 'Plan' })).toBeChecked();
+});

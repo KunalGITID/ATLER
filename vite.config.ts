@@ -21,8 +21,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: false, // registered in main.tsx, after the first paint
       manifest: {
-        name: 'ATLER',
-        short_name: 'ATLER',
+        name: 'Atler',
+        short_name: 'Atler',
         description: 'Subscriptions and spending: see your month before it happens.',
         start_url: './',
         scope: './',
@@ -30,6 +30,13 @@ export default defineConfig({
         orientation: 'portrait',
         background_color: '#0a0a0a',
         theme_color: '#0a0a0a',
+        // Long-press shortcuts (Android and desktop; iOS doesn't offer them to web apps).
+        shortcuts: [
+          { name: 'Add an expense', short_name: 'Add expense', url: './?do=add-expense', icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }] },
+          { name: 'Add a plan', short_name: 'Add plan', url: './?do=add-plan', icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }] },
+          { name: 'Calendar', url: './#/calendar', icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }] },
+          { name: 'What I spent', short_name: 'Spent', url: './#/spent', icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }] },
+        ],
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },

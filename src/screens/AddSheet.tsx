@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { parseDay, today as todayDay } from '../core/dates.ts';
 import { parseRupees } from '../core/money.ts';
 import { addPayment, addPlan, resolveCategory } from '../data/actions.ts';
@@ -17,9 +17,10 @@ import { formatRupees, sum } from '../core/money.ts';
 type Kind = 'plan' | 'expense';
 
 
-export function AddSheet({ db, categories, plans = [], payments = [], open, onClose, onTrialAdded }: { db: AtlerDB; categories: Category[]; plans?: Plan[]; payments?: Payment[]; open: boolean; onClose: () => void; onTrialAdded?: () => void }) {
+export function AddSheet({ db, categories, plans = [], payments = [], open, startAs, onClose, onTrialAdded }: { db: AtlerDB; categories: Category[]; plans?: Plan[]; payments?: Payment[]; startAs?: Kind; open: boolean; onClose: () => void; onTrialAdded?: () => void }) {
   const today = todayDay();
   const [kind, setKind] = useState<Kind>('plan');
+  useEffect(() => { if (open && startAs) setKind(startAs); }, [open, startAs]);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [cycleKey, setCycleKey] = useState('monthly');
