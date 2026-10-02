@@ -7,6 +7,7 @@ import { deletePayment, restorePayment } from '../data/actions.ts';
 import type { AtlerDB } from '../data/db.ts';
 import { planHref } from '../route.ts';
 import { Block, Kicker } from '../ui/Block.tsx';
+import { useSlide } from '../ui/useSlide.ts';
 import { useToast } from '../ui/Toast.tsx';
 import { EditExpenseSheet } from './ExpenseSheet.tsx';
 
@@ -21,6 +22,7 @@ export function Spent({ db, month, plans, events, payments, categories }: {
   const today = todayDay();
   const toast = useToast();
   const [editing, setEditing] = useState<Payment | null>(null);
+  const slide = useSlide(month);
   const s = spentInMonth(month, today, plans, events, payments);
   const prev = startOfMonth(addDays(month, -1));
   const next = addDays(endOfMonth(month), 1);
@@ -36,10 +38,11 @@ export function Spent({ db, month, plans, events, payments, categories }: {
             ? <a href={`#/spent/${monthKey(next)}`} aria-label={`Next month, ${monthLabel(next)}`} className="flex size-10 items-center justify-center rounded-xl bg-on-color/10 text-on-color no-underline">›</a>
             : <span className="size-10" aria-hidden="true" />}
         </div>
-        <div className="num mt-2 text-center text-[40px] leading-none font-bold">{formatRupees(s.total)}</div>
+        <div key={month} className={`num mt-2 text-center text-[40px] leading-none font-bold ${slide}`}>{formatRupees(s.total)}</div>
         <div className="mt-2 text-center"><a href={`#/year/${month.slice(0, 4)}`} className="text-[13px] font-extrabold text-on-color underline">Year in review ›</a></div>
       </Block>
 
+      <div key={month} className={`flex flex-col gap-2.5 ${slide}`}>
       {!s.days.length && <Block><p className="text-sm text-ink-2">Nothing was spent in {monthLabel(month)}.</p></Block>}
 
       {s.days.map(day => (
@@ -67,6 +70,8 @@ export function Spent({ db, month, plans, events, payments, categories }: {
           </ul>
         </section>
       ))}
+
+      </div>
 
       {editing && (
         <EditExpenseSheet

@@ -14,7 +14,7 @@ test('a free trial charges nothing until it ends, and says so everywhere', async
   await sheet.getByLabel('Name').fill('Spotify');
   await sheet.getByRole('switch', { name: 'Free trial' }).click();
   await expect(sheet.getByLabel('Price after the trial (₹)')).toBeVisible();
-  await expect(sheet.getByText('3 days and 1 day before it turns into a charge')).toBeVisible();
+  await expect(sheet.getByText(/Nothing is charged until then. You'll get a reminder 3 days and 1 day before/)).toBeVisible();
   await sheet.getByLabel('Price after the trial (₹)').fill('139');
   await sheet.getByLabel('Trial ends on').fill(daysFromToday(5));
   await sheet.getByRole('button', { name: 'ADD PLAN' }).click();

@@ -10,7 +10,6 @@ import { Button } from '../ui/Button.tsx';
 import { Field } from '../ui/Field.tsx';
 import { Segmented } from '../ui/Segmented.tsx';
 import { Sheet } from '../ui/Sheet.tsx';
-import { Switch } from '../ui/Switch.tsx';
 import { CYCLES } from './cycles.ts';
 import { parseBankSmsList, type SmsExpense } from '../core/import/sms.ts';
 import { formatRupees, sum } from '../core/money.ts';
@@ -112,7 +111,13 @@ export function AddSheet({ db, categories, plans = [], payments = [], open, onCl
           <button type="button" onClick={() => setSmsOpen(true)} className="self-start text-sm font-bold text-money">Paste a bank SMS instead</button>
         ))}
         <Field label={kind === 'plan' ? 'Name' : 'What for'} placeholder={kind === 'plan' ? 'Netflix' : 'Groceries'} value={name} onChange={e => typeName(e.target.value)} autoComplete="off" />
-        {kind === 'plan' && <Switch label="Free trial" hint="Nothing is charged until it ends" checked={trial} onChange={setTrial} />}
+        {kind === 'plan' && (
+          // Small on purpose: most plans aren't trials. White when on = chosen.
+          <button type="button" role="switch" aria-checked={trial} aria-label="Free trial" onClick={() => setTrial(!trial)}
+            className={`-mt-1 flex h-8 items-center gap-1.5 self-start rounded-full px-3 text-xs font-extrabold transition-colors ${trial ? 'bg-here text-on-color' : 'bg-block-2 text-ink-2'}`}>
+            <span aria-hidden="true">{trial ? '✓' : '+'}</span>Free trial
+          </button>
+        )}
         <Field label={kind === 'plan' && trial ? 'Price after the trial (₹)' : 'Amount (₹)'} inputMode="decimal" placeholder="199" value={amount} onChange={e => setAmount(e.target.value)} />
         {kind === 'plan' && (
           <div className="flex flex-col gap-1.5">
@@ -125,7 +130,7 @@ export function AddSheet({ db, categories, plans = [], payments = [], open, onCl
         {kind === 'plan' && trial ? (
           <>
             <Field label="Trial ends on" type="date" value={trialEnds} onChange={e => setTrialEnds(e.target.value)} />
-            <p className="-mt-1 text-xs text-ink-2">You'll get a reminder 3 days and 1 day before it turns into a charge.</p>
+            <p className="-mt-1 text-xs text-ink-2">Nothing is charged until then. You'll get a reminder 3 days and 1 day before.</p>
           </>
         ) : (
           <>

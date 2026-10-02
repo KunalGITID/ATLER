@@ -8,6 +8,7 @@ import '@fontsource/plus-jakarta-sans/700.css';
 import '@fontsource/plus-jakarta-sans/800.css';
 import './styles/tokens.css';
 import './styles/launch.css';
+import './styles/motion.css';
 import { App } from './App.tsx';
 import { ErrorBoundary } from './ui/ErrorBoundary.tsx';
 import { startErrorReporting } from './data/errors.ts';

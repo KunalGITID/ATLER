@@ -5,6 +5,7 @@ import { formatRupees, sum } from '../core/money.ts';
 import type { Payment, Plan, PlanEvent } from '../core/model.ts';
 import { planHref } from '../route.ts';
 import { Block, Kicker } from '../ui/Block.tsx';
+import { useSlide } from '../ui/useSlide.ts';
 
 const monthLabel = (d: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 const short = (n: number) => (n >= 100000 ? `₹${Math.round(n / 100000)}k` : `₹${Math.round(n / 100)}`);
@@ -13,6 +14,7 @@ export function Calendar({ month, plans, events, payments }: { month: Day; plans
   const today = todayDay();
   const days = calendarMonth(month, today, plans, events, payments);
   const [picked, setPicked] = useState<CalendarDay | null>(null);
+  const slide = useSlide(month);
   const shown = picked && picked.inMonth ? picked : null;
   const prev = startOfMonth(addDays(month, -1));
   const next = addDays(endOfMonth(month), 1);
@@ -28,6 +30,7 @@ export function Calendar({ month, plans, events, payments }: { month: Day; plans
           <h2 className="font-display text-xl font-bold">{monthLabel(month)}</h2>
           <a href={`#/calendar/${next.slice(0, 7)}`} aria-label={`Next month, ${monthLabel(next)}`} className="flex size-10 items-center justify-center rounded-xl bg-block-2 text-ink no-underline">›</a>
         </div>
+        <div key={month} className={slide}>
         <div className="mt-2 flex justify-center gap-4 text-xs font-bold text-ink-2">
           <span>{formatRupees(total)} in the month</span>
           {coming > 0 && <span className="text-soon">{formatRupees(coming)} still coming</span>}
@@ -61,6 +64,7 @@ export function Calendar({ month, plans, events, payments }: { month: Day; plans
               </button>
             );
           })}
+        </div>
         </div>
         <div className="mt-3 flex justify-center gap-4 text-[11px] font-bold text-ink-2">
           <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-money" />Paid</span>

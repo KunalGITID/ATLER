@@ -1,0 +1,20 @@
+/* Movement says where you went: deeper or to the next tab slides in from the
+   right, back slides in from the left. Nothing moves if you've asked for less motion. */
+main { view-transition-name: page; }
+
+@keyframes from-right { from { opacity: 0; transform: translateX(28px); } }
+@keyframes from-left { from { opacity: 0; transform: translateX(-28px); } }
+@keyframes to-left { to { opacity: 0; transform: translateX(-28px); } }
+@keyframes to-right { to { opacity: 0; transform: translateX(28px); } }
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(page), ::view-transition-new(page) { animation-duration: 220ms; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+  :root[data-nav='forward']::view-transition-old(page) { animation-name: to-left; }
+  :root[data-nav='forward']::view-transition-new(page) { animation-name: from-right; }
+  :root[data-nav='back']::view-transition-old(page) { animation-name: to-right; }
+  :root[data-nav='back']::view-transition-new(page) { animation-name: from-left; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+
+  .slide-forward { animation: from-right 240ms cubic-bezier(.2, .8, .2, 1); }
+  .slide-back { animation: from-left 240ms cubic-bezier(.2, .8, .2, 1); }
+}

@@ -5,6 +5,7 @@ import { trackingSince } from '../core/month.ts';
 import { yearReview, type YearLine } from '../core/year.ts';
 import { planHref } from '../route.ts';
 import { Block, Kicker } from '../ui/Block.tsx';
+import { useSlide } from '../ui/useSlide.ts';
 
 const short = (d: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { month: 'short', timeZone: 'UTC' });
 const long = (d: Day) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { month: 'long', timeZone: 'UTC' });
@@ -34,6 +35,7 @@ function Lines({ label, lines, total, of }: { label: string; lines: YearLine[]; 
 
 export function Year({ year, plans, events, payments, categories }: { year: number; plans: Plan[]; events: PlanEvent[]; payments: Payment[]; categories: Category[] }) {
   const today = todayDay();
+  const slide = useSlide(String(year));
   const since = trackingSince(plans, payments);
   const r = yearReview(year, today, plans, events, payments, categories, since);
   const max = Math.max(...r.months.map(m => m.total ?? 0), 1);
@@ -49,12 +51,13 @@ export function Year({ year, plans, events, payments, categories }: { year: numb
           <Kicker>{year === thisYear ? `${year} so far` : `Your ${year}`}</Kicker>
           {year < thisYear ? <a href={`#/year/${year + 1}`} aria-label={`Next year, ${year + 1}`} className={navCls}>›</a> : <span className="size-10" aria-hidden="true" />}
         </div>
-        <div className="num mt-2 text-center text-[40px] leading-none font-bold">{formatRupees(r.total)}</div>
+        <div key={year} className={`num mt-2 text-center text-[40px] leading-none font-bold ${slide}`}>{formatRupees(r.total)}</div>
         {r.total > 0 && (
           <p className="mt-2 text-center text-[13px] font-bold">{formatRupees(r.plansTotal)} on plans · {formatRupees(r.everydayTotal)} everyday</p>
         )}
       </Block>
 
+      <div key={year} className={`flex flex-col gap-2.5 ${slide}`}>
       {r.total === 0 ? <Block><p className="text-sm text-ink-2">Nothing tracked in {year}.</p></Block> : <>
         <Block className="!p-4">
           <Kicker className="text-ink-2">Month by month</Kicker>
@@ -105,6 +108,7 @@ export function Year({ year, plans, events, payments, categories }: { year: numb
           </Block>
         )}
       </>}
+      </div>
     </div>
   );
 }

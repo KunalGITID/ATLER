@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { useEffect, useRef, useState } from 'react';
 
 // Hash routes so the phone's back button works without a server:
 //   #/            the month
@@ -22,6 +23,10 @@ function parse(hash: string): Route {
   return { name: 'month' };
 }
 
+// Where each page sits, left to right / shallow to deep. Panels (null) float
+// over Month instead of replacing it.
+const DEPTH: Record<Route['name'], number | null> = { month: 0, plans: 1, plan: 2, you: 3, spent: null, calendar: null, year: null };
+
 export const planHref = (id: string) => `#/plan/${id}`;
 
 // Set once the user has moved between screens, so Back can return them there.
@@ -29,8 +34,20 @@ let movedInApp = false;
 
 export function useRoute(): Route {
   const [route, setRoute] = useState(() => parse(location.hash));
+  const current = useRef(route);
   useEffect(() => {
-    const onChange = () => { movedInApp = true; setRoute(parse(location.hash)); window.scrollTo(0, 0); };
+    const onChange = () => {
+      movedInApp = true;
+      const next = parse(location.hash);
+      const from = DEPTH[current.current.name];
+      const to = DEPTH[next.name];
+      current.current = next;
+      const apply = () => { flushSync(() => setRoute(next)); window.scrollTo(0, 0); };
+      // Panels float in on their own; only whole pages slide.
+      if (from === null || to === null || from === to || !document.startViewTransition) return apply();
+      document.documentElement.dataset.nav = to > from ? 'forward' : 'back';
+      document.startViewTransition(apply);
+    };
     window.addEventListener('hashchange', onChange);
     return () => window.removeEventListener('hashchange', onChange);
   }, []);
