@@ -35,7 +35,7 @@ export function Calendar({ month, plans, events, payments }: { month: Day; plans
         <div className="mt-3 grid grid-cols-7 gap-1 text-center text-[10px] font-extrabold text-ink-2" aria-hidden="true">
           {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((w, i) => <div key={i}>{w}</div>)}
         </div>
-        <div role="grid" aria-label={`${monthLabel(month)} by day`} className="mt-1 grid grid-cols-7 gap-1">
+        <div role="group" aria-label={`${monthLabel(month)} by day`} className="mt-1 grid grid-cols-7 gap-1">
           {days.map(day => {
             const isToday = day.on === today;
             const hasComing = day.entries.some(e => !e.paid);
@@ -44,9 +44,8 @@ export function Calendar({ month, plans, events, payments }: { month: Day; plans
               <button
                 key={day.on}
                 type="button"
-                role="gridcell"
                 disabled={!day.inMonth}
-                aria-selected={shown?.on === day.on}
+                aria-pressed={shown?.on === day.on}
                 aria-label={`${Number(day.on.slice(8))}${day.entries.length ? `: ${day.entries.map(e => `${e.name} ${formatRupees(e.amount)}`).join(', ')}` : ''}`}
                 onClick={() => setPicked(day)}
                 className={`flex h-14 flex-col items-center justify-start rounded-xl pt-1.5 text-sm font-bold ${!day.inMonth ? 'opacity-0' : shown?.on === day.on ? 'bg-here text-on-color' : isToday ? 'bg-money text-on-color' : day.entries.length ? 'bg-block-2' : ''}`}

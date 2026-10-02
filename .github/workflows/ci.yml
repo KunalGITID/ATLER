@@ -45,3 +45,21 @@ jobs:
         with:
           name: playwright-traces
           path: test-results/
+
+  lighthouse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Accessibility must stay at 100; performance and best practices ≥ 90/95 on a throttled phone.
+      - run: npx -y @lhci/cli@0.15 autorun
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse
+          path: .lighthouseci/
