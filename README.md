@@ -1,11 +1,16 @@
 # ATLER v2
 
+[![CI](https://github.com/KunalGITID/ATLER/actions/workflows/ci.yml/badge.svg)](https://github.com/KunalGITID/ATLER/actions/workflows/ci.yml)
+
+**Live: [kunalgitid.github.io/ATLER](https://kunalgitid.github.io/ATLER/)** · a local-first expense and subscription tracker (installable PWA).
+
 Rebuilt from scratch. Design direction D ("Block × Orbit"), with one rule:
 **every ring, dot, bar and colour must tell you something or do something.**
 
 ## Stack
 React 19 + TypeScript (strict) + Vite, Tailwind v4 (tokens in `src/styles/tokens.css`),
-Supabase (auth, sync), Dexie (local-first storage, next), Vitest.
+Supabase (auth, sync, row-level security, Edge Functions for push reminders), Dexie (local-first
+storage), Vitest and Playwright.
 
 ## Layout
 ```
@@ -25,6 +30,9 @@ src/styles/   tokens (the only place colours and type are defined) and the launc
   budgets that warn before they're over, overlapping plans and bundles, forgotten subscriptions,
   expenses logged twice, spending patterns, last month in short, category suggestions that learn
   from your filing, and "Ask" for plain questions about your money.
+- Learned on the phone: a category prior and a subscription finder trained in
+  [atler-ml](https://github.com/KunalGITID/atler-ml) and shipped as small JSON models, and
+  unusual-spend alerts that learn your own bar from "Expected / Not expected".
 - Backups: one file, optionally locked with a password (AES-GCM).
 
 ## Colours mean one thing each
@@ -33,5 +41,9 @@ lime = your money and primary actions · coral = a charge coming soon · white =
 ```bash
 npm install
 npm run dev
-npm test
+npm test        # unit (Vitest)
+npm run e2e     # end-to-end (Playwright, against a local Supabase mock)
 ```
+
+## Licence
+[MIT](LICENSE)
